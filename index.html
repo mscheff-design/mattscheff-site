@@ -1,13 +1,296 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matthew Scheffler</title>
-    <link rel="stylesheet" href="style.css">
-  </head>
-  <body>
-    <h1>Hello World</h1>
-    <script src="script.js"></script>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matthew Scheffler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:#e8e3d9;font-family:'DM Mono',monospace;overflow-x:hidden}
+
+#grain{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.45;mix-blend-mode:multiply}
+
+nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:20px 48px;mix-blend-mode:multiply}
+.nav-name{font-family:'DM Mono',monospace;font-size:10px;color:rgba(28,20,10,0.5);letter-spacing:0.1em}
+.nav-links{display:flex;gap:32px}
+.nav-links a{font-family:'DM Mono',monospace;font-size:10px;color:rgba(28,20,10,0.4);letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:color 0.2s}
+.nav-links a:hover{color:rgba(28,20,10,0.85)}
+
+.hero{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;padding:0 48px 80px}
+.hero-meta{font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.3);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:20px}
+.hero-name{font-family:'EB Garamond',serif;font-size:clamp(64px,10vw,128px);font-weight:400;color:#1c140a;line-height:0.92;letter-spacing:-0.02em;margin-bottom:24px}
+.hero-name em{font-style:italic;color:rgba(28,20,10,0.45)}
+.hero-sub{font-family:'DM Mono',monospace;font-size:10px;color:rgba(28,20,10,0.4);letter-spacing:0.12em;text-transform:uppercase;line-height:2.2}
+.hero-scroll{position:absolute;bottom:32px;right:48px;font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.25);letter-spacing:0.1em;writing-mode:vertical-rl}
+
+.work{position:relative;z-index:1;padding:0 48px 120px}
+.section-header{display:flex;justify-content:space-between;align-items:center;padding:18px 0;border-top:0.5px solid rgba(28,20,10,0.12);border-bottom:0.5px solid rgba(28,20,10,0.12);margin-bottom:0}
+.section-header span{font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.35);letter-spacing:0.14em;text-transform:uppercase}
+
+.project-row{display:flex;align-items:center;padding:22px 0;border-bottom:0.5px solid rgba(28,20,10,0.08);cursor:pointer;transition:all 0.25s;gap:20px}
+.project-row:hover{padding-left:8px}
+.project-row:hover .row-arrow{opacity:1;transform:translateX(4px)}
+.project-row:hover .row-name{color:#1c140a}
+.row-num{font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.25);width:32px;flex-shrink:0;letter-spacing:0.08em}
+.row-body{flex:1}
+.row-name{font-family:'EB Garamond',serif;font-size:22px;font-weight:400;color:rgba(28,20,10,0.85);margin-bottom:4px;transition:color 0.2s}
+.row-sub{font-family:'DM Mono',monospace;font-size:8.5px;color:rgba(28,20,10,0.3);letter-spacing:0.1em;text-transform:uppercase}
+.row-tag{font-family:'DM Mono',monospace;font-size:8px;color:rgba(28,20,10,0.25);letter-spacing:0.08em;text-transform:uppercase;text-align:right;line-height:1.8;flex-shrink:0}
+.row-arrow{font-size:16px;color:rgba(28,20,10,0.2);transition:all 0.25s;opacity:0;margin-left:8px}
+
+.transition-band{position:relative;z-index:1;height:200px;background:linear-gradient(to bottom,#e8e3d9 0%,#141008 100%)}
+
+.photo-section{position:relative;z-index:1;background:#141008;padding:64px 48px 80px}
+#grain-dark{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.6}
+.photo-inner{position:relative;z-index:1}
+.photo-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:20px;border-bottom:0.5px solid rgba(210,200,180,0.1);margin-bottom:32px}
+.photo-header span{font-family:'DM Mono',monospace;font-size:9px;color:rgba(210,200,180,0.3);letter-spacing:0.14em;text-transform:uppercase}
+
+.rebate{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.rebate-text{font-family:'DM Mono',monospace;font-size:7px;color:rgba(210,200,180,0.18);letter-spacing:0.06em;white-space:nowrap}
+.rebate-dots{flex:1;border-top:0.5px solid rgba(210,200,180,0.1)}
+
+.contact-sheet{background:#0a0805;padding:12px;border:0.5px solid rgba(210,200,180,0.08)}
+.sheet-row{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:4px}
+.sheet-row:last-child{margin-bottom:0}
+.frame{position:relative;aspect-ratio:2/3;background:#0f0c08;cursor:pointer;overflow:hidden;transition:opacity 0.2s}
+.frame:hover{opacity:0.7}
+.frame.selected{outline:1.5px solid #9b2335;outline-offset:-1px}
+.frame-bg{width:100%;height:100%;background:linear-gradient(135deg,rgba(210,200,180,0.03) 0%,rgba(210,200,180,0.06) 100%)}
+.frame-num{position:absolute;top:3px;left:3px;font-family:'DM Mono',monospace;font-size:6px;color:rgba(210,200,180,0.2);letter-spacing:0.05em}
+.frame-label{position:absolute;bottom:3px;left:3px;right:3px;font-family:'DM Mono',monospace;font-size:6px;color:rgba(210,200,180,0.25);letter-spacing:0.04em;line-height:1.4}
+
+.rebate-bottom{margin-top:6px}
+
+.photo-projects{margin-top:40px;border-top:0.5px solid rgba(210,200,180,0.08);padding-top:24px}
+.photo-row{display:flex;align-items:center;padding:14px 0;border-bottom:0.5px solid rgba(210,200,180,0.06);cursor:pointer;gap:16px;transition:all 0.2s}
+.photo-row:hover{padding-left:6px}
+.photo-row:hover .photo-arrow{opacity:1;transform:translateX(3px)}
+.photo-num{font-family:'DM Mono',monospace;font-size:9px;color:rgba(210,200,180,0.2);width:28px;flex-shrink:0}
+.photo-title{font-family:'EB Garamond',serif;font-size:18px;font-weight:400;color:rgba(210,200,180,0.7);flex:1}
+.photo-year{font-family:'DM Mono',monospace;font-size:8px;color:rgba(210,200,180,0.2);letter-spacing:0.1em}
+.photo-arrow{font-size:14px;color:rgba(210,200,180,0.15);transition:all 0.2s;opacity:0}
+
+footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-top:0.5px solid rgba(210,200,180,0.08);display:flex;justify-content:space-between;align-items:center}
+.footer-left{font-family:'DM Mono',monospace;font-size:9px;color:rgba(210,200,180,0.2);letter-spacing:0.08em}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-family:'DM Mono',monospace;font-size:9px;color:rgba(210,200,180,0.25);letter-spacing:0.08em;text-decoration:none;transition:color 0.2s}
+.footer-links a:hover{color:rgba(210,200,180,0.6)}
+</style>
+</head>
+<body>
+
+<canvas id="grain"></canvas>
+
+<nav>
+  <span class="nav-name">MS</span>
+  <div class="nav-links">
+    <a href="#work">Work</a>
+    <a href="#photography">Photography</a>
+    <a href="#contact">Contact</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-meta">Brooklyn, NY &nbsp;·&nbsp; 2026</div>
+  <h1 class="hero-name">Matthew<br><em>Scheffler</em></h1>
+  <div class="hero-sub">
+    Digital Strategy &nbsp;·&nbsp; E-Commerce<br>
+    Content &amp; Visual Direction
+  </div>
+  <div class="hero-scroll">scroll</div>
+</section>
+
+<section class="work" id="work">
+  <div class="section-header">
+    <span>Selected Work</span>
+    <span>2020 – Present</span>
+  </div>
+
+  <div class="project-row">
+    <span class="row-num">01</span>
+    <div class="row-body">
+      <div class="row-name">Urban Architecture Inc.</div>
+      <div class="row-sub">E-Commerce · Content · Digital Operations · 2022 – Present</div>
+    </div>
+    <div class="row-tag">Strategy<br>Web<br>Content</div>
+    <span class="row-arrow">→</span>
+  </div>
+
+  <div class="project-row">
+    <span class="row-num">02</span>
+    <div class="row-body">
+      <div class="row-name">Bernard Figueroa Studio</div>
+      <div class="row-sub">Photography · Social · Email · 2025 – Present</div>
+    </div>
+    <div class="row-tag">Photography<br>Social<br>Email</div>
+    <span class="row-arrow">→</span>
+  </div>
+
+  <div class="project-row">
+    <span class="row-num">03</span>
+    <div class="row-body">
+      <div class="row-name">STATMASK</div>
+      <div class="row-sub">Product Photography · Social Media · E-Commerce · 2020 – 2022</div>
+    </div>
+    <div class="row-tag">Photography<br>Paid Social<br>E-Commerce</div>
+    <span class="row-arrow">→</span>
+  </div>
+
+</section>
+
+<div class="transition-band"></div>
+
+<section class="photo-section" id="photography">
+  <canvas id="grain-dark"></canvas>
+  <div class="photo-inner">
+
+    <div class="photo-header">
+      <span>Photography</span>
+      <span>2016 – 2019</span>
+    </div>
+
+    <div class="rebate">
+      <span class="rebate-text">KODAK PORTRA 400 · 135 · 2018</span>
+      <div class="rebate-dots"></div>
+      <span class="rebate-text">©MS</span>
+    </div>
+
+    <div class="contact-sheet">
+      <div class="sheet-row">
+        <div class="frame selected">
+          <div class="frame-bg"></div>
+          <span class="frame-num">1</span>
+          <span class="frame-label">Motherland<br>2018</span>
+        </div>
+        <div class="frame">
+          <div class="frame-bg"></div>
+          <span class="frame-num">2</span>
+          <span class="frame-label">Motherland<br>2018</span>
+        </div>
+        <div class="frame">
+          <div class="frame-bg"></div>
+          <span class="frame-num">3</span>
+          <span class="frame-label">Heliographs<br>2018</span>
+        </div>
+        <div class="frame">
+          <div class="frame-bg"></div>
+          <span class="frame-num">4</span>
+          <span class="frame-label">Heliographs<br>2018</span>
+        </div>
+      </div>
+      <div class="sheet-row">
+        <div class="frame">
+          <div class="frame-bg"></div>
+          <span class="frame-num">5</span>
+          <span class="frame-label">Refraction/<br>Diffraction</span>
+        </div>
+        <div class="frame">
+          <div class="frame-bg"></div>
+          <span class="frame-num">6</span>
+          <span class="frame-label">Refraction/<br>Diffraction</span>
+        </div>
+        <div class="frame">
+          <div class="frame-bg"></div>
+          <span class="frame-num">7</span>
+          <span class="frame-label">We Do Not<br>Spring Up</span>
+        </div>
+        <div class="frame">
+          <div class="frame-bg"></div>
+          <span class="frame-num">8</span>
+          <span class="frame-label">We Do Not<br>Spring Up</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rebate rebate-bottom">
+      <div class="rebate-dots"></div>
+      <span class="rebate-text">SAFETY · SAFETY · SAFETY</span>
+      <div class="rebate-dots"></div>
+    </div>
+
+    <div class="photo-projects">
+      <div class="photo-row">
+        <span class="photo-num">01</span>
+        <span class="photo-title">Motherland</span>
+        <span class="photo-year">2018</span>
+        <span class="photo-arrow">→</span>
+      </div>
+      <div class="photo-row">
+        <span class="photo-num">02</span>
+        <span class="photo-title">Heliographs</span>
+        <span class="photo-year">2018</span>
+        <span class="photo-arrow">→</span>
+      </div>
+      <div class="photo-row">
+        <span class="photo-num">03</span>
+        <span class="photo-title">Refraction / Diffraction</span>
+        <span class="photo-year">2018</span>
+        <span class="photo-arrow">→</span>
+      </div>
+      <div class="photo-row">
+        <span class="photo-num">04</span>
+        <span class="photo-title">We Do Not Spring Up From Nothing</span>
+        <span class="photo-year">2019</span>
+        <span class="photo-arrow">→</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<footer id="contact">
+  <span class="footer-left">© 2026 Matthew Scheffler</span>
+  <div class="footer-links">
+    <a href="https://instagram.com" target="_blank">Instagram</a>
+    <a href="https://linkedin.com" target="_blank">LinkedIn</a>
+    <a href="mailto:matthew.scheffler14@gmail.com">Email</a>
+  </div>
+</footer>
+
+<script>
+function makeGrain(canvas, w, h, dark) {
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const v = dark
+      ? Math.floor(Math.random() * 30)
+      : Math.floor(160 + Math.random() * 80);
+    d[i] = v;
+    d[i+1] = Math.floor(v * (dark ? 0.95 : 0.97));
+    d[i+2] = Math.floor(v * (dark ? 0.88 : 0.92));
+    d[i+3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function animateGrain(canvas, dark) {
+  const w = Math.ceil(window.innerWidth / 2);
+  const h = Math.ceil(window.innerHeight / 2);
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  let frame = 0;
+  function tick() {
+    frame++;
+    if (frame % 3 === 0) makeGrain(canvas, w, h, dark);
+    requestAnimationFrame(tick);
+  }
+  makeGrain(canvas, w, h, dark);
+  tick();
+}
+
+const grainLight = document.getElementById('grain');
+const grainDark = document.getElementById('grain-dark');
+animateGrain(grainLight, false);
+animateGrain(grainDark, true);
+</script>
+
+</body>
 </html>
