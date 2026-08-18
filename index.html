@@ -10,7 +10,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{background:#e8e3d9;font-family:'DM Mono',monospace;overflow-x:hidden}
+body{background:#e8e3d9;font-family:'DM Mono',monospace}
 
 nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:20px 48px;mix-blend-mode:multiply}
 .nav-name{font-family:'DM Mono',monospace;font-size:10px;color:rgba(28,20,10,0.5);letter-spacing:0.1em}
@@ -20,35 +20,10 @@ nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-cont
 
 .hero{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 80px}
 
-.card{position:relative;width:min(92vw,640px);background:#faf5e8;border-radius:32px;padding:56px 48px 0;overflow:hidden;perspective:1200px;box-shadow:0 50px 90px -30px rgba(20,14,4,0.4),0 10px 30px rgba(20,14,4,0.14),0 0 0 1px rgba(28,20,10,0.04);opacity:0;transform:translateY(24px);animation:cardIn 0.9s cubic-bezier(.22,1,.36,1) 0.15s forwards}
-@keyframes cardIn{to{opacity:1;transform:translateY(0)}}
-
-.card-meta{font-family:'DM Mono',monospace;font-size:10px;color:rgba(28,20,10,0.4);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:22px}
-.card-name{font-family:'EB Garamond',serif;font-size:clamp(48px,9vw,84px);font-weight:400;color:#1c140a;line-height:0.95;letter-spacing:-0.01em;margin-bottom:22px}
-.card-name em{font-style:italic;color:rgba(28,20,10,0.45)}
-.card-tagline{font-family:'DM Mono',monospace;font-size:11px;color:rgba(28,20,10,0.42);letter-spacing:0.1em;text-transform:uppercase;line-height:2;margin-bottom:8px}
-
-.fold-tab{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:32px;padding:18px 2px;border-top:1px dashed rgba(28,20,10,0.25);cursor:pointer;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(28,20,10,0.45);transition:color 0.2s}
-.fold-tab:hover{color:rgba(28,20,10,0.85)}
-.fold-chevron{display:inline-block;transition:transform 0.5s cubic-bezier(.65,0,.35,1);font-size:12px}
-.card.open .fold-chevron{transform:rotate(180deg)}
-
-.resume-wrap{display:grid;grid-template-rows:0fr;transition:grid-template-rows 0.6s cubic-bezier(.65,0,.35,1)}
-.card.open .resume-wrap{grid-template-rows:1fr}
-.resume-wrap>div{overflow:hidden}
-.resume-inner{padding-top:6px;padding-bottom:44px;transform-origin:top;transform:rotateX(-14deg);opacity:0;transition:transform 0.6s cubic-bezier(.65,0,.35,1),opacity 0.45s ease}
-.card.open .resume-inner{transform:rotateX(0deg);opacity:1}
-
-.resume-block{padding:14px 0;border-bottom:0.5px solid rgba(28,20,10,0.1)}
-.resume-role{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin-bottom:4px}
-.resume-company{font-family:'EB Garamond',serif;font-size:17px;color:#1c140a}
-.resume-years{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.08em;color:rgba(28,20,10,0.35);white-space:nowrap}
-.resume-desc{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(28,20,10,0.35)}
-.resume-skills{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(28,20,10,0.32);margin-top:20px;line-height:1.9}
-.resume-contact{display:inline-block;margin-top:20px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#1c140a;text-decoration:none;border-bottom:1px solid rgba(28,20,10,0.3);padding-bottom:2px;transition:border-color 0.2s}
-.resume-contact:hover{border-color:#1c140a}
-
-.hero-scroll{margin-top:40px;font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.25);letter-spacing:0.1em;text-transform:uppercase}
+/* the 3D business card lives entirely in card.js — see initCard(). This is
+   just the mount point; sizing/positioning for its own overlays (confirm
+   text, résumé toggle, scroll cue) is injected by card.js itself. */
+.card3d-container{width:min(94vw,820px);height:min(74vh,660px)}
 
 .work{position:relative;z-index:1;padding:0 48px 120px}
 .section-header{display:flex;justify-content:space-between;align-items:center;padding:18px 0;border-top:0.5px solid rgba(28,20,10,0.12);border-bottom:0.5px solid rgba(28,20,10,0.12);margin-bottom:0}
@@ -76,36 +51,49 @@ nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-cont
 
 .contact-sheet{background:#0a0805;padding:12px;border:0.5px solid rgba(210,200,180,0.08)}
 
-.frame{position:relative;background:#0f0c08;overflow:hidden;transition:opacity 0.2s}
+.frame{position:relative;background:#0f0c08;overflow:hidden;isolation:isolate;transition:opacity 0.2s}
 .frame:hover{opacity:0.85}
+.frame::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 60%,rgba(255,196,130,0.13) 100%);mix-blend-mode:screen}
 .frame::after{content:'';position:absolute;left:0;right:0;bottom:0;height:32%;background:linear-gradient(to top,rgba(0,0,0,0.6),transparent);pointer-events:none}
 .frame-label{position:absolute;top:3px;left:3px;z-index:1;font-family:'DM Mono',monospace;color:#F4811F;letter-spacing:0.05em;text-shadow:0 0 4px rgba(244,129,31,0.65)}
 
 /* level 1 — project cover tiles */
-.project-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
-.project-frame{aspect-ratio:3/4;cursor:pointer}
-.project-frame.is-empty{cursor:default}
+.project-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:11px}
+.project-tile{position:relative;cursor:pointer}
+.project-frame{aspect-ratio:3/4}
 .project-frame .cover-slide{position:relative;width:100%;height:100%}
-.project-frame .cs-img,.project-frame .frame-placeholder{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(15%) contrast(1.08) brightness(0.85) saturate(0.9)}
+.project-frame .cs-img,.project-frame .frame-placeholder{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;filter:url(#chromaticAberration) grayscale(15%) contrast(1.08) brightness(0.85) saturate(0.9)}
 .project-frame .cs-img{transition:opacity 1s ease}
 .project-frame .frame-placeholder{background:linear-gradient(135deg,rgba(210,200,180,0.03) 0%,rgba(210,200,180,0.06) 100%)}
 .project-frame .frame-label{font-size:8px;letter-spacing:0.08em;text-transform:uppercase}
+.project-num{position:absolute;top:3px;right:3px;z-index:1;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:0.05em;color:#F4811F;text-shadow:0 0 4px rgba(244,129,31,0.65)}
 
-.project-frame .grease-circle{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
-.project-frame .grease-circle path{fill:none;stroke:#F4811F;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px rgba(244,129,31,0.55));stroke-dasharray:1000;stroke-dashoffset:1000}
-.project-frame:hover .grease-circle path{animation:drawGrease 0.9s cubic-bezier(.65,0,.35,1) forwards}
-@keyframes drawGrease{to{stroke-dashoffset:0}}
+/* grease mark — level-1 project-tile hover marks, and level-2 frame hover marks */
+.grease-mark{position:absolute;inset:-15%;width:130%;height:130%;pointer-events:none;z-index:20;overflow:visible;opacity:0}
+.grease-mark image{overflow:visible}
+.grease-mark--hover{transition:opacity 0.18s ease}
+.project-tile:hover .grease-mark--hover{opacity:1}
+.cs-frame-cell:hover .grease-mark--hover{opacity:1}
 
-/* level 2 — full proof sheet for one project, inside the floating sheet */
-.frames-grid{background:#000}
-.strip-row+.strip-row{margin-top:5px}
-.strip-rebate{display:grid;gap:3px;padding:4px 0}
-.strip-rebate span{font-family:'DM Mono',monospace;font-size:6px;letter-spacing:0.03em;text-transform:uppercase;color:#F4811F;text-shadow:0 0 4px rgba(244,129,31,0.6);text-align:center;white-space:nowrap;overflow:hidden}
-.strip-rebate span b{font-weight:400;opacity:0.8}
-.strip-frames{display:grid;gap:3px}
-.sheet-frame{cursor:pointer;aspect-ratio:1/1;background:#000}
-.sheet-frame::after{content:none}
-.sheet-frame img{width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(15%) contrast(1.08) brightness(0.85) saturate(0.9)}
+/* level 2 — cursor-following glass loupe, see loupe.js */
+.loupe-root{position:fixed;top:0;left:0;pointer-events:none;z-index:250;border-radius:50%;overflow:hidden;opacity:0;transition:opacity 0.25s cubic-bezier(.22,1,.36,1);filter:drop-shadow(0 10px 26px rgba(0,0,0,0.4))}
+.loupe-root.is-visible{opacity:1}
+.loupe-root canvas{display:block;width:100%;height:100%}
+
+/* level 2 — reusable contact sheet component, see createContactSheet() */
+.cs-root{background:#000}
+.cs-titlebar{display:flex;justify-content:space-between;gap:16px;padding-bottom:10px;margin-bottom:10px;border-bottom:0.5px dashed rgba(244,129,31,0.25);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#F4811F;text-shadow:0 0 4px rgba(244,129,31,0.5)}
+.cs-strip{background:#000}
+.cs-sprocket-row{display:flex;justify-content:space-between;align-items:center;padding:4px 3px}
+.cs-sprocket{width:5px;height:3px;border-radius:1px;background:rgba(255,255,255,0.07);flex-shrink:0}
+.cs-rebate-row{display:grid;gap:8px;padding:12px 0}
+.cs-rebate-row span{font-family:'DM Mono',monospace;font-size:6px;letter-spacing:0.03em;text-transform:uppercase;color:#F4811F;text-shadow:0 0 4px rgba(244,129,31,0.6);text-align:center;white-space:nowrap;overflow:hidden}
+.cs-rebate-row span b{font-weight:400;opacity:0.8}
+.cs-frame-row{display:grid;gap:8px}
+.cs-frame-cell{position:relative}
+.cs-frame{position:relative;aspect-ratio:1/1;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.cs-frame img{width:100%;height:100%;object-fit:cover;display:block;filter:url(#chromaticAberration) grayscale(15%) contrast(1.08) brightness(0.85) saturate(0.9)}
+.cs-frame-placeholder{width:100%;height:100%;background:linear-gradient(135deg,rgba(210,200,180,0.03) 0%,rgba(210,200,180,0.06) 100%)}
 
 .rebate-bottom{margin-top:6px}
 
@@ -125,36 +113,74 @@ footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-t
 .footer-links a:hover{color:rgba(210,200,180,0.6)}
 
 /* floating sheet backdrop — hosts either the level-2 grid or the level-3 coverflow viewer */
-.sheet-backdrop{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(8,6,3,0.96);opacity:0;pointer-events:none;transition:opacity 0.3s ease}
+.sheet-backdrop{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);opacity:0;pointer-events:none;transition:opacity 0.3s ease}
 .sheet-backdrop.open{opacity:1;pointer-events:auto}
+.sheet-backdrop.mode-viewer{background:rgba(8,6,3,0.96)}
 
-.sheet-panel{position:relative;background:#0a0805;border:8px solid #1c1610;padding:14px;box-shadow:0 40px 90px rgba(0,0,0,0.55);opacity:0;transform:translateY(64px);transition:transform 0.5s cubic-bezier(.22,1,.36,1),opacity 0.4s ease}
-.sheet-backdrop.open .sheet-panel{opacity:1;transform:translateY(0)}
-.sheet-panel.mode-grid{width:min(92vw,980px);max-height:88vh;overflow-y:auto;background:#000;border-color:#000}
-.sheet-panel.mode-viewer{width:min(94vw,1100px);height:78vh;display:flex;flex-direction:column;overflow:hidden}
+.sheet-panel{position:relative;background:#0a0805;border:8px solid #1c1610;padding:14px;box-shadow:0 40px 90px rgba(0,0,0,0.55);opacity:0}
+.sheet-backdrop.open .sheet-panel{opacity:1}
 
-.sheet-rebate{display:flex;justify-content:space-between;gap:16px;padding-bottom:10px;margin-bottom:10px;border-bottom:0.5px dashed rgba(210,200,180,0.15);font-family:'DM Mono',monospace;font-size:8px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(210,200,180,0.3)}
+/* level 2 — floating modal: fixed size, centered, fade + scale entrance */
+.sheet-panel.mode-grid{width:88vw;height:85vh;overflow-y:auto;overflow-x:hidden;background:#000;border-color:#000;scrollbar-width:none;transform:scale(0.96);transition:transform 0.2s ease,opacity 0.2s ease}
+.sheet-panel.mode-grid::-webkit-scrollbar{display:none}
+.sheet-backdrop.open .sheet-panel.mode-grid{transform:scale(1)}
 
-.sheet-close{all:unset;position:absolute;top:28px;right:40px;font-family:'DM Mono',monospace;font-size:20px;color:rgba(210,200,180,0.4);cursor:pointer;transition:color 0.2s;z-index:1}
+/* level 3 — full-viewport image viewer */
+.sheet-panel.mode-viewer{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000;border:none;padding:0;box-shadow:none;transform:none}
+.sheet-backdrop.open .sheet-panel.mode-viewer{transform:none}
+
+.sheet-close{all:unset;position:absolute;top:28px;right:40px;font-family:'DM Mono',monospace;font-size:20px;color:rgba(210,200,180,0.4);cursor:pointer;transition:color 0.2s;z-index:4}
 .sheet-close:hover{color:rgba(210,200,180,0.9)}
-.sheet-prev,.sheet-next{all:unset;position:absolute;top:50%;transform:translateY(-50%);font-family:'DM Mono',monospace;font-size:22px;color:rgba(210,200,180,0.3);cursor:pointer;padding:20px;transition:color 0.2s;display:none}
-.sheet-prev:hover,.sheet-next:hover{color:rgba(210,200,180,0.9)}
-.sheet-prev{left:12px}
-.sheet-next{right:12px}
-.sheet-backdrop.mode-viewer .sheet-prev,.sheet-backdrop.mode-viewer .sheet-next{display:block}
 
-/* level 3 — cover flow viewer */
-.coverflow-stage{position:relative;flex:1;perspective:1400px;overflow:hidden}
-.cf-item{position:absolute;top:50%;width:min(46vw,420px);display:flex;align-items:center;justify-content:center;transition:transform 0.5s cubic-bezier(.22,1,.36,1);cursor:pointer;z-index:10}
-.cf-item.cf-current{cursor:default;left:50%;width:min(62vw,600px);transform:translate(-50%,-50%) scale(1);z-index:30}
-.cf-item.cf-prev{left:0;transform:translate(-72%,-50%) scale(0.72) rotateY(28deg)}
-.cf-item.cf-next{right:0;left:auto;transform:translate(72%,-50%) scale(0.72) rotateY(-28deg)}
-.cf-item img{max-width:100%;max-height:min(70vw,64vh);width:auto;height:auto;display:block;box-shadow:0 30px 60px rgba(0,0,0,0.5);filter:grayscale(15%) contrast(1.08) brightness(0.95) saturate(0.9)}
-.cf-item:not(.cf-current) img{filter:grayscale(15%) contrast(1.08) brightness(0.5) saturate(0.9)}
-.coverflow-caption{margin-top:14px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(210,200,180,0.4)}
+.lv3-grain{position:absolute;inset:-20%;pointer-events:none;z-index:1;opacity:0.05;background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:180px 180px;animation:lv3GrainShift 1s steps(4) infinite}
+@keyframes lv3GrainShift{0%{transform:translate(0,0)}25%{transform:translate(-2%,2%)}50%{transform:translate(2%,-1%)}75%{transform:translate(-1%,-2%)}100%{transform:translate(0,0)}}
+
+.lv3-stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;z-index:2;transition:opacity 0.15s ease}
+
+.lv3-main{position:relative;height:85vh;max-width:90vw;display:flex;align-items:center;justify-content:center;z-index:2}
+.lv3-main img{width:100%;height:100%;object-fit:contain;display:block;filter:url(#chromaticAberrationSubtle) grayscale(15%) contrast(1.08) brightness(0.92) saturate(0.9)}
+
+.lv3-edge{position:absolute;top:50%;transform:translateY(-50%);width:8vw;height:85vh;overflow:hidden;cursor:pointer;opacity:0.4;transition:opacity 0.25s ease;z-index:1}
+.lv3-edge:hover{opacity:0.65}
+.lv3-edge--prev{left:0}
+.lv3-edge--next{right:0}
+.lv3-edge img{width:8vw;height:85vh;object-fit:cover;display:block;filter:url(#chromaticAberrationSubtle) grayscale(20%) contrast(1.08) brightness(0.7) saturate(0.85)}
+.lv3-edge--prev img{object-position:100% 50%}
+.lv3-edge--next img{object-position:0% 50%}
+
+.lv3-label{position:absolute;left:28px;bottom:24px;z-index:3;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#F4811F;text-shadow:0 0 4px rgba(244,129,31,0.6)}
+.lv3-label b{font-weight:400;opacity:0.85}
+.lv3-count{position:absolute;right:76px;top:30px;z-index:3;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#F4811F;text-shadow:0 0 4px rgba(244,129,31,0.6)}
+
+.lv3-loupe-toggle{all:unset;position:absolute;right:30px;bottom:26px;z-index:4;width:30px;height:30px;border-radius:50%;cursor:pointer;background:transparent;border:1px solid rgba(210,200,180,0.4);transition:border-color 0.25s ease,transform 0.2s ease,box-shadow 0.25s ease}
+.lv3-loupe-toggle:hover{border-color:rgba(210,200,180,0.75);transform:scale(1.08)}
+.lv3-loupe-toggle.is-active{border-color:#F4811F;box-shadow:0 0 7px rgba(244,129,31,0.5)}
 </style>
 </head>
 <body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="chromaticAberration" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red"/>
+      <feOffset in="red" dx="-0.6" dy="0.15" result="redOff"/>
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="green"/>
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blue"/>
+      <feOffset in="blue" dx="0.6" dy="-0.15" result="blueOff"/>
+      <feComposite in="redOff" in2="green" operator="arithmetic" k2="1" k3="1" result="rg"/>
+      <feComposite in="rg" in2="blueOff" operator="arithmetic" k2="1" k3="1"/>
+    </filter>
+    <filter id="chromaticAberrationSubtle" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red"/>
+      <feOffset in="red" dx="-0.18" dy="0.045" result="redOff"/>
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="green"/>
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blue"/>
+      <feOffset in="blue" dx="0.18" dy="-0.045" result="blueOff"/>
+      <feComposite in="redOff" in2="green" operator="arithmetic" k2="1" k3="1" result="rg"/>
+      <feComposite in="rg" in2="blueOff" operator="arithmetic" k2="1" k3="1"/>
+    </filter>
+  </defs>
+</svg>
 
 <nav>
   <span class="nav-name">MS</span>
@@ -166,56 +192,7 @@ footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-t
 </nav>
 
 <section class="hero">
-  <div class="card" id="card">
-    <div class="card-meta">Brooklyn, NY &nbsp;·&nbsp; 2026</div>
-    <h1 class="card-name">Matthew<br><em>Scheffler</em></h1>
-    <div class="card-tagline">
-      Digital Strategy &nbsp;·&nbsp; E-Commerce<br>
-      Content &amp; Visual Direction
-    </div>
-
-    <button class="fold-tab" id="foldTab" aria-expanded="false" aria-controls="resumeWrap">
-      <span>Résumé</span>
-      <span class="fold-chevron">⌄</span>
-    </button>
-
-    <div class="resume-wrap" id="resumeWrap">
-      <div>
-        <div class="resume-inner">
-
-          <div class="resume-block">
-            <div class="resume-role">
-              <span class="resume-company">Urban Architecture Inc.</span>
-              <span class="resume-years">2022 &ndash; Present</span>
-            </div>
-            <div class="resume-desc">Digital Strategy · E-Commerce · Content</div>
-          </div>
-
-          <div class="resume-block">
-            <div class="resume-role">
-              <span class="resume-company">Bernard Figueroa Studio</span>
-              <span class="resume-years">2025 &ndash; Present</span>
-            </div>
-            <div class="resume-desc">Photography · Social · Email</div>
-          </div>
-
-          <div class="resume-block">
-            <div class="resume-role">
-              <span class="resume-company">STATMASK</span>
-              <span class="resume-years">2020 &ndash; 2022</span>
-            </div>
-            <div class="resume-desc">Product Photography · Paid Social · E-Commerce</div>
-          </div>
-
-          <div class="resume-skills">Strategy · Web · Content · Photography · Social · Email · Paid Social · E-Commerce</div>
-          <a class="resume-contact" href="mailto:matthew.scheffler14@gmail.com">Request full résumé &rarr;</a>
-
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="hero-scroll">scroll</div>
+  <div class="card3d-container" id="card3d"></div>
 </section>
 
 <section class="work" id="work">
@@ -280,32 +257,7 @@ footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-t
       <div class="rebate-dots"></div>
     </div>
 
-    <div class="photo-projects" id="photoProjects">
-      <div class="photo-row" data-project="motherland">
-        <span class="photo-num">01</span>
-        <span class="photo-title">Motherland</span>
-        <span class="photo-year">2017</span>
-        <span class="photo-arrow">→</span>
-      </div>
-      <div class="photo-row" data-project="heliographs">
-        <span class="photo-num">02</span>
-        <span class="photo-title">Heliographs</span>
-        <span class="photo-year">2018</span>
-        <span class="photo-arrow">→</span>
-      </div>
-      <div class="photo-row" data-project="refraction">
-        <span class="photo-num">03</span>
-        <span class="photo-title">Refraction / Diffraction</span>
-        <span class="photo-year">2018</span>
-        <span class="photo-arrow">→</span>
-      </div>
-      <div class="photo-row" data-project="spring-up">
-        <span class="photo-num">04</span>
-        <span class="photo-title">We Do Not Spring Up From Nothing</span>
-        <span class="photo-year">2019</span>
-        <span class="photo-arrow">→</span>
-      </div>
-    </div>
+    <div class="photo-projects" id="photoProjects"></div>
 
   </div>
 </section>
@@ -321,38 +273,53 @@ footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-t
 
 <div class="sheet-backdrop" id="sheetBackdrop" aria-hidden="true">
   <button class="sheet-close" id="sheetClose" aria-label="Close">&times;</button>
-  <button class="sheet-prev" id="sheetPrev" aria-label="Previous">&larr;</button>
   <div class="sheet-panel" id="sheetPanel"></div>
-  <button class="sheet-next" id="sheetNext" aria-label="Next">&rarr;</button>
 </div>
 
 <script>
-const card = document.getElementById('card');
-const foldTab = document.getElementById('foldTab');
-foldTab.addEventListener('click', () => {
-  const open = card.classList.toggle('open');
-  foldTab.setAttribute('aria-expanded', open ? 'true' : 'false');
-});
+/* TEMP TEST PATCH — remove before shipping */
+window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
+window.cancelAnimationFrame = (id) => clearTimeout(id);
+</script>
+<script type="module">
+import { Loupe } from './loupe.js';
+import { initCard } from './card.js';
 
-/* ---------- project data ---------- */
+initCard(document.getElementById('card3d'));
 
-const MOTHERLAND_PHOTOS = [
-  '_DSF1091', '_DSF2357', '_DSF2395', '_DSF2486', '_DSF2634', '_DSF2679',
-  '_DSF2787', '_DSF2867', '_DSF2911', '_DSF2923', '_DSF2929', '_DSF3176',
-  '_DSF3423', '_DSF6730', '_DSF6778', '_DSF6921', '_DSF7216', '_DSF7315',
-  '_DSF7403', '_DSF7406', '_DSF7703', '_DSF7730', '_DSF8027', '_DSF8053',
-  '_DSF8110', '_DSF8257', '_DSF8265', '_DSF8462', '_DSF8585', '_DSF8595'
-];
+/* ---------- project config ----------
+   To add a new photography project:
+     1. Drop its photo folder into assets/ (full-res .webp files).
+     2. Run assets/generate-manifests.sh to create manifest.json + thumbs/.
+     3. Add one entry below. Nothing else needs to change. */
 
 const PROJECTS = [
-  {
-    id: 'motherland', title: 'Motherland', year: '2017',
-    base: 'assets/motherland (2017)/', photos: MOTHERLAND_PHOTOS
-  },
-  { id: 'heliographs', title: 'Heliographs', year: '2018', base: null, photos: [] },
-  { id: 'refraction', title: 'Refraction / Diffraction', year: '2018', base: null, photos: [] },
-  { id: 'spring-up', title: 'We Do Not Spring Up From Nothing', year: '2019', base: null, photos: [] }
+  { projectCode: 'MLND', year: '2017', title: 'Motherland', folderPath: 'assets/motherland (2017)/', selectedIndex: 0 },
+  { projectCode: 'HELO', year: '2018', title: 'Heliographs', folderPath: 'assets/heliographs/', selectedIndex: 0 },
+  { projectCode: 'RFDF', year: '2018', title: 'Refraction / Diffraction', folderPath: null, selectedIndex: 0 },
+  { projectCode: 'WDNS', year: '2019', title: 'We Do Not Spring Up From Nothing', folderPath: null, selectedIndex: 0 },
+  { projectCode: 'FCMG', year: '2020', title: "His Father's Castle, His Mother's Glory", folderPath: null, selectedIndex: 0 }
 ];
+
+PROJECTS.forEach(project => {
+  project.id = project.projectCode.toLowerCase();
+  project.code = project.projectCode;
+  project.base = project.folderPath;
+  project.photos = [];
+});
+
+const PLACEHOLDER_ROW = new Array(6).fill(null);
+
+async function loadManifest(project) {
+  if (!project.folderPath) return;
+  try {
+    const res = await fetch(`${project.folderPath}manifest.json`);
+    if (!res.ok) throw new Error(res.status);
+    project.photos = await res.json();
+  } catch (err) {
+    console.warn(`No manifest.json found for "${project.title}" at ${project.folderPath} — treating as empty. Run assets/generate-manifests.sh.`, err);
+  }
+}
 
 function thumbSrc(project, i) {
   return `${project.base}thumbs/${project.photos[i]}.jpg`;
@@ -360,17 +327,160 @@ function thumbSrc(project, i) {
 function fullSrc(project, i) {
   return `${project.base}${project.photos[i]}.webp`;
 }
+function sheetFramesFor(project) {
+  return project.photos.length > 0
+    ? project.photos.map((_, i) => thumbSrc(project, i))
+    : PLACEHOLDER_ROW;
+}
 
-const GREASE_PATH = 'M 60 3 C 88 8 104 32 97 58 C 100 82 70 103 38 98 C 10 94 -4 66 4 40 C 10 16 34 -2 58 3 C 61 3 64 4 61 7';
-function greaseCircleSVG() {
-  return `<svg class="grease-circle" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="${GREASE_PATH}"/></svg>`;
+/* ---------- grease mark system: two SVG marks, one picked at random per showing ---------- */
+
+const GREASE_MARKS = [
+  'assets/grease-mark.svg',
+  'assets/grease-mark-2.svg',
+  'assets/grease-mark-3.svg',
+  'assets/grease-mark-4.svg',
+  'assets/grease-mark-5.svg'
+];
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+let greaseMarkBag = shuffle(GREASE_MARKS);
+function nextGreaseMark() {
+  if (greaseMarkBag.length === 0) greaseMarkBag = shuffle(GREASE_MARKS);
+  return greaseMarkBag.shift();
+}
+
+// frame index -> assigned mark path, set on first hover and locked for the rest of the session
+const greaseMarkAssignments = new Map();
+function assignedGreaseMark(frameIndex) {
+  if (!greaseMarkAssignments.has(frameIndex)) {
+    greaseMarkAssignments.set(frameIndex, nextGreaseMark());
+  }
+  return greaseMarkAssignments.get(frameIndex);
+}
+
+function greaseMarkSVG(modifierClass) {
+  return `
+    <svg class="grease-mark ${modifierClass}" overflow="visible">
+      <image href="" x="0" y="0" width="100%" height="100%" preserveAspectRatio="xMidYMid meet"/>
+    </svg>
+  `;
+}
+
+const LEVEL2_GREASE_MARK = 'assets/level-2-grease-mark.svg';
+function level2GreaseMarkSVG() {
+  return `
+    <svg class="grease-mark grease-mark--hover" overflow="visible">
+      <image href="${LEVEL2_GREASE_MARK}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="xMidYMid meet"/>
+    </svg>
+  `;
+}
+
+/* ---------- reusable contact sheet component ---------- */
+
+function createContactSheet(config) {
+  const {
+    projectCode,
+    year,
+    title,
+    frames,
+    selectedIndex = 0,
+    onFrameClick = () => {}
+  } = config;
+
+  const cols = 6;
+
+  const root = document.createElement('div');
+  root.className = 'cs-root';
+  root.innerHTML = `
+    <div class="cs-titlebar">
+      <span>${title.toUpperCase()}</span>
+      <span>${frames.length} FRAME${frames.length === 1 ? '' : 'S'}</span>
+    </div>
+    <div class="cs-strip"></div>
+  `;
+
+  const strip = root.querySelector('.cs-strip');
+  strip.appendChild(sprocketRowEl());
+
+  for (let r = 0; r < frames.length; r += cols) {
+    const rowSlice = frames.slice(r, r + cols);
+    strip.appendChild(rebateRowEl(rowSlice.length, r));
+    strip.appendChild(frameRowEl(rowSlice, r));
+  }
+
+  strip.appendChild(sprocketRowEl());
+
+  return root;
+
+  function sprocketRowEl() {
+    const row = document.createElement('div');
+    row.className = 'cs-sprocket-row';
+    row.innerHTML = '<span class="cs-sprocket"></span>'.repeat(40);
+    return row;
+  }
+
+  function rebateRowEl(count, startIndex) {
+    const row = document.createElement('div');
+    row.className = 'cs-rebate-row';
+    row.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+    for (let i = 0; i < count; i++) {
+      const num = String(startIndex + i + 1).padStart(2, '0');
+      const span = document.createElement('span');
+      span.innerHTML = `${projectCode} ${year} <b>${num}</b>`;
+      row.appendChild(span);
+    }
+    return row;
+  }
+
+  function frameRowEl(rowSlice, startIndex) {
+    const row = document.createElement('div');
+    row.className = 'cs-frame-row';
+    row.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+    rowSlice.forEach((src, ci) => {
+      const idx = startIndex + ci;
+      const cell = document.createElement('div');
+      cell.className = 'cs-frame-cell';
+
+      const frame = document.createElement('div');
+      frame.className = 'cs-frame';
+      let imgEl = null;
+      if (src) {
+        imgEl = document.createElement('img');
+        imgEl.loading = 'lazy';
+        imgEl.alt = `${title}, frame ${idx + 1}`;
+        imgEl.src = src;
+        frame.appendChild(imgEl);
+        frame.style.cursor = 'pointer';
+        frame.addEventListener('click', () => onFrameClick(idx));
+      } else {
+        frame.innerHTML = `<div class="cs-frame-placeholder"></div>`;
+      }
+      cell.appendChild(frame);
+      cell.insertAdjacentHTML('beforeend', level2GreaseMarkSVG());
+      row.appendChild(cell);
+    });
+    return row;
+  }
 }
 
 /* ---------- level 1: project cover tiles, auto-cycling ---------- */
 
 const projectGrid = document.getElementById('projectGrid');
+const photoProjectsEl = document.getElementById('photoProjects');
 
-PROJECTS.forEach((project) => {
+(async function initLevel1() {
+  await Promise.all(PROJECTS.map(loadManifest));
+
+  PROJECTS.forEach((project, projectIdx) => {
   const hasPhotos = project.photos.length > 0;
   const frame = document.createElement('div');
   frame.className = 'frame project-frame' + (hasPhotos ? '' : ' is-empty');
@@ -385,13 +495,20 @@ PROJECTS.forEach((project) => {
   frame.innerHTML = `
     ${coverHTML}
     <span class="frame-label">${project.title}</span>
-    ${greaseCircleSVG()}
+    <span class="project-num">${String(projectIdx + 1).padStart(2, '0')}</span>
   `;
 
-  if (hasPhotos) {
-    frame.addEventListener('click', () => openProjectSheet(project.id));
-  }
-  projectGrid.appendChild(frame);
+  const tile = document.createElement('div');
+  tile.className = 'project-tile';
+  tile.appendChild(frame);
+  tile.insertAdjacentHTML('beforeend', greaseMarkSVG('grease-mark--hover'));
+  const markImage = tile.querySelector('.grease-mark image');
+  tile.addEventListener('mouseenter', () => {
+    markImage.setAttribute('href', assignedGreaseMark(projectIdx));
+  });
+
+  tile.addEventListener('click', () => openProjectSheet(project.id));
+  projectGrid.appendChild(tile);
 
   if (project.photos.length > 1) {
     const imgA = frame.querySelector('.cs-a');
@@ -408,7 +525,21 @@ PROJECTS.forEach((project) => {
       shownIndex = nextIndex;
     }, 2400);
   }
-});
+  });
+
+  PROJECTS.forEach((project, projectIdx) => {
+    const row = document.createElement('div');
+    row.className = 'photo-row';
+    row.dataset.project = project.id;
+    row.innerHTML = `
+      <span class="photo-num">${String(projectIdx + 1).padStart(2, '0')}</span>
+      <span class="photo-title">${project.title}</span>
+      <span class="photo-year">${project.year}</span>
+      <span class="photo-arrow">&rarr;</span>
+    `;
+    photoProjectsEl.appendChild(row);
+  });
+})();
 
 /* ---------- floating sheet: level 2 (frame grid) + level 3 (cover flow) ---------- */
 
@@ -418,10 +549,21 @@ const sheetPanel = document.getElementById('sheetPanel');
 let activeProject = null;
 let viewStack = [];
 let cfIndex = 0;
+let activeLoupe = null;
+let cfEdgePrevEl = null;
+let cfEdgeNextEl = null;
+let cfMainEl = null;
+
+function disposeLoupe() {
+  if (activeLoupe) {
+    activeLoupe.destroy();
+    activeLoupe = null;
+  }
+}
 
 function openProjectSheet(id) {
   const project = PROJECTS.find(p => p.id === id);
-  if (!project || project.photos.length === 0) return;
+  if (!project) return;
   activeProject = project;
   viewStack = ['grid'];
   sheetBackdrop.classList.add('open');
@@ -435,6 +577,7 @@ function closeSheet() {
   sheetBackdrop.classList.remove('open', 'mode-viewer');
   sheetBackdrop.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
+  disposeLoupe();
 }
 
 function goBack() {
@@ -448,12 +591,16 @@ function goBack() {
 
 function openViewer(index) {
   cfIndex = index;
+  window.scrollTo(0, 0);
+  document.body.style.overflow = 'hidden';
+  sheetPanel.scrollTop = 0;
   viewStack.push('viewer');
   renderPanel();
 }
 
 function renderPanel() {
   const mode = viewStack[viewStack.length - 1];
+  disposeLoupe();
   sheetPanel.className = 'sheet-panel mode-' + mode;
   sheetBackdrop.classList.toggle('mode-viewer', mode === 'viewer');
   sheetPanel.style.opacity = 0;
@@ -466,93 +613,119 @@ function renderPanel() {
 
 function renderGrid() {
   const project = activeProject;
-  const stock = project.filmStock || 'KODAK PORTRA 400';
-  const cols = 6;
-
-  const rows = [];
-  for (let r = 0; r < project.photos.length; r += cols) {
-    rows.push(project.photos.slice(r, r + cols).map((name, ci) => ({ name, index: r + ci })));
-  }
-
-  const stripsHTML = rows.map((row) => {
-    const cssCols = `grid-template-columns:repeat(${row.length},1fr)`;
-    const rebateHTML = row.map(({ index }) => `
-      <span>${stock} <b>${String(index + 1).padStart(2, '0')}</b></span>
-    `).join('');
-    const framesHTML = row.map(({ index }) => `
-      <div class="frame sheet-frame" data-index="${index}">
-        <img src="${thumbSrc(project, index)}" loading="lazy" alt="${project.title}, frame ${index + 1}">
-      </div>
-    `).join('');
-    return `
-      <div class="strip-row">
-        <div class="strip-rebate" style="${cssCols}">${rebateHTML}</div>
-        <div class="strip-frames" style="${cssCols}">${framesHTML}</div>
-      </div>
-    `;
-  }).join('');
-
-  sheetPanel.innerHTML = `
-    <div class="sheet-rebate">
-      <span>${project.title.toUpperCase()} &nbsp;·&nbsp; ${project.year}</span>
-      <span>${project.photos.length} FRAMES</span>
-    </div>
-    <div class="frames-grid">${stripsHTML}</div>
-  `;
-
-  sheetPanel.querySelectorAll('.sheet-frame').forEach((el) => {
-    el.addEventListener('click', () => openViewer(parseInt(el.dataset.index, 10)));
+  sheetPanel.innerHTML = '';
+  const sheetEl = createContactSheet({
+    projectCode: project.code || project.id.toUpperCase(),
+    year: project.year,
+    title: project.title,
+    frames: sheetFramesFor(project),
+    selectedIndex: project.selectedIndex || 0,
+    onFrameClick: (index) => {
+      if (project.photos.length > 0) openViewer(index);
+    }
   });
+  sheetPanel.appendChild(sheetEl);
 }
 
 function renderCoverflow() {
-  const project = activeProject;
-  const total = project.photos.length;
-
+  sheetPanel.scrollTop = 0;
   sheetPanel.innerHTML = `
-    <div class="sheet-rebate">
-      <span>${project.title.toUpperCase()} &nbsp;·&nbsp; ${project.year}</span>
-      <span id="cfCount"></span>
+    <div class="lv3-grain"></div>
+    <div class="lv3-stage" id="cfStage">
+      <div class="lv3-edge lv3-edge--prev" id="cfEdgePrev"><img alt=""></div>
+      <div class="lv3-main"><img id="cfMainImg" alt=""></div>
+      <div class="lv3-edge lv3-edge--next" id="cfEdgeNext"><img alt=""></div>
     </div>
-    <div class="coverflow-stage" id="cfStage"></div>
+    <div class="lv3-label" id="cfLabel"></div>
+    <div class="lv3-count" id="cfCount"></div>
+    <button class="lv3-loupe-toggle" id="lv3LoupeToggle" aria-pressed="false" aria-label="Toggle loupe"></button>
   `;
 
-  const stage = document.getElementById('cfStage');
-  const slots = [
-    { offset: -1, cls: 'cf-prev' },
-    { offset: 0, cls: 'cf-current' },
-    { offset: 1, cls: 'cf-next' }
-  ];
+  cfEdgePrevEl = document.getElementById('cfEdgePrev');
+  cfEdgeNextEl = document.getElementById('cfEdgeNext');
+  cfMainEl = sheetPanel.querySelector('.lv3-main');
 
-  slots.forEach(({ offset, cls }) => {
-    const i = ((cfIndex + offset) % total + total) % total;
-    const item = document.createElement('div');
-    item.className = 'cf-item ' + cls;
-    item.innerHTML = `<img src="${fullSrc(project, i)}" alt="${project.title}, frame ${i + 1}">`;
-    if (offset !== 0) {
-      item.addEventListener('click', () => {
-        cfIndex = i;
-        renderCoverflow();
+  cfEdgePrevEl.addEventListener('click', cfPrev);
+  cfEdgeNextEl.addEventListener('click', cfNext);
+
+  const loupeToggle = document.getElementById('lv3LoupeToggle');
+  loupeToggle.addEventListener('click', () => {
+    if (activeLoupe) {
+      disposeLoupe();
+      loupeToggle.classList.remove('is-active');
+      loupeToggle.setAttribute('aria-pressed', 'false');
+    } else {
+      activeLoupe = new Loupe(cfMainEl, {
+        rim: false,
+        fit: 'contain',
+        resolveImage: () => document.getElementById('cfMainImg'),
+        material: { thickness: 1.1, roughness: 0.035 }
       });
+      loupeToggle.classList.add('is-active');
+      loupeToggle.setAttribute('aria-pressed', 'true');
     }
-    stage.appendChild(item);
   });
 
+  bindSwipe(document.getElementById('cfStage'));
+  updateStage();
+}
+
+function updateStage() {
+  const project = activeProject;
+  const total = project.photos.length;
+  const code = project.code || project.id.toUpperCase();
+  const prevI = (cfIndex - 1 + total) % total;
+  const nextI = (cfIndex + 1) % total;
+
+  const mainImg = document.getElementById('cfMainImg');
+  mainImg.src = fullSrc(project, cfIndex);
+  mainImg.alt = `${project.title}, frame ${cfIndex + 1}`;
+  cfEdgePrevEl.querySelector('img').src = fullSrc(project, prevI);
+  cfEdgeNextEl.querySelector('img').src = fullSrc(project, nextI);
+
+  document.getElementById('cfLabel').innerHTML = `${code} ${project.year} <b>${String(cfIndex + 1).padStart(2, '0')}</b>`;
   document.getElementById('cfCount').textContent = `${String(cfIndex + 1).padStart(2, '0')} / ${total}`;
+}
+
+function updateStageWithTransition() {
+  const stage = document.getElementById('cfStage');
+  stage.style.opacity = '0';
+  setTimeout(() => {
+    updateStage();
+    requestAnimationFrame(() => { stage.style.opacity = '1'; });
+  }, 150);
 }
 
 function cfNext() {
   cfIndex = (cfIndex + 1) % activeProject.photos.length;
-  renderCoverflow();
+  updateStageWithTransition();
 }
 function cfPrev() {
   cfIndex = (cfIndex - 1 + activeProject.photos.length) % activeProject.photos.length;
-  renderCoverflow();
+  updateStageWithTransition();
+}
+
+function bindSwipe(el) {
+  let startX = 0, startY = 0, tracking = false;
+  el.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    startX = t.clientX;
+    startY = t.clientY;
+    tracking = true;
+  }, { passive: true });
+  el.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) cfNext(); else cfPrev();
+    }
+  }, { passive: true });
 }
 
 document.getElementById('sheetClose').addEventListener('click', closeSheet);
-document.getElementById('sheetNext').addEventListener('click', cfNext);
-document.getElementById('sheetPrev').addEventListener('click', cfPrev);
 
 document.getElementById('photoProjects').addEventListener('click', (e) => {
   const row = e.target.closest('.photo-row');
@@ -561,6 +734,13 @@ document.getElementById('photoProjects').addEventListener('click', (e) => {
 
 sheetBackdrop.addEventListener('click', (e) => {
   if (e.target === sheetBackdrop) goBack();
+});
+
+sheetPanel.addEventListener('click', (e) => {
+  if (!sheetPanel.classList.contains('mode-viewer')) return;
+  if (e.target === sheetPanel || e.target.id === 'cfStage' || e.target.classList.contains('lv3-main')) {
+    goBack();
+  }
 });
 
 document.addEventListener('keydown', (e) => {
