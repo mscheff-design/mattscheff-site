@@ -1,66 +1,64 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { initContactForm } from './contact.js';
+import { JOBS } from './jobs.js';
 
 /**
- * initCard(container) builds and runs the entire 3D business-card hero,
- * including its résumé reveal. Self-contained: owns the Three.js scene,
- * all textures/materials, its own injected stylesheet, and every DOM
- * overlay (confirmation text, scroll cue). The caller only provides an
- * empty container element.
+ * initCard(container) builds and runs the entire 3D business-card hero.
+ * Self-contained: owns the Three.js scene, all textures/materials, its own
+ * injected stylesheet, and every DOM overlay. The caller only provides an
+ * empty container element. Communicates outward only via a CustomEvent
+ * ('resume-job-click') dispatched on the container — it never calls into
+ * the host page's own code directly.
  *
  * Interactions:
- *   - hover, horizontal cursor position -> small Y-axis tilt (same scale as
- *                             the vertical tilt below), just a subtle turn
- *                             toward the cursor
- *   - hover, vertical cursor position   -> small X-axis tilt, card angles
- *                             toward/away from the viewer
- *   - click directly on the card (no drag) -> flip 180° between front/back,
- *                             unless the résumé is open (see below)
- *   - idle (no cursor, no drag)         -> slow ambient Y-axis sway
- *   - click-hold-drag anywhere in the hero -> picks the card up and moves
- *                             it freely in X and Y, following the cursor;
- *                             past 65% of the way to a screen edge, that
- *                             side of the page glows to signal the drop
- *                             zone is active; release there to throw the
- *                             card off (vCard download on the right,
- *                             mailto on the left); released after enough
- *                             upward travel instead opens the résumé
- *                             (released after enough downward travel
- *                             closes it); otherwise it springs back to
- *                             wherever it's currently resting (center when
- *                             closed, parked-near-the-top when open)
- *   - click the "RÉSUMÉ" row (drawn on the card, just below the bio) ->
- *                             the card itself never changes size or shape —
- *                             it's a fixed, single physical object, drawn
- *                             once and never redrawn or rebuilt while
- *                             animating, so it can't warp. Opening the
- *                             résumé instead animates two independent,
- *                             separate objects simultaneously: the card
- *                             (a rigid body) slides up toward the top of
- *                             the page, while a second, entirely separate
- *                             "résumé tab" object — its own fixed-size
- *                             mesh and texture, carrying the job rows/tag
- *                             cloud/download link — slides out from behind
- *                             the card's bottom edge. The surrounding page
- *                             grows in lockstep (the hero section's bottom
- *                             padding grows with the reveal) so nothing
- *                             below gets overlapped. Click the row again to
- *                             close.
- *   - click "DOWNLOAD RÉSUMÉ (PDF)" (visible once the tab is open) ->
- *                             downloads the static résumé PDF
+ *   - hover, cursor position         -> small X/Y-axis tilt
+ *   - idle (no cursor, no drag)      -> slow ambient Y-axis sway
+ *   - click directly on the card (no drag) -> flip 180° between front/back;
+ *                             always available regardless of whether the
+ *                             dropdown tab is open on either face
+ *   - click-hold-drag anywhere in the hero -> picks the card up and moves it
+ *                             freely. THE CARD STAYS WHERE IT IS DROPPED —
+ *                             no snap back to center. Past 65% of the way
+ *                             to a screen edge, that side glows; release
+ *                             there to throw the card off (vCard download
+ *                             on the right, mailto on the left), after
+ *                             which it flies back to wherever it was
+ *                             sitting before the throw.
+ *   - drag UPWARD past a threshold and release -> opens the dropdown tab
+ *                             (résumé on the front, contact note on the
+ *                             back); dragging up again while already open
+ *                             downloads the résumé PDF instead
+ *   - drag DOWNWARD past a threshold and release -> closes the dropdown
+ *   - click the toggle row ("RÉSUMÉ" / "OR LEAVE A NOTE") -> same
+ *                             open/close toggle. Both tabs share ONE
+ *                             open/closed state, so whichever face you
+ *                             land on after a flip shows its own tab
+ *                             already in that same state.
+ *   - click a job row on the open résumé tab -> dispatches a
+ *                             'resume-job-click' CustomEvent (detail:
+ *                             { jobId }) on the container; the page
+ *                             decides what that means (this module never
+ *                             navigates or opens anything itself for it)
+ *   - click "DOWNLOAD RÉSUMÉ (PDF)" (on the open résumé tab) -> downloads
+ *                             the static résumé PDF
+ *
+ * Geometry strategy (this is what keeps the type from warping): the card's
+ * own front/back caps and the dropdown tab are each built ONCE, at one
+ * fixed size, and never rebuilt or rescaled. Opening/closing the dropdown
+ * only ever *moves* the tab (and lifts the card) — it never touches
+ * geometry or textures, so nothing can ever resample or stretch.
  */
 
 const CARD_WIDTH = 3.4;
 const BASE_CARD_HEIGHT = 2.14;
-const CARD_THICKNESS = 0.055;
+// thin, real-cardstock feel — paper texture/detailing gets layered on top
+// of this later, so the object itself has to read as thin first.
+const CARD_THICKNESS = 0.026;
 const CARD_RADIUS = 0.12;
-
-// The card is a single fixed physical object — this is its one and only
-// height, forever. It is never resized, never rebuilt, never redrawn on a
-// timer; that per-frame reshaping is exactly what used to warp the text.
-const TOGGLE_BAND_TOP_F = 0.99;
-const TOGGLE_LABEL_F = 1.075;
-const TOGGLE_BAND_BOTTOM_F = 1.16;
-const CARD_HEIGHT = BASE_CARD_HEIGHT * TOGGLE_BAND_BOTTOM_F;
+const CARD_PAD_FRACTION = 0.09;
+// single source of truth for the stock color — used for the card's own
+// front/back faces AND both dropdown tabs, so nothing can drift apart.
+const CARD_STOCK_COLOR = '#f7f0e1';
 
 function roundedRectShape(w, h, r) {
   const shape = new THREE.Shape();
@@ -77,21 +75,28 @@ function roundedRectShape(w, h, r) {
   return shape;
 }
 
-// Same rounded-rect, but only the bottom two corners are rounded and the
-// top edge is a plain straight line — so when the résumé tab is slid all
-// the way out (its top edge flush against the card's bottom edge) the two
-// objects read as one continuous card, matching the card's own corner
-// radius only where a new outer edge is actually created.
-function bottomRoundedRectShape(w, h, r) {
+// A tab shape whose top-left/top-right corners are not independently
+// rounded, but are the *exact same* quadratic curve the card's own
+// bottom-left/bottom-right corners use (same three control points — see
+// roundedRectShape's bottom corners above). Two independently-rounded
+// corners meeting at the seam are only tangent at a single point and then
+// curve away from each other on both sides of it, leaving a lens-shaped
+// gap — same radius or not, that gap is unavoidable between two separate
+// curves. Reusing the identical curve isn't "close enough to match", it's
+// the same curve, so there's nothing between them to gap.
+function tabRoundedRectShape(w, h, r) {
   const shape = new THREE.Shape();
   const x = -w / 2, y = -h / 2;
-  shape.moveTo(x, y + h);
+  const top = y + h;
+  shape.moveTo(x + r, top);
+  shape.quadraticCurveTo(x, top, x, top + r);
   shape.lineTo(x, y + r);
   shape.quadraticCurveTo(x, y, x + r, y);
   shape.lineTo(x + w - r, y);
   shape.quadraticCurveTo(x + w, y, x + w, y + r);
-  shape.lineTo(x + w, y + h);
-  shape.lineTo(x, y + h);
+  shape.lineTo(x + w, top + r);
+  shape.quadraticCurveTo(x + w, top, x + w - r, top);
+  shape.lineTo(x + r, top);
   return shape;
 }
 
@@ -107,22 +112,19 @@ const CONTACT = {
   location: 'Brooklyn, NY'
 };
 
-const JOBS = [
-  { name: 'Urban Architecture Inc.', dates: '2022 – Present', tags: 'DIGITAL STRATEGY · E-COMMERCE · CONTENT' },
-  { name: 'Bernard Figueroa Studio', dates: '2025 – Present', tags: 'PHOTOGRAPHY · SOCIAL · EMAIL' },
-  { name: 'STATMASK', dates: '2020 – 2022', tags: 'PRODUCT PHOTOGRAPHY · PAID SOCIAL · E-COMMERCE' },
-  { name: 'Contributor Development Partnership', dates: '2023', tags: 'TRAINING · CRM · DOCUMENTATION' }
-];
-const TAGCLOUD_LINE_1 = 'STRATEGY · WEB · CONTENT · PHOTOGRAPHY · SOCIAL';
-const TAGCLOUD_LINE_2 = 'EMAIL · PAID SOCIAL · E-COMMERCE · TRAINING · CRM';
 const RESUME_PDF_PATH = 'assets/matthew-scheffler-resume.pdf';
 
-// Résumé-tab layout, expressed as fractions of BASE_CARD_HEIGHT measured
-// from the CARD's top edge (so these compose with TOGGLE_BAND_* above) —
-// kept in that space purely so the spacing constants read the same way
-// they always have. TAB_F_OFFSET (= TOGGLE_BAND_BOTTOM_F) is subtracted
-// off whenever one of these needs to become a position *on the tab's own
-// canvas*, whose top edge is this same offset lower down.
+// Résumé/tab layout, expressed as fractions of BASE_CARD_HEIGHT measured
+// down from the card's TOP edge. Landmarks derive from each other so
+// there's one place to retune spacing. Everything through
+// TOGGLE_BAND_BOTTOM_F is drawn on the card's own front/back faces;
+// everything from ROWS_TOP_F on lives on the separate dropdown tab (see
+// TAB_F_OFFSET below).
+const TOGGLE_BAND_TOP_F = 0.99;
+const TOGGLE_LABEL_F = 1.075;
+const TOGGLE_BAND_BOTTOM_F = 1.16;
+const CARD_HEIGHT = BASE_CARD_HEIGHT * TOGGLE_BAND_BOTTOM_F;
+
 const ROWS_TOP_F = TOGGLE_BAND_BOTTOM_F;
 const ROW_HEIGHT_F = 0.155;
 const ROWS_BOTTOM_F = ROWS_TOP_F + JOBS.length * ROW_HEIGHT_F;
@@ -134,23 +136,50 @@ const DOWNLOAD_LABEL_F = DOWNLOAD_BAND_TOP_F + 0.055;
 const DOWNLOAD_BAND_BOTTOM_F = DOWNLOAD_BAND_TOP_F + 0.11;
 const TAB_CONTENT_BOTTOM_F = DOWNLOAD_BAND_BOTTOM_F + 0.05;
 
+// TAB_F_OFFSET (= TOGGLE_BAND_BOTTOM_F) is subtracted off whenever one of
+// these card-relative fractions needs to become a position on the tab's
+// own canvas, whose top edge is this same offset lower down.
 const TAB_F_OFFSET = TOGGLE_BAND_BOTTOM_F;
-// The tab's own fixed height — built once, never resized.
 const TAB_HEIGHT = BASE_CARD_HEIGHT * (TAB_CONTENT_BOTTOM_F - TAB_F_OFFSET);
 
-// Where things rest, in local Y (card-space) — all fixed constants, none of
-// them ever recomputed from a "current" size:
-const CARD_BOTTOM_LOCAL_Y = -CARD_HEIGHT / 2;
-// tucked fully behind the card's own body, hidden by its opaque front face
-const TAB_CLOSED_LOCAL_Y = CARD_BOTTOM_LOCAL_Y + TAB_HEIGHT / 2;
-// slid out, top edge flush against the card's bottom edge
-const TAB_OPEN_LOCAL_Y = CARD_BOTTOM_LOCAL_Y - TAB_HEIGHT / 2;
-
-// How far the card itself rises toward the top of the page when the résumé
-// opens (world units) — the rest of the tab's height is made up by the
-// page growing (see PAGE_GROWTH_WORLD / updateHeroPadding).
+// How far the card itself rises toward the top of the page when the
+// dropdown opens (world units) — the rest of the tab's height is made up
+// by the page growing (see PAGE_GROWTH_WORLD / updateHeroPadding).
 const PARKED_LIFT = TAB_HEIGHT * 0.6;
 const PAGE_GROWTH_WORLD = TAB_HEIGHT - PARKED_LIFT;
+
+// Where things rest, in local Y (card-space) — all fixed constants, none
+// of them ever recomputed from a "current" size.
+const CARD_BOTTOM_LOCAL_Y = -CARD_HEIGHT / 2;
+const TAB_CLOSED_LOCAL_Y = CARD_BOTTOM_LOCAL_Y + TAB_HEIGHT / 2;
+const TAB_OPEN_LOCAL_Y = CARD_BOTTOM_LOCAL_Y - TAB_HEIGHT / 2;
+
+// Fixed texture resolution. TEX_BASE_PX is the pixel height of one
+// BASE_CARD_HEIGHT — the unit the card's own *_F layout fractions are
+// multiplied by when drawing; the tab canvas uses its own analogous scale
+// (see drawTab/drawNoteTab).
+const TEX_W = 1024;
+const TEX_H = Math.round(TEX_W * (CARD_HEIGHT / CARD_WIDTH));
+const TEX_BASE_PX = TEX_W * (BASE_CARD_HEIGHT / CARD_WIDTH);
+const TAB_TEX_H = Math.round(TEX_W * (TAB_HEIGHT / CARD_WIDTH));
+
+const FOV_DEG = 32;
+const TAN_HALF_FOV = Math.tan(THREE.MathUtils.degToRad(FOV_DEG) / 2);
+// preserves the card's on-screen size regardless of viewport — fixed to
+// BASE_CARD_HEIGHT so the page growing to reveal the dropdown never itself
+// changes how big anything already on screen appears. See handleResize().
+const REFERENCE_CARD_PX_HEIGHT = 366;
+const PIXELS_PER_WORLD_UNIT = REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT;
+
+// how far a drag-release must TRAVEL (relative to where that drag started,
+// as a fraction of viewport height) before it opens/closes the dropdown.
+const DRAG_UP_THRESHOLD_FRACTION = 0.16;
+const DRAG_DOWN_THRESHOLD_FRACTION = 0.12;
+
+// keeps a dropped card reachable — it can be parked anywhere, but never
+// entirely off-screen where it couldn't be picked up again.
+const MAX_POS_X_FRACTION = 0.45;
+const MAX_POS_Y_FRACTION = 0.40;
 
 const EASE = {
   outCubic: t => 1 - Math.pow(1 - t, 3),
@@ -173,18 +202,34 @@ function tween(duration, ease, onUpdate, onDone) {
   return () => cancelAnimationFrame(raf);
 }
 
-function clamp255(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
-
-function applyGrain(ctx, w, h, amount) {
-  const imgData = ctx.getImageData(0, 0, w, h);
-  const d = imgData.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const n = (Math.random() - 0.5) * amount;
-    d[i] = clamp255(d[i] + n);
-    d[i + 1] = clamp255(d[i + 1] + n);
-    d[i + 2] = clamp255(d[i + 2] + n * 0.9);
+// Grain is a small tiled noise pattern composited at low alpha, rather
+// than a per-pixel pass over the full texture.
+let grainPatternCanvas = null;
+function getGrainCanvas() {
+  if (grainPatternCanvas) return grainPatternCanvas;
+  const s = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(s, s);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 128 + (Math.random() - 0.5) * 190;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
   }
-  ctx.putImageData(imgData, 0, 0);
+  ctx.putImageData(img, 0, 0);
+  grainPatternCanvas = c;
+  return c;
+}
+
+function applyGrain(ctx, w, h, alpha) {
+  const pattern = ctx.createPattern(getGrainCanvas(), 'repeat');
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.fillStyle = pattern;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
 }
 
 function drawTracked(ctx, text, x, y, size, color, spacing, font) {
@@ -216,30 +261,9 @@ function makeBumpTexture() {
   return tex;
 }
 
-const FOV_DEG = 32;
-const TAN_HALF_FOV = Math.tan(THREE.MathUtils.degToRad(FOV_DEG) / 2);
-// preserves the card's original on-screen size (from when the canvas was
-// confined to the small hero container) now that the canvas covers the
-// full hero section instead. Fixed to BASE_CARD_HEIGHT so the résumé
-// reveal growing the page never itself changes how big anything already
-// on screen appears — see handleResize().
-const REFERENCE_CARD_PX_HEIGHT = 366;
-const PIXELS_PER_WORLD_UNIT = REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT;
-
-// how far (as a fraction of viewport height) a drag-release must travel,
-// up or down, before it opens/closes the résumé the same way clicking the
-// toggle row does.
-const DRAG_UP_THRESHOLD_FRACTION = 0.16;
-const DRAG_DOWN_THRESHOLD_FRACTION = 0.12;
-
 export function initCard(container) {
   injectStyles();
 
-  // the canvas must cover the whole hero section — not just the small
-  // container box the DOM overlays live in — so the card has room to be
-  // dragged/thrown anywhere on screen without hitting a bounding-box edge.
-  // Every ancestor up to <html> is also forced to overflow:visible so none
-  // of them can clip it either.
   const interactionRoot = container.closest('section') || container;
   for (let el = container; el; el = el.parentElement) {
     el.style.overflow = 'visible';
@@ -269,32 +293,58 @@ export function initCard(container) {
   fill.position.set(-3, -1.2, 2.4);
   scene.add(fill);
 
-  /* ---------- card textures (drawn once; redrawn only twice per résumé
-     toggle, to swap the chevron glyph — never resized, never touched on a
-     per-frame basis) ---------- */
+  /* ---------- textures: fixed resolution, drawn once, never rebuilt ---------- */
 
   const frontCanvas = document.createElement('canvas');
   const backCanvas = document.createElement('canvas');
+  const tabCanvas = document.createElement('canvas');
+  const noteCanvas = document.createElement('canvas');
+  frontCanvas.width = backCanvas.width = tabCanvas.width = noteCanvas.width = TEX_W;
+  frontCanvas.height = backCanvas.height = TEX_H;
+  tabCanvas.height = noteCanvas.height = TAB_TEX_H;
+
   const frontTex = new THREE.CanvasTexture(frontCanvas);
   const backTex = new THREE.CanvasTexture(backCanvas);
-  frontTex.colorSpace = backTex.colorSpace = THREE.SRGBColorSpace;
+  const tabTex = new THREE.CanvasTexture(tabCanvas);
+  const noteTex = new THREE.CanvasTexture(noteCanvas);
+  [frontTex, backTex, tabTex, noteTex].forEach(t => { t.colorSpace = THREE.SRGBColorSpace; });
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  [frontTex, backTex, tabTex, noteTex].forEach(t => { t.anisotropy = maxAniso; });
 
-  function sizeCanvas(canvas, aspectW, aspectH) {
-    const w = 1024;
-    const h = Math.round(w * (aspectH / aspectW));
-    canvas.width = w;
-    canvas.height = h;
-    return canvas.getContext('2d');
+  // shared toggle-row drawing for the card's own front/back faces — same
+  // spot on both, toggling the same shared open/closed state.
+  function drawToggleRow(ctx, w, bh, pad, label) {
+    ctx.save();
+    ctx.setLineDash([bh * 0.012, bh * 0.012]);
+    ctx.strokeStyle = 'rgba(28,20,10,0.25)';
+    ctx.lineWidth = Math.max(1, bh * 0.003);
+    ctx.beginPath();
+    ctx.moveTo(pad, bh * TOGGLE_BAND_TOP_F);
+    ctx.lineTo(w - pad, bh * TOGGLE_BAND_TOP_F);
+    ctx.stroke();
+    ctx.restore();
+
+    drawTracked(ctx, label, pad, bh * TOGGLE_LABEL_F, Math.round(bh * 0.034), 'rgba(28,20,10,0.55)', 1.3);
+    ctx.save();
+    ctx.font = `400 ${Math.round(bh * 0.04)}px "DM Mono", monospace`;
+    ctx.fillStyle = 'rgba(28,20,10,0.55)';
+    ctx.textAlign = 'center';
+    ctx.translate(w - pad - bh * 0.02, bh * (TOGGLE_LABEL_F - 0.01));
+    ctx.rotate(dropdownOpen ? Math.PI : 0);
+    ctx.fillText('⌄', 0, 0);
+    ctx.restore();
   }
 
   function drawFront() {
-    const ctx = sizeCanvas(frontCanvas, CARD_WIDTH, CARD_HEIGHT);
-    const w = frontCanvas.width, h = frontCanvas.height;
-    const bh = h; // the card's own canvas is always exactly CARD_HEIGHT tall
-    const pad = w * 0.09;
+    const ctx = frontCanvas.getContext('2d');
+    const w = TEX_W, h = TEX_H, bh = TEX_BASE_PX;
+    const pad = w * CARD_PAD_FRACTION;
 
-    ctx.fillStyle = '#f7f0e1';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = CARD_STOCK_COLOR;
     ctx.fillRect(0, 0, w, h);
+
     const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
     vg.addColorStop(0, 'rgba(28,20,10,0)');
     vg.addColorStop(1, 'rgba(28,20,10,0.06)');
@@ -302,52 +352,32 @@ export function initCard(container) {
     ctx.fillRect(0, 0, w, bh);
 
     ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#1c140a';
-    ctx.font = `400 ${Math.round(bh * 0.135)}px "EB Garamond", serif`;
-    ctx.fillText(CONTACT.first, pad, bh * 0.365);
+    ctx.font = `400 ${Math.round(bh * 0.155)}px "EB Garamond", serif`;
+    ctx.fillText(CONTACT.first, pad, bh * 0.42);
     ctx.fillStyle = 'rgba(28,20,10,0.55)';
-    ctx.font = `italic 400 ${Math.round(bh * 0.135)}px "EB Garamond", serif`;
-    ctx.fillText(CONTACT.last, pad, bh * 0.52);
+    ctx.font = `italic 400 ${Math.round(bh * 0.155)}px "EB Garamond", serif`;
+    ctx.fillText(CONTACT.last, pad, bh * 0.6);
 
-    drawTracked(ctx, 'DIGITAL STRATEGY · E-COMMERCE', pad, bh * 0.655, Math.round(bh * 0.035), 'rgba(28,20,10,0.5)', 1.4);
-    drawTracked(ctx, 'CONTENT & VISUAL DIRECTION', pad, bh * 0.715, Math.round(bh * 0.035), 'rgba(28,20,10,0.5)', 1.4);
-    drawTracked(ctx, 'BROOKLYN, NY  ·  2026', pad, bh * 0.81, Math.round(bh * 0.031), 'rgba(28,20,10,0.32)', 1.4);
+    drawTracked(ctx, 'DIGITAL STRATEGY · E-COMMERCE', pad, bh * 0.75, Math.round(bh * 0.04), 'rgba(28,20,10,0.5)', 1.4);
+    drawTracked(ctx, 'CONTENT & VISUAL DIRECTION', pad, bh * 0.82, Math.round(bh * 0.04), 'rgba(28,20,10,0.5)', 1.4);
+    drawTracked(ctx, 'BROOKLYN, NY  ·  2026', pad, bh * 0.93, Math.round(bh * 0.036), 'rgba(28,20,10,0.32)', 1.4);
 
-    // dashed divider
-    ctx.save();
-    ctx.setLineDash([bh * 0.012, bh * 0.012]);
-    ctx.strokeStyle = 'rgba(28,20,10,0.25)';
-    ctx.lineWidth = Math.max(1, bh * 0.003);
-    ctx.beginPath();
-    ctx.moveTo(pad, bh * (TOGGLE_BAND_TOP_F / TOGGLE_BAND_BOTTOM_F));
-    ctx.lineTo(w - pad, bh * (TOGGLE_BAND_TOP_F / TOGGLE_BAND_BOTTOM_F));
-    ctx.stroke();
-    ctx.restore();
+    drawToggleRow(ctx, w, bh, pad, 'RÉSUMÉ');
 
-    // toggle row: label + chevron. The chevron's orientation is baked in
-    // directly (0° closed, 180° open) — this redraw happens exactly once
-    // per open/close, not continuously, so there's no per-frame texture
-    // churn and nothing here can ever warp the card's own fixed geometry.
-    const labelYF = TOGGLE_LABEL_F / TOGGLE_BAND_BOTTOM_F;
-    drawTracked(ctx, 'RÉSUMÉ', pad, bh * labelYF, Math.round(bh * 0.03), 'rgba(28,20,10,0.55)', 1.3);
-    ctx.save();
-    ctx.font = `400 ${Math.round(bh * 0.035)}px "DM Mono", monospace`;
-    ctx.fillStyle = 'rgba(28,20,10,0.55)';
-    ctx.textAlign = 'center';
-    ctx.translate(w - pad - bh * 0.017, bh * (labelYF - 0.009));
-    ctx.rotate(resumeOpen ? Math.PI : 0);
-    ctx.fillText('⌄', 0, 0);
-    ctx.restore();
-
-    applyGrain(ctx, w, h, 6);
+    applyGrain(ctx, w, h, 0.055);
     frontTex.needsUpdate = true;
   }
 
   function drawBack() {
-    const ctx = sizeCanvas(backCanvas, CARD_WIDTH, CARD_HEIGHT);
-    const w = backCanvas.width, h = backCanvas.height;
-    const bh = h;
-    ctx.fillStyle = '#efe4cd';
+    const ctx = backCanvas.getContext('2d');
+    const w = TEX_W, h = TEX_H, bh = TEX_BASE_PX;
+    const pad = w * CARD_PAD_FRACTION;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = CARD_STOCK_COLOR;
     ctx.fillRect(0, 0, w, h);
     const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
     vg.addColorStop(0, 'rgba(28,20,10,0)');
@@ -355,38 +385,36 @@ export function initCard(container) {
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, w, bh);
 
-    const pad = w * 0.09;
-    drawTracked(ctx, 'CONTACT', pad, bh * 0.14, Math.round(bh * 0.032), 'rgba(28,20,10,0.4)', 3);
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    drawTracked(ctx, 'CONTACT', pad, bh * 0.18, Math.round(bh * 0.04), 'rgba(28,20,10,0.4)', 3);
 
     const lines = [CONTACT.email, CONTACT.phoneDisplay, CONTACT.url, CONTACT.location];
-    const startY = bh * 0.32;
-    const lineGap = bh * 0.13;
+    const startY = bh * 0.38;
+    const lineGap = bh * 0.148;
     lines.forEach((line, i) => {
-      drawTracked(ctx, line.toUpperCase(), pad, startY + i * lineGap, Math.round(bh * 0.05), '#1c140a', 1.2);
+      drawTracked(ctx, line.toUpperCase(), pad, startY + i * lineGap, Math.round(bh * 0.058), '#1c140a', 1.2);
     });
 
-    applyGrain(ctx, w, h, 6);
+    drawToggleRow(ctx, w, bh, pad, 'OR LEAVE A NOTE');
+
+    applyGrain(ctx, w, h, 0.055);
     backTex.needsUpdate = true;
   }
 
-  /* ---------- résumé tab texture (own canvas, own fixed size — drawn
-     once, never resized) ---------- */
-
-  const tabCanvas = document.createElement('canvas');
-  const tabTex = new THREE.CanvasTexture(tabCanvas);
-  tabTex.colorSpace = THREE.SRGBColorSpace;
-
+  // job rows, tag cloud, and the download link — all live on the résumé
+  // tab's own canvas now, rebased so its top edge is TAB_F_OFFSET.
   function drawTab() {
-    const ctx = sizeCanvas(tabCanvas, CARD_WIDTH, TAB_HEIGHT);
-    const w = tabCanvas.width, h = tabCanvas.height;
-    const bh = h / (TAB_CONTENT_BOTTOM_F - TAB_F_OFFSET); // same px-per-fraction scale as the card's own canvas
-    const pad = w * 0.09;
-    const off = TAB_F_OFFSET; // rebases the card-relative *_F constants onto the tab's own top edge
+    const ctx = tabCanvas.getContext('2d');
+    const w = TEX_W, h = TAB_TEX_H, bh = TEX_BASE_PX;
+    const off = TAB_F_OFFSET;
+    const pad = w * CARD_PAD_FRACTION;
 
-    ctx.fillStyle = '#f7f0e1';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = CARD_STOCK_COLOR;
     ctx.fillRect(0, 0, w, h);
 
-    // job rows
     JOBS.forEach((job, i) => {
       const rowTopF = ROWS_TOP_F + i * ROW_HEIGHT_F - off;
       ctx.font = `400 ${Math.round(bh * 0.052)}px "EB Garamond", serif`;
@@ -401,7 +429,7 @@ export function initCard(container) {
       ctx.fillText(job.dates, w - pad, bh * (rowTopF + 0.07));
       ctx.restore();
 
-      drawTracked(ctx, job.tags, pad, bh * (rowTopF + 0.11), Math.round(bh * 0.023), 'rgba(28,20,10,0.35)', 1.1);
+      drawTracked(ctx, job.tags.join(' · '), pad, bh * (rowTopF + 0.11), Math.round(bh * 0.023), 'rgba(28,20,10,0.35)', 1.1);
 
       ctx.save();
       ctx.strokeStyle = 'rgba(28,20,10,0.1)';
@@ -413,11 +441,13 @@ export function initCard(container) {
       ctx.restore();
     });
 
-    // tag cloud
-    drawTracked(ctx, TAGCLOUD_LINE_1, pad, bh * (TAGCLOUD_TOP_F - off), Math.round(bh * 0.021), 'rgba(28,20,10,0.3)', 1);
-    drawTracked(ctx, TAGCLOUD_LINE_2, pad, bh * (TAGCLOUD_BOTTOM_F - off), Math.round(bh * 0.021), 'rgba(28,20,10,0.3)', 1);
+    const allTags = Array.from(new Set(JOBS.flatMap(j => j.tags)));
+    const half = Math.ceil(allTags.length / 2);
+    const line1 = allTags.slice(0, half).join(' · ');
+    const line2 = allTags.slice(half).join(' · ');
+    drawTracked(ctx, line1, pad, bh * (TAGCLOUD_TOP_F - off), Math.round(bh * 0.021), 'rgba(28,20,10,0.3)', 1);
+    drawTracked(ctx, line2, pad, bh * (TAGCLOUD_BOTTOM_F - off), Math.round(bh * 0.021), 'rgba(28,20,10,0.3)', 1);
 
-    // download link, with a manual underline (canvas has no text-decoration)
     const downloadText = 'DOWNLOAD RÉSUMÉ (PDF) →';
     const downloadSize = Math.round(bh * 0.027);
     ctx.font = `400 ${downloadSize}px "DM Mono", monospace`;
@@ -434,8 +464,22 @@ export function initCard(container) {
     ctx.stroke();
     ctx.restore();
 
-    applyGrain(ctx, w, h, 6);
+    applyGrain(ctx, w, h, 0.055);
     tabTex.needsUpdate = true;
+  }
+
+  // the note tab's own canvas stays a blank stock-color background — the
+  // actual form is a real DOM overlay (contact.js) sitting on top of it,
+  // so there's nothing to draw here beyond matching the card stock.
+  function drawNoteTab() {
+    const ctx = noteCanvas.getContext('2d');
+    const w = TEX_W, h = TAB_TEX_H;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = CARD_STOCK_COLOR;
+    ctx.fillRect(0, 0, w, h);
+    applyGrain(ctx, w, h, 0.055);
+    noteTex.needsUpdate = true;
   }
 
   const bump = makeBumpTexture();
@@ -465,19 +509,6 @@ export function initCard(container) {
     });
   }
 
-  // ShapeGeometry's default UVs are raw shape-space coordinates, not
-  // normalized to 0..1 (unlike BoxGeometry's faces) — remap them to the
-  // shape's own bounding box ourselves.
-  function remapUV(geo, w, h) {
-    const uv = geo.attributes.uv;
-    for (let i = 0; i < uv.count; i++) {
-      const u = (uv.getX(i) + w / 2) / w;
-      const v = (uv.getY(i) + h / 2) / h;
-      uv.setXY(i, u, v);
-    }
-    uv.needsUpdate = true;
-  }
-
   /* ---------- card mesh: rounded-rect front/back caps + extruded edge.
      Built exactly once, at its one fixed size — nothing here is ever
      rebuilt or resized again. ---------- */
@@ -489,6 +520,16 @@ export function initCard(container) {
   const hitMat = new THREE.MeshBasicMaterial({ visible: false });
 
   const cardShape = roundedRectShape(CARD_WIDTH, CARD_HEIGHT, CARD_RADIUS);
+
+  function remapUV(geo, w, h) {
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) {
+      const u = (uv.getX(i) + w / 2) / w;
+      const v = (uv.getY(i) + h / 2) / h;
+      uv.setXY(i, u, v);
+    }
+    uv.needsUpdate = true;
+  }
 
   const frontGeo = new THREE.ShapeGeometry(cardShape, 16);
   remapUV(frontGeo, CARD_WIDTH, CARD_HEIGHT);
@@ -508,48 +549,82 @@ export function initCard(container) {
   const hitGeo = new THREE.BoxGeometry(CARD_WIDTH, CARD_HEIGHT, CARD_THICKNESS * 3);
   const hitMesh = new THREE.Mesh(hitGeo, hitMat);
 
-  /* ---------- résumé tab mesh: a second, entirely separate fixed-size
-     object. It never scales or rebuilds either — opening/closing the
-     résumé only ever *moves* it (and the card), never reshapes either
-     one. ---------- */
+  /* ---------- tab meshes: two second, entirely separate fixed-size
+     objects — one behind the front face (résumé), one behind the back
+     (contact note). Neither ever scales or rebuilds; opening/closing
+     either only ever *moves* it (and the card), never reshapes anything.
+     Both are built by the same makeTab() so the two stay identical in
+     construction; mirrored=true is the only thing that differs for the
+     back one, flipping it to face the same way backCap does. ---------- */
 
-  const tabMat = cardStockMaterial(tabTex);
-  const tabShape = bottomRoundedRectShape(CARD_WIDTH, TAB_HEIGHT, CARD_RADIUS);
+  const tabShape = tabRoundedRectShape(CARD_WIDTH, TAB_HEIGHT, CARD_RADIUS);
+  // Recessed just enough behind the card's own front face to avoid
+  // z-fighting — enough that, when tucked closed, the opaque card front
+  // fully occludes it, but small enough it doesn't read as a visible
+  // depth step once the tab is slid out and its cap sits at the card's edge.
+  const TAB_CAP_Z = CARD_THICKNESS / 2 - 0.0015;
 
-  const tabFrontGeo = new THREE.ShapeGeometry(tabShape, 16);
-  remapUV(tabFrontGeo, CARD_WIDTH, TAB_HEIGHT);
-  const tabFrontCap = new THREE.Mesh(tabFrontGeo, tabMat);
-  // recessed slightly behind the card's own front face so that, when
-  // tucked closed, the opaque card front fully occludes it
-  tabFrontCap.position.z = CARD_THICKNESS / 2 - 0.01;
+  function makeTab(texture, mirrored) {
+    const capGeo = new THREE.ShapeGeometry(tabShape, 16);
+    remapUV(capGeo, CARD_WIDTH, TAB_HEIGHT);
+    const cap = new THREE.Mesh(capGeo, cardStockMaterial(texture));
+    cap.position.z = TAB_CAP_Z;
 
-  const tabEdgeGeo = new THREE.ExtrudeGeometry(tabShape, { depth: CARD_THICKNESS, bevelEnabled: false, curveSegments: 16 });
-  tabEdgeGeo.translate(0, 0, tabFrontCap.position.z - CARD_THICKNESS);
-  const tabEdgeMesh = new THREE.Mesh(tabEdgeGeo, [edgeCapMat, edgeSideMat]);
+    const edgeGeo2 = new THREE.ExtrudeGeometry(tabShape, { depth: CARD_THICKNESS, bevelEnabled: false, curveSegments: 16 });
+    edgeGeo2.translate(0, 0, TAB_CAP_Z - CARD_THICKNESS);
+    const edge = new THREE.Mesh(edgeGeo2, [edgeCapMat, edgeSideMat]);
 
-  const tabHitGeo = new THREE.BoxGeometry(CARD_WIDTH, TAB_HEIGHT, CARD_THICKNESS * 3);
-  const tabHitMesh = new THREE.Mesh(tabHitGeo, hitMat);
+    const hitGeo2 = new THREE.BoxGeometry(CARD_WIDTH, TAB_HEIGHT, CARD_THICKNESS * 3);
+    const hit = new THREE.Mesh(hitGeo2, hitMat);
 
-  const tabGroup = new THREE.Group();
-  tabGroup.add(tabFrontCap, tabEdgeMesh, tabHitMesh);
-  tabGroup.position.y = TAB_CLOSED_LOCAL_Y;
+    const group = new THREE.Group();
+    group.add(cap, edge, hit);
+    if (mirrored) group.rotation.y = Math.PI;
+    group.position.y = TAB_CLOSED_LOCAL_Y;
+    return { group, hit };
+  }
+
+  const { group: tabGroup, hit: tabHitMesh } = makeTab(tabTex, false);
+  const { group: noteGroup } = makeTab(noteTex, true);
+
+  // anchor for the contact form's CSS-3D panel (see contact.js):
+  // positioned in the *same* unmirrored local convention as the note
+  // tab's own cap, so it automatically inherits the tab's open/close
+  // slide, the mirrored (back-facing) orientation, and — further up the
+  // chain — the card's own drag/tilt/flip/lift transform.
+  const noteAnchor = new THREE.Object3D();
+  noteAnchor.position.set(0, 0, TAB_CAP_Z + 0.001);
+  noteGroup.add(noteAnchor);
 
   const cardMesh = new THREE.Group();
-  cardMesh.add(edgeMesh, frontCap, backCap, hitMesh, tabGroup);
+  cardMesh.add(edgeMesh, frontCap, backCap, hitMesh, tabGroup, noteGroup);
 
   const cardGroup = new THREE.Group();
   cardGroup.add(cardMesh);
   scene.add(cardGroup);
 
-  // declared ahead of the initial draw calls below since drawFront() reads
-  // it to decide which way the chevron glyph points
-  let resumeOpen = false;
+  let basePaddingBottomPx = null;
+
+  function updateHeroPadding(progress) {
+    if (basePaddingBottomPx === null) {
+      basePaddingBottomPx = parseFloat(getComputedStyle(interactionRoot).paddingBottom) || 0;
+    }
+    const growthPx = PAGE_GROWTH_WORLD * progress * PIXELS_PER_WORLD_UNIT;
+    interactionRoot.style.paddingBottom = (basePaddingBottomPx + growthPx) + 'px';
+    handleResize();
+  }
+
+  // declared ahead of the initial draw calls below since drawFront()/
+  // drawBack() read this to decide which way the chevron glyph points
+  let dropdownOpen = false;
+  let dropdownProgress = 0; // both tabs' current, shared 0..1 slide progress
   let cardLift = 0;
-  let cancelResumeTween = null;
+  let cancelDropdownTween = null;
 
   drawFront();
   drawBack();
   drawTab();
+  drawNoteTab();
 
   // regenerate all text once webfonts are confirmed loaded, for crisp type
   if (document.fonts && document.fonts.ready) {
@@ -560,39 +635,46 @@ export function initCard(container) {
     });
   }
 
-  /* ---------- résumé open/close: the card and the tab each animate their
-     own position in lockstep, driven by one shared progress value; the
+  /* ---------- open/close: a single shared state drives both tabs at
+     once, in lockstep, animating the card and both tabs' positions; the
      page grows to match. No geometry or texture is touched by any of
-     this. ---------- */
+     this. Flipping never opens or closes anything by itself — whichever
+     face you land on after a flip shows its own tab already in the same
+     open/closed state, since both tabs always move together. ---------- */
 
-  function setResumeVisual(progress) {
+  function setDropdownVisual(progress) {
+    dropdownProgress = progress;
+    const y = TAB_CLOSED_LOCAL_Y + (TAB_OPEN_LOCAL_Y - TAB_CLOSED_LOCAL_Y) * progress;
+    tabGroup.position.y = y;
+    noteGroup.position.y = y;
     cardLift = PARKED_LIFT * progress;
-    tabGroup.position.y = TAB_CLOSED_LOCAL_Y + (TAB_OPEN_LOCAL_Y - TAB_CLOSED_LOCAL_Y) * progress;
     updateHeroPadding(progress);
   }
 
-  function animateResume(target) {
-    if (cancelResumeTween) cancelResumeTween();
-    const start = (cardLift / PARKED_LIFT) || 0;
-    cancelResumeTween = tween(500, EASE.outCubic, (v) => {
-      setResumeVisual(start + (target - start) * v);
+  function animateDropdown(target) {
+    if (cancelDropdownTween) cancelDropdownTween();
+    const start = dropdownProgress;
+    cancelDropdownTween = tween(500, EASE.outCubic, (v) => {
+      setDropdownVisual(start + (target - start) * v);
     }, () => {
-      cancelResumeTween = null;
+      cancelDropdownTween = null;
     });
   }
 
-  function expandResume() {
-    if (resumeOpen) return;
-    resumeOpen = true;
+  function openDropdown() {
+    if (dropdownOpen) return;
+    dropdownOpen = true;
     drawFront();
-    animateResume(1);
+    drawBack();
+    animateDropdown(1);
   }
 
-  function collapseResume() {
-    if (!resumeOpen) return;
-    resumeOpen = false;
+  function closeDropdown() {
+    if (!dropdownOpen) return;
+    dropdownOpen = false;
     drawFront();
-    animateResume(0);
+    drawBack();
+    animateDropdown(0);
   }
 
   function downloadResumePdf() {
@@ -604,33 +686,25 @@ export function initCard(container) {
     document.body.removeChild(a);
   }
 
-  let basePaddingBottomPx = null;
-
-  function updateHeroPadding(progress) {
-    if (basePaddingBottomPx === null) {
-      basePaddingBottomPx = parseFloat(getComputedStyle(interactionRoot).paddingBottom) || 0;
-    }
-    const growthPx = PAGE_GROWTH_WORLD * progress * PIXELS_PER_WORLD_UNIT;
-    interactionRoot.style.paddingBottom = (basePaddingBottomPx + growthPx) + 'px';
-    // padding-only growth doesn't change interactionRoot's content-box
-    // size, so a ResizeObserver watching that (the default) never fires
-    // for it — handleResize() is called directly instead, every frame of
-    // the reveal, to keep the camera/renderer in sync with the growing
-    // section.
-    handleResize();
+  function isCardSettled() {
+    return !dragging && !flipping && !cancelDropdownTween;
   }
 
   /* ---------- interaction state ---------- */
 
-  // hover tilt: vertical -> X, horizontal -> Y, same small-angle spring for both
   let tiltX = 0, tiltTargetX = 0, tiltVelX = 0;
   let tiltY = 0, tiltTargetY = 0, tiltVelY = 0;
   const TILT_MAX = THREE.MathUtils.degToRad(12);
   const TILT_STIFFNESS = 0.09;
   const TILT_DAMPING = 0.8;
-  let hovering = false; // cursor currently within interactionRoot (and not dragging)
+  let hovering = false;
 
-  // click-to-flip
+  let physicsSuspended = false;
+  function setPhysicsSuspended(v) {
+    physicsSuspended = v;
+    if (v) { tiltTargetX = 0; tiltTargetY = 0; }
+  }
+
   let flipYaw = 0, flipped = false, flipping = false;
 
   let idleT = Math.random() * 100;
@@ -672,13 +746,16 @@ export function initCard(container) {
   function hitsCard(clientX, clientY) {
     setNdcFromClient(clientX, clientY);
     if (raycaster.intersectObject(hitMesh, false).length > 0) return true;
-    if (resumeOpen) return raycaster.intersectObject(tabHitMesh, false).length > 0;
+    // the note tab has no click target of its own (it's a real DOM form,
+    // not canvas-drawn) — only the résumé tab's own hit region needs a
+    // hit test, and only when the front face is actually the one showing.
+    if (!flipped && dropdownOpen) return raycaster.intersectObject(tabHitMesh, false).length > 0;
     return false;
   }
 
-  // returns how far down the click landed, as a fraction of BASE_CARD_HEIGHT
-  // from the card's top edge (matching the *_F layout constants above), or
-  // null if the click missed the card entirely.
+  // returns how far down the click landed, as a fraction of
+  // BASE_CARD_HEIGHT from the card's top edge (matching the *_F layout
+  // constants above), or null if the click missed the card entirely.
   function hitFractionFromTop(clientX, clientY) {
     setNdcFromClient(clientX, clientY);
     const hits = raycaster.intersectObject(hitMesh, false);
@@ -700,23 +777,48 @@ export function initCard(container) {
   }
 
   function handleCardClick(clientX, clientY) {
+    // Checked against the card's own hitbox first. This only covers the
+    // card body itself (up through the toggle band) — the résumé tab's
+    // job rows and download link live entirely below that, on the tab's
+    // own separate mesh, so a null here does NOT mean the click missed
+    // everything; it just means it missed the card proper.
     const frac = hitFractionFromTop(clientX, clientY);
-    if (frac !== null) {
-      if (frac >= TOGGLE_BAND_TOP_F && frac <= TOGGLE_BAND_BOTTOM_F) {
-        if (resumeOpen) collapseResume(); else expandResume();
-        return;
-      }
-      if (!resumeOpen) {
-        toggleFlip();
-        return;
-      }
+
+    // the toggle row sits at the same spot on both faces and toggles the
+    // same shared open/closed state regardless of which one you click
+    if (frac !== null && frac >= TOGGLE_BAND_TOP_F && frac <= TOGGLE_BAND_BOTTOM_F) {
+      if (dropdownOpen) closeDropdown(); else openDropdown();
+      return;
     }
-    if (resumeOpen) {
+
+    if (!flipped && dropdownOpen) {
       const tfrac = tabHitFractionFromTop(clientX, clientY);
-      if (tfrac !== null && tfrac >= DOWNLOAD_BAND_TOP_F && tfrac <= DOWNLOAD_BAND_BOTTOM_F) {
-        downloadResumePdf();
+      if (tfrac !== null) {
+        for (let i = 0; i < JOBS.length; i++) {
+          const rowTopF = ROWS_TOP_F + i * ROW_HEIGHT_F;
+          if (tfrac >= rowTopF && tfrac <= rowTopF + ROW_HEIGHT_F) {
+            // the card only ever announces the click — it stays self-
+            // contained by never calling into the page's own code
+            // directly; the page decides what a job click means.
+            container.dispatchEvent(new CustomEvent('resume-job-click', { detail: { jobId: JOBS[i].id }, bubbles: true }));
+            return;
+          }
+        }
+        if (tfrac >= DOWNLOAD_BAND_TOP_F && tfrac <= DOWNLOAD_BAND_BOTTOM_F) {
+          downloadResumePdf();
+          return;
+        }
       }
     }
+
+    // a click that missed both the card's own hitbox and (when applicable)
+    // the tab's job rows/download link didn't land on anything clickable
+    if (frac === null) return;
+
+    // flipping stays available no matter what's open — the open/closed
+    // state itself is shared between both faces, but which face is
+    // currently showing can always be changed by clicking the card body
+    toggleFlip();
   }
 
   /* ---------- pointer handling: click-on-card = flip/toggle, drag-anywhere = move/throw ---------- */
@@ -725,8 +827,14 @@ export function initCard(container) {
   document.body.style.cursor = 'grab';
 
   interactionRoot.addEventListener('pointerdown', (e) => {
-    if (mode !== 'idle' || flipping) return;
-    if (e.target.closest && e.target.closest('a, button')) return;
+    if (mode !== 'idle' || flipping || physicsSuspended) return;
+    // .contact-form: without this, pressing down to select text in a
+    // field (or just the very click that focuses one) would also start
+    // dragging the whole card. physicsSuspended above covers everything
+    // *after* a field already has focus; this covers the initiating
+    // click itself, which lands before focus (and the suspension it
+    // triggers) has taken effect.
+    if (e.target.closest && e.target.closest('a, button, .contact-form')) return;
     isPointerDown = true;
     potentialDrag = true;
     pointerDownClient = { x: e.clientX, y: e.clientY };
@@ -769,12 +877,17 @@ export function initCard(container) {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && resumeOpen) collapseResume();
+    if (e.key !== 'Escape') return;
+    // a focused form field takes the Escape first (blurs it); only once
+    // there's no field to blur does Escape fall through to closing the tab
+    if (contactForm.blurActive()) return;
+    if (dropdownOpen) closeDropdown();
   });
 
   /* ---------- hover: vertical -> X tilt, horizontal -> Y tilt (small angle, both axes) ---------- */
 
   function updateHoverTilt(clientX, clientY) {
+    if (physicsSuspended) { hovering = false; tiltTargetX = 0; tiltTargetY = 0; return; }
     const rect = interactionRoot.getBoundingClientRect();
     if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
       hovering = false;
@@ -815,6 +928,7 @@ export function initCard(container) {
     dragOriginClientY = clientY;
     dragStartX = posX;
     dragStartY = posY;
+    lastDragProgress = 0;
     liftProgressTarget = 1;
     document.body.style.cursor = 'grabbing';
   }
@@ -823,9 +937,13 @@ export function initCard(container) {
     const rect = renderer.domElement.getBoundingClientRect();
     const worldW = worldWidthAtZ(0);
     const worldH = worldHeightAtZ(0);
-    posX = dragStartX + (clientX - dragOriginClientX) * (worldW / rect.width);
+    const nextX = dragStartX + (clientX - dragOriginClientX) * (worldW / rect.width);
     // screen Y grows downward, world Y grows upward
-    posY = dragStartY - (clientY - dragOriginClientY) * (worldH / rect.height);
+    const nextY = dragStartY - (clientY - dragOriginClientY) * (worldH / rect.height);
+
+    // clamped so a dropped card is always still reachable
+    posX = THREE.MathUtils.clamp(nextX, -worldW * MAX_POS_X_FRACTION, worldW * MAX_POS_X_FRACTION);
+    posY = THREE.MathUtils.clamp(nextY, -worldH * MAX_POS_Y_FRACTION, worldH * MAX_POS_Y_FRACTION);
 
     const edgeThreshold = worldW * 0.5 * 0.42;
     const progress = posX / edgeThreshold;
@@ -845,38 +963,21 @@ export function initCard(container) {
     zoneRight.classList.remove('is-active');
     zoneLeft.classList.remove('is-active');
 
-    if (activeRight) {
-      throwCard('right');
-      return;
-    } else if (activeLeft) {
-      throwCard('left');
-      return;
-    }
+    if (activeRight) { throwCard('right'); return; }
+    if (activeLeft) { throwCard('left'); return; }
 
-    // The card only ever moves as a rigid body — dragging never changes
-    // its shape. posY here is purely the transient hand-off-center offset
-    // from wherever it's currently resting; it always springs back to 0
-    // below. The résumé's own open/closed "parked" offset lives entirely
-    // in cardLift, animated separately by expandResume()/collapseResume(),
-    // which is what actually moves the card toward the top of the page.
+    // The card keeps whatever position it was released at — no snap back
+    // to center. Open/close is judged on how far THIS drag travelled, so
+    // a card already parked near the top doesn't re-trigger on every nudge.
+    mode = 'idle';
     const worldH = worldHeightAtZ(0);
-    const dragDeltaY = posY - dragStartY;
-    if (dragDeltaY > worldH * DRAG_UP_THRESHOLD_FRACTION) {
-      if (resumeOpen) downloadResumePdf(); else expandResume();
-    } else if (dragDeltaY < -worldH * DRAG_DOWN_THRESHOLD_FRACTION) {
-      collapseResume();
-    }
+    const travelY = posY - dragStartY;
 
-    mode = 'returning';
-    const startX = posX, startY = posY;
-    tween(360, EASE.outCubic, (v) => {
-      posX = startX * (1 - v);
-      posY = startY * (1 - v);
-    }, () => {
-      posX = 0;
-      posY = 0;
-      mode = 'idle';
-    });
+    if (travelY > worldH * DRAG_UP_THRESHOLD_FRACTION) {
+      if (dropdownOpen) downloadResumePdf(); else openDropdown();
+    } else if (travelY < -worldH * DRAG_DOWN_THRESHOLD_FRACTION) {
+      closeDropdown();
+    }
   }
 
   function throwCard(direction) {
@@ -884,8 +985,10 @@ export function initCard(container) {
     const sign = direction === 'right' ? 1 : -1;
     const worldW = worldWidthAtZ(0);
     const offX = sign * worldW * 0.85;
-    const startX = posX;
-    const startY = posY;
+    // where the card lives when it isn't mid-throw — it returns here, not
+    // to the center of the screen.
+    const homeX = posX;
+    const homeY = posY;
 
     if (direction === 'right') {
       downloadVCard();
@@ -896,19 +999,20 @@ export function initCard(container) {
     }
 
     tween(340, EASE.inCubic, (v) => {
-      posX = startX + (offX - startX) * v;
-      posY = startY * (1 - v);
+      posX = homeX + (offX - homeX) * v;
       throwSpin = sign * THREE.MathUtils.degToRad(18) * v;
     }, () => {
       posX = offX;
-      posY = 0;
       setTimeout(() => {
         mode = 'returning';
+        const startX = posX;
         tween(480, EASE.outCubic, (v) => {
-          posX = offX * (1 - v);
+          posX = startX + (homeX - startX) * v;
+          posY = homeY;
           throwSpin = sign * THREE.MathUtils.degToRad(18) * (1 - v);
         }, () => {
-          posX = 0;
+          posX = homeX;
+          posY = homeY;
           throwSpin = 0;
           mode = 'idle';
         });
@@ -976,12 +1080,43 @@ export function initCard(container) {
   }
   window.addEventListener('scroll', onFirstScroll, { passive: true });
 
+  /* ---------- contact form (back-face note tab) ---------- */
+
+  const contactForm = initContactForm({
+    THREE,
+    // canvasEl + these two fixed constants replace passing the mutable
+    // `camera` object directly — see contact.js's own doc comment for why
+    // reading position off the live camera was the actual source of the
+    // panel drifting away from the card after a resize
+    canvasEl: renderer.domElement,
+    pixelsPerWorldUnit: PIXELS_PER_WORLD_UNIT,
+    invTanHalfFov: 1 / TAN_HALF_FOV,
+    anchor: noteAnchor,
+    hostEl: interactionRoot,
+    fallbackEmail: CONTACT.email,
+    // driven directly off the same progress moving the tab itself, so the
+    // form fades in/out in exact lockstep with the drawer sliding rather
+    // than lagging behind on its own timer
+    progress: () => (flipped && !flipping) ? dropdownProgress : 0,
+    isCardSettled,
+    onFocusChange: setPhysicsSuspended,
+    // the note tab's true footprint, in the same px units the CSS-3D
+    // projection already uses — lets contact.js hard-clip the form to the
+    // tab's own real size instead of trusting its natural content height
+    // to always stay inside it
+    tabWidthPx: CARD_WIDTH * PIXELS_PER_WORLD_UNIT,
+    tabHeightPx: TAB_HEIGHT * PIXELS_PER_WORLD_UNIT
+  });
+
   /* ---------- resize ---------- */
 
+  let lastResizeW = 0, lastResizeH = 0;
   function handleResize() {
     const w = interactionRoot.clientWidth;
     const h = interactionRoot.clientHeight;
     if (!w || !h) return;
+    lastResizeW = w;
+    lastResizeH = h;
     camera.aspect = w / h;
     // hold on-screen scale constant so the résumé reveal growing
     // interactionRoot's own height — via updateHeroPadding() — never
@@ -998,6 +1133,21 @@ export function initCard(container) {
 
   let lastTime = performance.now();
   function tick(now) {
+    // ResizeObserver notifications are delivered *after* this frame's own
+    // requestAnimationFrame callbacks (per spec) — so mid-resize, the
+    // canvas's on-screen CSS box can already reflect the new size while
+    // camera.aspect/position.z (only touched inside handleResize()) are
+    // still one or more frames stale. That's invisible on the card itself
+    // (its box just follows CSS either way), but contact.js's panel used
+    // to project its position off this same camera every frame — so for
+    // however long the camera lagged, the panel would visibly drift from
+    // the card. Position no longer depends on the camera at all (see
+    // contact.js), but this check stays cheap insurance for the WebGL
+    // render itself never lagging a resize by more than zero frames.
+    if (interactionRoot.clientWidth !== lastResizeW || interactionRoot.clientHeight !== lastResizeH) {
+      handleResize();
+    }
+
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
 
@@ -1013,15 +1163,15 @@ export function initCard(container) {
 
     liftProgress += (liftProgressTarget - liftProgress) * 0.14;
 
-    const idleActive = mode === 'idle' && !hovering && !dragging;
+    const idleActive = mode === 'idle' && !hovering && !dragging && !physicsSuspended;
     const swayY = idleActive ? THREE.MathUtils.degToRad(4) * Math.sin(idleT * 0.5) : 0;
     const breathe = idleActive ? Math.sin(idleT * 0.6) * 0.035 : 0;
 
     // posY is a transient drag offset (always springs back to 0); cardLift
     // is the persistent, state-driven "parked near the top" offset for
-    // when the résumé is open, animated by expandResume()/collapseResume().
+    // when the dropdown is open, animated by openDropdown()/closeDropdown().
     // The two simply add — the card is always just a rigid translation
-    // away from wherever it's currently resting.
+    // away from wherever it's resting.
     cardGroup.position.x = posX;
     cardGroup.position.y = posY + cardLift + breathe + liftProgress * 0.12;
     cardGroup.rotation.set(tiltX, flipYaw + tiltY + swayY, throwSpin);
@@ -1034,6 +1184,7 @@ export function initCard(container) {
     renderer.domElement.style.filter = `drop-shadow(0 ${offY}px ${blur}px rgba(20,14,4,${alpha.toFixed(3)}))`;
 
     renderer.render(scene, camera);
+    contactForm.update();
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
