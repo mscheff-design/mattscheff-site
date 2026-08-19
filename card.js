@@ -947,7 +947,15 @@ export function initCard(container) {
   }
 
   function isCardSettled() {
-    return !dragging && !flipping && !cancelDropdownTween && !cancelReturnTween;
+    // mode, not dragging: dragging flips back to false the instant a drag
+    // ends, but a throw leaves mode at 'thrown'/'returning' for the ~1.6s
+    // the card is still visibly flying off-screen and back (see
+    // throwCard) — exactly the sort of mid-animation state this check
+    // exists to rule out. Every other gate that cares about this
+    // (pointerdown, toggleFlip) already checks mode; this one needs to as
+    // well, since the back face (and its form) stays interactive through
+    // a throw — flipped/flipping are untouched by throwCard.
+    return mode === 'idle' && !flipping && !cancelDropdownTween && !cancelReturnTween;
   }
 
   /* ---------- interaction state ---------- */
