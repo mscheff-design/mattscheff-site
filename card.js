@@ -1571,6 +1571,7 @@ export function initCard(container) {
   /* ---------- render loop ---------- */
 
   let lastTime = performance.now();
+  let lastFilterStr = '';
   function tick(now) {
     // ResizeObserver notifications are delivered *after* this frame's own
     // requestAnimationFrame callbacks (per spec) — so mid-resize, the
@@ -1634,10 +1635,31 @@ export function initCard(container) {
     const scale = 1 + liftProgress * 0.035;
     cardGroup.scale.setScalar(scale);
 
-    const blur = 16 + liftProgress * 12;
-    const offY = 14 + liftProgress * 9;
-    const alpha = 0.26 + liftProgress * 0.16;
-    renderer.domElement.style.filter = `drop-shadow(0 ${offY}px ${blur}px rgba(20,14,4,${alpha.toFixed(3)}))`;
+    // filter:drop-shadow() forces the browser to re-rasterize/re-blur the
+    // whole canvas element every time this string changes — a real,
+    // non-trivial cost, and liftProgress's own ease (above) means the raw
+    // blur/offY/alpha are ALWAYS very slightly different frame to frame,
+    // for as long as it takes to fully converge (asymptotic, so
+    // technically forever). Rounded to a step coarse enough to be
+    // visually identical between adjacent frames but fine enough that the
+    // animation still reads as smooth, so the string — and the expensive
+    // work behind it — only actually changes on a fraction of frames
+    // instead of every single one. This mattered most for exactly the
+    // reported case: the longer a drag lasts before release, the closer
+    // liftProgress gets to its max before liftProgressTarget flips back
+    // to 0, so the bigger and longer the post-release decay tail — a
+    // quick drag barely raises liftProgress before releasing and settles
+    // almost immediately; a slow one saturates it and then has to
+    // re-rasterize a large blur radius every frame for a much longer
+    // settle, right around the moment of release.
+    const blur = Math.round((16 + liftProgress * 12) * 2) / 2;
+    const offY = Math.round((14 + liftProgress * 9) * 2) / 2;
+    const alpha = Math.round((0.26 + liftProgress * 0.16) * 100) / 100;
+    const filterStr = `drop-shadow(0 ${offY}px ${blur}px rgba(20,14,4,${alpha}))`;
+    if (filterStr !== lastFilterStr) {
+      renderer.domElement.style.filter = filterStr;
+      lastFilterStr = filterStr;
+    }
 
     renderer.render(scene, camera);
     contactForm.update();
