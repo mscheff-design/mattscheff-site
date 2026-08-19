@@ -100,8 +100,10 @@
  *                     showing and settled (0 mid-flip or while the front
  *                     is up). Binary, not a slide-driven ramp — the back
  *                     face doesn't extend, so the form has nothing of its
- *                     own to lag behind; see the CSS opacity transition on
- *                     .contact3d-stage for the actual fade.
+ *                     own to lag behind. This no longer drives visibility
+ *                     (see update()'s own comment) — it only gates
+ *                     pointer-events/focus and, on mobile, the plain
+ *                     display toggle.
  *   isCardSettled() - true when the card isn't mid drag/tween/flip;
  *                     gates submit so Enter can't fire mid-animation
  *   onFocusChange(hasFocus) - called when any field gains/loses focus, so
@@ -296,6 +298,13 @@ export function initContactForm(opts) {
   // time this runs, the camera the frame just rendered with and the
   // camera read here are guaranteed to be the same one.
   const mvpMatrix = new THREE.Matrix4();
+  // Facing test (is the anchor's own face turned toward the camera right
+  // now?), used to show/hide the panel every frame — see the comment
+  // where these are used, in update(), for why this is done as an
+  // explicit dot product rather than CSS backface-visibility.
+  const worldNormal = new THREE.Vector3();
+  const toCamera = new THREE.Vector3();
+  const anchorWorldPos = new THREE.Vector3();
   // local panel px (Y-down, origin at panel's own center, post
   // translate(-50%,-50%)) → anchor-local world units (Y-up): a fixed
   // scale, computed once, since neither the unit conversion nor the
@@ -346,11 +355,10 @@ export function initContactForm(opts) {
     stage.classList.toggle('is-mobile', mobile);
 
     // p is binary (0 or 1) — the back face is a fixed region, not a slide,
-    // so there's no ramp to compute here; the actual fade is a plain CSS
-    // opacity transition on .contact3d-stage, triggered by this class/
-    // inline-style flip.
+    // so there's no ramp to compute here. It no longer drives visibility
+    // on desktop (see the transform block below for why); it still gates
+    // interactivity and, on mobile, the plain display toggle.
     const p = progress();
-    stage.style.opacity = mobile ? '' : p;
     stage.classList.toggle('is-visible', p > 0); // mobile's display toggle only
 
     const nextInteractive = p > 0;
@@ -360,7 +368,7 @@ export function initContactForm(opts) {
       if (!interactive) blurActive();
     }
 
-    if (p < 1 || mobile) return;
+    if (mobile) return;
 
     if (w !== lastW || h !== lastH) {
       stage.style.width = w + 'px';
@@ -379,7 +387,37 @@ export function initContactForm(opts) {
       panel.style.top = cachedCanvasCenterY + 'px';
     }
 
+    // Runs every frame regardless of p, including mid-flip: the anchor is
+    // a real child of backCap (see opts doc), so its matrixWorld already
+    // carries the card's live rotation at whatever point the flip tween
+    // is currently at — recomputing the matrix here on every frame,
+    // rather than only once flipped/settled, is what makes the panel
+    // physically spin with the card instead of popping into its resting
+    // pose once the card has already finished turning.
     anchor.updateMatrixWorld(true);
+
+    // Visibility is no longer a separate opacity fade gated by p — it's a
+    // per-frame facing test, so the panel shows/hides at the same instant
+    // the WebGL back cap itself would stop facing the camera, in lockstep
+    // with the card's live rotation rather than only at the two tween
+    // endpoints. This was first tried as CSS backface-visibility:hidden
+    // on the panel (free, and the standard trick for CSS card flips) —
+    // but that test is defined for an ordinary affine 3D transform
+    // (rotateX/Y/translateZ), and panel's transform is a full camera
+    // *projection* matrix, not an affine one; against that matrix
+    // backface-visibility didn't track the true facing direction at all
+    // (the panel showed through, mirrored, even while resting flat on the
+    // front). Explicitly transforming the anchor's own local +Z (its
+    // outward face normal, since backCap's own rotation.y = Math.PI is
+    // already baked into anchor.matrixWorld — see card.js) into world
+    // space and dotting it with the direction to the camera reproduces
+    // exactly the test the WebGL back-face culling itself is doing, so it
+    // can't disagree with what the card's own geometry is doing.
+    worldNormal.set(0, 0, 1).transformDirection(anchor.matrixWorld);
+    anchor.getWorldPosition(anchorWorldPos);
+    toCamera.copy(camera.position).sub(anchorWorldPos);
+    panel.style.visibility = worldNormal.dot(toCamera) > 0 ? 'visible' : 'hidden';
+
     // camera.matrixWorldInverse and .projectionMatrix are both already
     // current: card.js's tick() calls handleResize() (which refreshes
     // the projection matrix) before renderer.render() (which refreshes
@@ -478,12 +516,14 @@ function injectStyles() {
   const style = document.createElement('style');
   style.id = 'contact3d-styles';
   style.textContent = `
-    .contact3d-stage{position:absolute;inset:0;pointer-events:none;overflow:visible;opacity:0;transition:opacity 0.3s ease;transform-style:preserve-3d;-webkit-transform-style:preserve-3d}
+    .contact3d-stage{position:absolute;inset:0;pointer-events:none;overflow:visible;transform-style:preserve-3d;-webkit-transform-style:preserve-3d}
 
     /* fixed to the tab's own real size (set inline, once, from
        tabWidthPx/tabHeightPx) with overflow hidden — this box IS the tab's
        silhouette as far as the form is concerned, so centering the form
-       inside it can never spill past the tab's true edge */
+       inside it can never spill past the tab's true edge. Visibility
+       (facing-camera test) is computed in JS, not via CSS
+       backface-visibility — see update()'s own comment for why. */
     .contact3d-panel{position:absolute;top:0;left:0;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;will-change:transform}
 
     /* the actual clip: fixed to the form's real reserved region, overflow

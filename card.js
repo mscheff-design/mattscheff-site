@@ -1446,9 +1446,12 @@ export function initCard(container) {
     hostEl: interactionRoot,
     fallbackEmail: CONTACT.email,
     // binary now, not a slide-driven ramp — the back face doesn't extend
-    // any more, so the form has nothing to lag behind or race ahead of;
-    // it just fades with the flip settling (see contact.js's own CSS
-    // transition on this)
+    // any more, so the form has nothing to lag behind or race ahead of.
+    // This only gates pointer-events/focus (and mobile's plain display
+    // toggle) — the panel's own transform tracks backFormAnchor every
+    // frame regardless, so it visually spins with the card through the
+    // flip tween itself; see contact.js's update() for how it hides at
+    // the right moment without this flag's help.
     progress: () => (flipped && !flipping) ? 1 : 0,
     isCardSettled,
     onFocusChange: setPhysicsSuspended,
