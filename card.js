@@ -1034,6 +1034,9 @@ export function initCard(container) {
   let flipYaw = 0, flipped = false, flipping = false;
 
   let idleT = Math.random() * 100;
+  // Eased amplitude for the idle sway/breathe effect, not a hard on/off —
+  // see its own comment at the tick() computation for why.
+  let idleBlend = 0;
   let throwSpin = 0;
   let posX = 0, posY = 0;
   let liftProgress = 0, liftProgressTarget = 0;
@@ -1571,7 +1574,10 @@ export function initCard(container) {
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
 
-    if (mode === 'idle') idleT += dt;
+    // Always advances (not gated on mode) — it's just an ambient phase, not
+    // paused-and-resumed state. Only whether it's actually APPLIED (see
+    // idleBlend below) depends on mode/hover/drag.
+    idleT += dt;
 
     tiltVelX += (tiltTargetX - tiltX) * TILT_STIFFNESS;
     tiltVelX *= TILT_DAMPING;
@@ -1583,9 +1589,23 @@ export function initCard(container) {
 
     liftProgress += (liftProgressTarget - liftProgress) * 0.14;
 
+    // idleBlend eases toward 0/1 rather than the sway/breathe amplitude
+    // switching on/off outright: idleActive used to gate swayY/breathe
+    // directly (idleActive ? sin(...) : 0), a hard binary snap between
+    // exactly 0 and whatever the sine happened to be at that instant. Every
+    // mode change back to 'idle' — most noticeably drag-release, since
+    // dragging can hold mode away from 'idle' far longer than a quick
+    // hover-out — could land on any phase, including one near the sine's
+    // own peak, so the very next frame could jump the card's rotation/
+    // position by the sway/breathe's full amplitude in a single frame: a
+    // visible pop landing at the exact instant of release, independent of
+    // any rendering/perf cost. Easing an amplitude multiplier in/out (same
+    // pattern as liftProgress above) fades that in over several frames
+    // instead of snapping it, so a stale phase no longer reads as a pop.
     const idleActive = mode === 'idle' && !hovering && !dragging && !physicsSuspended;
-    const swayY = idleActive ? THREE.MathUtils.degToRad(4) * Math.sin(idleT * 0.5) : 0;
-    const breathe = idleActive ? Math.sin(idleT * 0.6) * 0.035 : 0;
+    idleBlend += ((idleActive ? 1 : 0) - idleBlend) * 0.1;
+    const swayY = THREE.MathUtils.degToRad(4) * Math.sin(idleT * 0.5) * idleBlend;
+    const breathe = Math.sin(idleT * 0.6) * 0.035 * idleBlend;
 
     // posY is a transient drag offset (always springs back to 0); cardLift
     // is the persistent, state-driven "parked near the top" offset for
