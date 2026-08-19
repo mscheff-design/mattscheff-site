@@ -1415,8 +1415,16 @@ export function initCard(container) {
     // out and back, with just enough rotation (a few degrees) to keep it
     // feeling physical rather than purely mechanical.
     const THROW_SPIN_DEG = 5;
+    // Starts from wherever the drag actually left the card (updateDrag's
+    // own clamped posX), not from homeX — the drag already carried it
+    // most of the way to the edge, so continuing from there (rather than
+    // snapping back to center for this tween's own v=0 frame, then
+    // animating out) is what makes release read as one unbroken sweep
+    // continuing the hand's own motion, instead of the card visibly
+    // resetting and then taking off on its own.
+    const departX = posX;
     tween(420, EASE.outCubic, (v) => {
-      posX = homeX + (offX - homeX) * v;
+      posX = departX + (offX - departX) * v;
       throwSpin = sign * THREE.MathUtils.degToRad(THROW_SPIN_DEG) * v;
     }, () => {
       posX = offX;
