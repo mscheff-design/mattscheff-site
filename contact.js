@@ -16,30 +16,44 @@
  * <input> elements remain normal, focusable, native DOM nodes the whole
  * time (crisp text at any zoom, real caret/selection, real autofill).
  *
- * Deliberately NOT built on Three's `.project(camera)` (an earlier version
- * was): that reads camera.projectionMatrix, which only gets refreshed
- * inside card.js's handleResize() — a separate callback (ResizeObserver)
- * that isn't guaranteed to run before the frame that reads it. Mid-resize
- * that gap let this panel's computed position visibly disagree with the
- * card's own on-screen box, which just follows CSS and is never stale.
- * canvasEl.getBoundingClientRect() is that same always-current CSS truth,
- * so building position from it directly — plus the scene's one fixed
- * pixelsPerWorldUnit constant, never anything read off the mutable camera
- * — makes the panel's screen position provably unable to drift from the
- * canvas it's meant to track, instead of merely being re-synced often
- * enough in practice.
+ * Position is rebuilt from scratch every frame from hostEl's own current
+ * size (never anything cached or read off another element that might
+ * itself be stale) plus the scene's one fixed pixelsPerWorldUnit constant.
+ * Three bugs, each found by actually reproducing the panel drifting away
+ * from the card rather than by inspection alone, ruled out three
+ * plausible-looking approaches before landing here:
+ *
+ *  - Three's `.project(camera)` (an earlier version used this): reads
+ *    camera.projectionMatrix, which only gets refreshed inside card.js's
+ *    handleResize() — a separate callback (ResizeObserver) not guaranteed
+ *    to run before the frame that reads it. Mid-resize that gap let the
+ *    panel's computed position visibly disagree with the card's own
+ *    on-screen box, which just follows CSS and is never stale.
+ *  - getBoundingClientRect() (a later version used this, on the canvas
+ *    and stage): it returns viewport-space coordinates, which only equal
+ *    the *local* (containing-block-relative) coordinates style.left/top
+ *    are interpreted in when nothing between them applies a zoom/scale.
+ *    Under real browser zoom that stops being true, and the panel ends up
+ *    drifting from the card by an amount that grows with zoom level.
+ *  - reading size from `stage` itself (the very next version): stage's
+ *    own width/height get explicitly written to further down
+ *    (`stage.style.width = w + 'px'`) to give it a known box for the CSS
+ *    3D math. But a `position:absolute;inset:0` element's explicit width,
+ *    once set, determines its size from then on — the insets stop
+ *    mattering. Reading stage.clientWidth as the resize signal meant
+ *    reading back exactly what this same code last wrote to it: the very
+ *    first write "locked" stage's size, and no resize or zoom afterward
+ *    could ever be detected again. hostEl (interactionRoot) is never
+ *    written to by this module, so it stays a genuine, always-current
+ *    ground truth — that's specifically why w/h are read from it, not
+ *    from stage, even though stage is kept sized to match.
  *
  * opts:
  *   THREE           - the Three.js module card.js already imported
- *   canvasEl        - the WebGL renderer's own <canvas> element
- *                     (renderer.domElement) — getBoundingClientRect() on
- *                     this is the ground truth for where the card is on
- *                     screen, right now, no matter what the camera object
- *                     itself is mid-updating to
  *   pixelsPerWorldUnit - card.js's one fixed world-units-to-CSS-px
  *                     constant (never viewport-dependent by construction)
  *   invTanHalfFov   - 1/tan(FOV/2) for the scene's camera; combined with
- *                     canvasEl's own current height, reproduces the CSS
+ *                     stage's own current height, reproduces the CSS
  *                     `perspective` distance the camera's FOV implies,
  *                     again without reading anything off the camera itself
  *   anchor          - a THREE.Object3D positioned/scaled by card.js at the
@@ -94,7 +108,7 @@ const CONTACT_ENDPOINT = '/api/contact';
 
 export function initContactForm(opts) {
   const {
-    THREE, canvasEl, pixelsPerWorldUnit, invTanHalfFov, anchor, hostEl,
+    THREE, pixelsPerWorldUnit, invTanHalfFov, anchor, hostEl,
     fallbackEmail,
     progress,
     isCardSettled,
@@ -219,10 +233,11 @@ export function initContactForm(opts) {
   /* ---------- CSS-3D sync (desktop) ---------- */
   //
   // Position and orientation are handled separately:
-  //   - position comes from canvasEl's own current getBoundingClientRect()
-  //     (always-correct CSS truth) plus the anchor's world XY times the
-  //     fixed pixelsPerWorldUnit constant — see the module doc comment for
-  //     why this reads nothing off the mutable camera object.
+  //   - position comes from stage's own local center (see
+  //     recomputeCanvasGeometry below) plus the anchor's world XY times
+  //     the fixed pixelsPerWorldUnit constant — see the module doc comment
+  //     for why this reads nothing off the mutable camera object, and
+  //     nothing off getBoundingClientRect() either.
   //   - orientation (so the panel visibly tilts with the card) comes from
   //     just the anchor's rotation, isolated from its position/scale via
   //     Matrix4.extractRotation(), applied through a `perspective` whose
@@ -230,6 +245,24 @@ export function initContactForm(opts) {
   const worldPos = new THREE.Vector3();
   const rotationOnly = new THREE.Matrix4();
   let lastW = 0, lastH = 0;
+
+  // w/h are always the fresh hostEl-derived values from update() (see the
+  // comment on why hostEl and not stage) — the canvas fills hostEl exactly
+  // (`inset:0`), and stage is kept sized to match it, so the canvas's
+  // center in stage's own local coordinate space (exactly what
+  // panel.style.left/top need) is trivially w/2, h/2. No
+  // getBoundingClientRect() anywhere: that returns viewport-space
+  // coordinates, which only equal the *local* (containing-block-relative)
+  // coordinates style.left/top are interpreted in when nothing between
+  // them applies a zoom/scale — under real browser zoom that stops being
+  // true, and a getBoundingClientRect()-based value assigned to
+  // style.left/top ends up with the zoom factor applied a second time.
+  let cachedCanvasCenterX = 0, cachedCanvasCenterY = 0, cachedPerspectivePx = 0;
+  function recomputeCanvasGeometry(w, h) {
+    cachedCanvasCenterX = w / 2;
+    cachedCanvasCenterY = h / 2;
+    cachedPerspectivePx = invTanHalfFov * (h / 2);
+  }
 
   function epsilon(v) { return Math.abs(v) < 1e-10 ? 0 : v; }
 
@@ -250,7 +283,16 @@ export function initContactForm(opts) {
   let interactive = false;
 
   function update() {
-    const w = stage.clientWidth, h = stage.clientHeight;
+    // hostEl (interactionRoot), not stage: stage's own width/height get
+    // explicitly written to below (`stage.style.width = w + 'px'`), and
+    // once a `position:absolute;inset:0` element has an explicit width
+    // set, that width — not the insets — determines its size from then
+    // on. Reading stage.clientWidth here would be reading back exactly
+    // what this same code last wrote to it, so `w !== lastW` could never
+    // fire again after the first frame — a real resize or zoom afterward
+    // would just silently stop updating. hostEl is never written to, so
+    // its size always reflects genuine, current layout.
+    const w = hostEl.clientWidth, h = hostEl.clientHeight;
     if (!w || !h) return;
 
     const mobile = window.innerWidth < MOBILE_BREAKPOINT_PX;
@@ -287,16 +329,12 @@ export function initContactForm(opts) {
       stage.style.width = w + 'px';
       stage.style.height = h + 'px';
       lastW = w; lastH = h;
+      // the canvas's on-screen box just changed size — refresh the cached
+      // geometry derived from it (see recomputeCanvasGeometry's own
+      // comment). lastW/lastH start at 0, so this also covers the very
+      // first frame the panel becomes visible.
+      recomputeCanvasGeometry(w, h);
     }
-
-    // canvasRect is the one source of truth for "where is the card on
-    // screen right now" — pure DOM layout, updated by the browser the
-    // instant CSS reflows, never dependent on the camera/renderer's own
-    // (separately-timed) bookkeeping catching up to a resize.
-    const canvasRect = canvasEl.getBoundingClientRect();
-    const stageRect = stage.getBoundingClientRect();
-    const canvasCenterX = canvasRect.left - stageRect.left + canvasRect.width / 2;
-    const canvasCenterY = canvasRect.top - stageRect.top + canvasRect.height / 2;
 
     anchor.updateMatrixWorld(true);
     anchor.getWorldPosition(worldPos);
@@ -304,11 +342,11 @@ export function initContactForm(opts) {
     // at the world origin — for anything at the card's own (~zero) depth,
     // that makes world-XY-to-screen-px a fixed affine scale by
     // pixelsPerWorldUnit, not a depth-dependent perspective divide
-    const screenX = canvasCenterX + worldPos.x * pixelsPerWorldUnit;
-    const screenY = canvasCenterY - worldPos.y * pixelsPerWorldUnit;
+    const screenX = cachedCanvasCenterX + worldPos.x * pixelsPerWorldUnit;
+    const screenY = cachedCanvasCenterY - worldPos.y * pixelsPerWorldUnit;
 
     stage.style.perspectiveOrigin = screenX + 'px ' + screenY + 'px';
-    stage.style.perspective = (invTanHalfFov * (canvasRect.height / 2)) + 'px';
+    stage.style.perspective = cachedPerspectivePx + 'px';
 
     rotationOnly.extractRotation(anchor.matrixWorld);
     panel.style.left = screenX + 'px';
@@ -406,7 +444,7 @@ function injectStyles() {
        tabWidthPx/tabHeightPx) with overflow hidden — this box IS the tab's
        silhouette as far as the form is concerned, so centering the form
        inside it can never spill past the tab's true edge */
-    .contact3d-panel{position:absolute;top:0;left:0;transform-style:preserve-3d;-webkit-transform-style:preserve-3d}
+    .contact3d-panel{position:absolute;top:0;left:0;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;will-change:transform}
 
     /* the actual clip: fixed to the tab's real size, overflow hidden, no
        3D styling of its own (see the comment where this is built) */

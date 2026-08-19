@@ -17,17 +17,25 @@ import { JOBS } from './jobs.js';
  *                             always available regardless of whether the
  *                             dropdown tab is open on either face
  *   - click-hold-drag anywhere in the hero -> picks the card up and moves it
- *                             freely. THE CARD STAYS WHERE IT IS DROPPED —
- *                             no snap back to center. Past 65% of the way
- *                             to a screen edge, that side glows; release
- *                             there to throw the card off (vCard download
- *                             on the right, mailto on the left), after
- *                             which it flies back to wherever it was
- *                             sitting before the throw.
+ *                             freely. Dragging is always a temporary
+ *                             displacement, never a new resting spot — on
+ *                             release it eases back to its one home
+ *                             position (0,0), whether or not that same
+ *                             drag also opened/closed the dropdown. Past
+ *                             65% of the way to a screen edge, that side
+ *                             glows; release there to throw the card off
+ *                             (vCard download on the right, mailto on the
+ *                             left), after which it flies back home too.
  *   - drag UPWARD past a threshold and release -> opens the dropdown tab
  *                             (résumé on the front, contact note on the
- *                             back); dragging up again while already open
- *                             downloads the résumé PDF instead
+ *                             back) and parks the card near the top —
+ *                             that "staying open" is a separate, persistent
+ *                             effect (cardLift) layered on top of the
+ *                             drag's own return-home, so the card ends up
+ *                             back at X=0 but still lifted for as long as
+ *                             the dropdown stays open. Dragging up again
+ *                             while already open downloads the résumé PDF
+ *                             instead
  *   - drag DOWNWARD past a threshold and release -> closes the dropdown
  *   - click the toggle row ("RÉSUMÉ" / "OR LEAVE A NOTE") -> same
  *                             open/close toggle. Both tabs share ONE
@@ -559,10 +567,18 @@ export function initCard(container) {
 
   const tabShape = tabRoundedRectShape(CARD_WIDTH, TAB_HEIGHT, CARD_RADIUS);
   // Recessed just enough behind the card's own front face to avoid
-  // z-fighting — enough that, when tucked closed, the opaque card front
-  // fully occludes it, but small enough it doesn't read as a visible
-  // depth step once the tab is slid out and its cap sits at the card's edge.
-  const TAB_CAP_Z = CARD_THICKNESS / 2 - 0.0015;
+  // z-fighting while tucked closed (where the tab sits directly behind
+  // the card, at the same depth, fully hidden by the opaque front face).
+  // This recess is only needed there — once the tab has slid out from
+  // behind the card, nothing overlaps it any more, so setDropdownVisual()
+  // linearly cancels it back out via tabGroup/noteGroup's own position.z
+  // as progress goes 0->1. Left uncancelled, the tab's cap sits ever so
+  // slightly behind the card's own face plane even at full open, and that
+  // tiny depth step reads as a visible crease/shadow right at the seam
+  // under the scene's raking key light — worse now the card itself is
+  // this thin, since TAB_RECESS didn't shrink along with CARD_THICKNESS.
+  const TAB_RECESS = 0.0015;
+  const TAB_CAP_Z = CARD_THICKNESS / 2 - TAB_RECESS;
 
   function makeTab(texture, mirrored) {
     const capGeo = new THREE.ShapeGeometry(tabShape, 16);
@@ -647,6 +663,12 @@ export function initCard(container) {
     const y = TAB_CLOSED_LOCAL_Y + (TAB_OPEN_LOCAL_Y - TAB_CLOSED_LOCAL_Y) * progress;
     tabGroup.position.y = y;
     noteGroup.position.y = y;
+    // cancels the tab's built-in closed-state z-recess (see TAB_RECESS)
+    // as it slides out, so its cap ends up perfectly coplanar with the
+    // card's own face at full open — one continuous surface, no seam.
+    const z = TAB_RECESS * progress;
+    tabGroup.position.z = z;
+    noteGroup.position.z = z;
     cardLift = PARKED_LIFT * progress;
     updateHeroPadding(progress);
   }
@@ -687,7 +709,7 @@ export function initCard(container) {
   }
 
   function isCardSettled() {
-    return !dragging && !flipping && !cancelDropdownTween;
+    return !dragging && !flipping && !cancelDropdownTween && !cancelReturnTween;
   }
 
   /* ---------- interaction state ---------- */
@@ -716,6 +738,7 @@ export function initCard(container) {
   let dragOriginClientX = 0, dragOriginClientY = 0;
   let dragStartX = 0, dragStartY = 0;
   let lastDragProgress = 0;
+  let cancelReturnTween = null;
 
   let isPointerDown = false;
   let potentialDrag = false;
@@ -921,6 +944,7 @@ export function initCard(container) {
   /* ---------- drag to throw ---------- */
 
   function beginDrag(clientX, clientY) {
+    if (cancelReturnTween) { cancelReturnTween(); cancelReturnTween = null; }
     dragging = true;
     hovering = false;
     mode = 'dragging';
@@ -966,9 +990,8 @@ export function initCard(container) {
     if (activeRight) { throwCard('right'); return; }
     if (activeLeft) { throwCard('left'); return; }
 
-    // The card keeps whatever position it was released at — no snap back
-    // to center. Open/close is judged on how far THIS drag travelled, so
-    // a card already parked near the top doesn't re-trigger on every nudge.
+    // Open/close is judged on how far THIS drag travelled, so a card
+    // already parked near the top doesn't re-trigger on every nudge.
     mode = 'idle';
     const worldH = worldHeightAtZ(0);
     const travelY = posY - dragStartY;
@@ -978,6 +1001,29 @@ export function initCard(container) {
     } else if (travelY < -worldH * DRAG_DOWN_THRESHOLD_FRACTION) {
       closeDropdown();
     }
+
+    // Dragging is always a temporary displacement, never a new permanent
+    // parking spot — the card eases back to its one resting spot (0,0)
+    // every time a drag ends, whether or not this same drag opened or
+    // closed the dropdown. "Staying" while the dropdown is open is a
+    // separate, persistent effect (cardLift, driven by dropdownOpen) that
+    // stays applied on top of this regardless of posX/posY, so a résumé
+    // drag-open still ends up parked near the top even though posY itself
+    // returns home.
+    returnToHome();
+  }
+
+  function returnToHome() {
+    if (cancelReturnTween) cancelReturnTween();
+    const startX = posX, startY = posY;
+    cancelReturnTween = tween(400, EASE.outCubic, (v) => {
+      posX = startX + (0 - startX) * v;
+      posY = startY + (0 - startY) * v;
+    }, () => {
+      posX = 0;
+      posY = 0;
+      cancelReturnTween = null;
+    });
   }
 
   function throwCard(direction) {
@@ -985,10 +1031,12 @@ export function initCard(container) {
     const sign = direction === 'right' ? 1 : -1;
     const worldW = worldWidthAtZ(0);
     const offX = sign * worldW * 0.85;
-    // where the card lives when it isn't mid-throw — it returns here, not
-    // to the center of the screen.
-    const homeX = posX;
-    const homeY = posY;
+    // the card's one resting spot — same as returnToHome() uses for every
+    // other drag-release. A throw is just a drag that happened to cross
+    // the edge threshold, so it returns to the same place any other drag
+    // would, not to wherever it happened to be when the throw fired.
+    const homeX = 0;
+    const homeY = 0;
 
     if (direction === 'right') {
       downloadVCard();
@@ -1084,11 +1132,11 @@ export function initCard(container) {
 
   const contactForm = initContactForm({
     THREE,
-    // canvasEl + these two fixed constants replace passing the mutable
-    // `camera` object directly — see contact.js's own doc comment for why
-    // reading position off the live camera was the actual source of the
-    // panel drifting away from the card after a resize
-    canvasEl: renderer.domElement,
+    // these two fixed constants replace passing the mutable `camera`
+    // object directly — see contact.js's own doc comment for why reading
+    // position off the live camera (or off getBoundingClientRect(), which
+    // has its own zoom/replaced-element pitfalls) was the actual source
+    // of the panel drifting away from the card
     pixelsPerWorldUnit: PIXELS_PER_WORLD_UNIT,
     invTanHalfFov: 1 / TAN_HALF_FOV,
     anchor: noteAnchor,
