@@ -282,7 +282,6 @@ const MAX_POS_Y_FRACTION = 0.40;
 
 const EASE = {
   outCubic: t => 1 - Math.pow(1 - t, 3),
-  inCubic: t => t * t * t,
   // slight slowdown at t=0.5 (the flip's edge-on apex), faster at both ends
   flipApex: t => t + 0.12 * Math.sin(2 * Math.PI * t)
 };
@@ -1410,9 +1409,15 @@ export function initCard(container) {
       showConfirmation('composing…');
     }
 
-    tween(340, EASE.inCubic, (v) => {
+    // outCubic both ways (fast-then-settle, not a hard snap-away) and a
+    // much smaller spin — a full 18° read as the card being flicked/spun
+    // off, not slid. A slide should look like one continuous, flat glide
+    // out and back, with just enough rotation (a few degrees) to keep it
+    // feeling physical rather than purely mechanical.
+    const THROW_SPIN_DEG = 5;
+    tween(420, EASE.outCubic, (v) => {
       posX = homeX + (offX - homeX) * v;
-      throwSpin = sign * THREE.MathUtils.degToRad(18) * v;
+      throwSpin = sign * THREE.MathUtils.degToRad(THROW_SPIN_DEG) * v;
     }, () => {
       posX = offX;
       setTimeout(() => {
@@ -1421,7 +1426,7 @@ export function initCard(container) {
         tween(480, EASE.outCubic, (v) => {
           posX = startX + (homeX - startX) * v;
           posY = homeY;
-          throwSpin = sign * THREE.MathUtils.degToRad(18) * (1 - v);
+          throwSpin = sign * THREE.MathUtils.degToRad(THROW_SPIN_DEG) * (1 - v);
         }, () => {
           posX = homeX;
           posY = homeY;
