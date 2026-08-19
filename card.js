@@ -1464,6 +1464,19 @@ export function initCard(container) {
     const w = interactionRoot.clientWidth;
     const h = interactionRoot.clientHeight;
     if (!w || !h) return;
+    // Idempotency guard: during the résumé open/close drag, updateHeroPadding()
+    // writes paddingBottom every tween frame and calls this synchronously
+    // (needed — see its own comment, skipping straight to the read below
+    // would show a stale camera for a frame) — but that same write also
+    // changes interactionRoot's own box, so the ResizeObserver below fires
+    // *again* for the exact same size, once per frame, arriving right after
+    // this frame's own rAF callbacks. Without this guard both calls run the
+    // full body — including renderer.setSize(), a real GPU-side framebuffer
+    // resize — twice as often as needed for the whole ~30-frame tween,
+    // which is exactly the drag-to-extend/collapse gesture flicker traces
+    // back to. clientWidth/clientHeight are always integers, so this
+    // comparison is exact, not an approximation.
+    if (w === lastResizeW && h === lastResizeH) return;
     lastResizeW = w;
     lastResizeH = h;
     camera.aspect = w / h;
