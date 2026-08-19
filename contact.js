@@ -104,6 +104,17 @@
  *                     (see update()'s own comment) — it only gates
  *                     pointer-events/focus and, on mobile, the plain
  *                     display toggle.
+ *   backActive()    - true whenever the back cap could conceivably be
+ *                     facing the camera (flipped or mid-flip either way);
+ *                     false while the card just sits resting on the
+ *                     front. Gates the entire per-frame matrix/facing-test
+ *                     block in update() — resting on the front is the vast
+ *                     majority of every session, and none of that math has
+ *                     anything to do while the back can't possibly be
+ *                     showing, so skipping it there (rather than computing
+ *                     it and hiding the result) avoids a continuous,
+ *                     pointless matrix-multiply + style.transform write
+ *                     every single frame.
  *   isCardSettled() - true when the card isn't mid drag/tween/flip;
  *                     gates submit so Enter can't fire mid-animation
  *   onFocusChange(hasFocus) - called when any field gains/loses focus, so
@@ -137,6 +148,7 @@ export function initContactForm(opts) {
     THREE, pixelsPerWorldUnit, camera, anchor, hostEl,
     fallbackEmail,
     progress,
+    backActive,
     isCardSettled,
     onFocusChange,
     tabWidthPx, tabHeightPx
@@ -369,6 +381,20 @@ export function initContactForm(opts) {
     }
 
     if (mobile) return;
+
+    // The back cap can only possibly be facing the camera while flipped
+    // or mid-flip (see backActive's own doc comment) — resting on the
+    // front, none of the matrix/facing-test work below has anything to
+    // do, so it's skipped entirely rather than computed and then hidden.
+    // The panel is already invisible by the time this can go false (the
+    // facing test below flips it well before the flip tween itself
+    // finishes — see toggleFlip), so there's no visible discontinuity
+    // from stopping here; this purely removes now-pointless per-frame
+    // work for the (vast majority of) time the card just sits idle.
+    if (!backActive()) {
+      if (panel.style.visibility !== 'hidden') panel.style.visibility = 'hidden';
+      return;
+    }
 
     if (w !== lastW || h !== lastH) {
       stage.style.width = w + 'px';

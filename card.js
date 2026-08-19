@@ -124,28 +124,6 @@ function tabRoundedRectShape(w, h, r) {
   return shape;
 }
 
-// A rounded-rect boundary covering only three of its four sides, used for
-// the card's own edge (side-wall) — deliberately omitting the bottom side
-// and both bottom corners, exactly where the résumé tab's own top edge
-// butts up against it once extended. Two independent side walls meeting
-// at that shared boundary — even perfectly matched in color and depth —
-// still read as a hairline shadow under any raking light, since each is
-// its own separate surface with its own normal. Leaving nothing there on
-// either piece (see tabRoundedRectOpenTop below for the tab's matching
-// half) means there's no wall left to catch that shadow: the two caps
-// become one continuous surface at the seam, not just a well-matched one.
-function roundedRectPathOpenBottom(w, h, r) {
-  const path = new THREE.Path();
-  const x = -w / 2, y = -h / 2;
-  path.moveTo(x + w, y + r);
-  path.lineTo(x + w, y + h - r);
-  path.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  path.lineTo(x + r, y + h);
-  path.quadraticCurveTo(x, y + h, x, y + h - r);
-  path.lineTo(x, y + r);
-  return path;
-}
-
 // The tab's matching half: everything except its own TOP edge and both
 // top corners (the side that meets the card's bottom — see
 // tabRoundedRectShape's own comment for why those corners are already the
@@ -305,7 +283,6 @@ const MAX_POS_Y_FRACTION = 0.40;
 const EASE = {
   outCubic: t => 1 - Math.pow(1 - t, 3),
   inCubic: t => t * t * t,
-  inOutCubic: t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
   // slight slowdown at t=0.5 (the flip's edge-on apex), faster at both ends
   flipApex: t => t + 0.12 * Math.sin(2 * Math.PI * t)
 };
@@ -1449,10 +1426,19 @@ export function initCard(container) {
     // any more, so the form has nothing to lag behind or race ahead of.
     // This only gates pointer-events/focus (and mobile's plain display
     // toggle) — the panel's own transform tracks backFormAnchor every
-    // frame regardless, so it visually spins with the card through the
-    // flip tween itself; see contact.js's update() for how it hides at
-    // the right moment without this flag's help.
+    // frame it's active (see backActive below), so it visually spins with
+    // the card through the flip tween itself; see contact.js's update()
+    // for how it hides at the right moment without this flag's help.
     progress: () => (flipped && !flipping) ? 1 : 0,
+    // Gates whether contact.js does ANY per-frame work at all — the back
+    // cap can only possibly be facing the camera while flipped or mid-flip
+    // (see toggleFlip); resting on the front (the vast majority of every
+    // session) it never can be, so there's nothing for the matrix/facing
+    // math in contact.js's update() to do. Skipping it there, rather than
+    // just hiding its result, avoids a continuous, pointless
+    // matrix-multiply + style.transform write on a will-change:transform
+    // layer every single frame the card just sits idle on the front.
+    backActive: () => flipped || flipping,
     isCardSettled,
     onFocusChange: setPhysicsSuspended,
     // the form's own reserved region on the back face, in the same px
