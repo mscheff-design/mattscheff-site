@@ -1,6 +1,8 @@
 /**
  * initContactForm(opts) builds and runs the "leave a note" contact form
- * that lives inside the résumé-style tab behind the card's BACK face.
+ * that lives in a fixed region of the card's own BACK face (below the
+ * contact info/social row — the back face itself never extends or moves
+ * anything; see card.js's own doc comment for why that's deliberate).
  * Self-contained: owns its own DOM (a CSS-3D-transformed panel kept in
  * sync with the card's actual Three.js transform every frame), its own
  * injected stylesheet, and all form/submission state. card.js owns the
@@ -18,25 +20,19 @@
  *
  * Position is rebuilt from scratch every frame from hostEl's own current
  * size (never anything cached or read off another element that might
- * itself be stale) plus the scene's one fixed pixelsPerWorldUnit constant.
- * Three bugs, each found by actually reproducing the panel drifting away
- * from the card rather than by inspection alone, ruled out three
+ * itself be stale) plus card.js's own camera and pixelsPerWorldUnit
+ * constant. Several bugs, each found by actually reproducing the panel
+ * drifting away from the card rather than by inspection alone, ruled out
  * plausible-looking approaches before landing here:
  *
- *  - Three's `.project(camera)` (an earlier version used this): reads
- *    camera.projectionMatrix, which only gets refreshed inside card.js's
- *    handleResize() — a separate callback (ResizeObserver) not guaranteed
- *    to run before the frame that reads it. Mid-resize that gap let the
- *    panel's computed position visibly disagree with the card's own
- *    on-screen box, which just follows CSS and is never stale.
- *  - getBoundingClientRect() (a later version used this, on the canvas
+ *  - getBoundingClientRect() (an early version used this, on the canvas
  *    and stage): it returns viewport-space coordinates, which only equal
  *    the *local* (containing-block-relative) coordinates style.left/top
  *    are interpreted in when nothing between them applies a zoom/scale.
  *    Under real browser zoom that stops being true, and the panel ends up
  *    drifting from the card by an amount that grows with zoom level.
- *  - reading size from `stage` itself (the very next version): stage's
- *    own width/height get explicitly written to further down
+ *  - reading size from `stage` itself (the next version): stage's own
+ *    width/height get explicitly written to further down
  *    (`stage.style.width = w + 'px'`) to give it a known box for the CSS
  *    3D math. But a `position:absolute;inset:0` element's explicit width,
  *    once set, determines its size from then on — the insets stop
@@ -47,50 +43,78 @@
  *    written to by this module, so it stays a genuine, always-current
  *    ground truth — that's specifically why w/h are read from it, not
  *    from stage, even though stage is kept sized to match.
+ *  - splitting position (an affine X/Y-to-px scale off the anchor's world
+ *    position, later patched with a manual perspective-divide for its Z)
+ *    from orientation (Matrix4.extractRotation(), rendered through a
+ *    separate CSS `perspective`+`perspective-origin`) worked exactly at
+ *    the anchor's own single point, by construction — but a flat panel
+ *    isn't a point. Comparing the panel's actual rendered corners against
+ *    the camera's own true projection of the same world points
+ *    (Vector3.project) showed a real gap that grows with tilt angle: CSS
+ *    `perspective`'s single-distance model doesn't reproduce Three's
+ *    actual FOV/aspect projection precisely enough across the panel's own
+ *    extent once the card rotates. Rotation was right; the *shape* of the
+ *    perspective wasn't — which read as the panel's lines "seesawing"
+ *    against the card instead of tilting as one rigid surface.
+ *  - Three's `.project(camera)` for position only (the version just
+ *    before this one) hit that same perspective-shape gap, for the same
+ *    reason: it only corrected a single point.
+ *
+ * The current approach reads camera.projectionMatrix and
+ * .matrixWorldInverse directly and composes them with the anchor's own
+ * matrixWorld into one matrix3d (see update()) — genuinely the camera's
+ * own projection, not a reconstruction of it, so it's correct across the
+ * panel's whole extent, not just its center. This does read live
+ * properties off the camera object, which an even earlier version
+ * avoided specifically because camera.projectionMatrix only gets
+ * refreshed inside card.js's handleResize() — a separate callback
+ * (ResizeObserver) not guaranteed to run before the frame that reads it.
+ * That's safe here because of *where* this runs: card.js's tick() calls
+ * handleResize() (refreshing the projection matrix) before
+ * renderer.render() (refreshing matrixWorldInverse) before
+ * contactForm.update() — by construction, the camera this reads is
+ * already the same one the frame was just rendered with.
  *
  * opts:
  *   THREE           - the Three.js module card.js already imported
  *   pixelsPerWorldUnit - card.js's one fixed world-units-to-CSS-px
  *                     constant (never viewport-dependent by construction)
- *   invTanHalfFov   - 1/tan(FOV/2) for the scene's camera; combined with
- *                     stage's own current height, reproduces the CSS
- *                     `perspective` distance the camera's FOV implies,
- *                     again without reading anything off the camera itself
- *   anchor          - a THREE.Object3D positioned/scaled by card.js at the
- *                     exact spot (and 1/PIXELS_PER_WORLD_UNIT scale) the
- *                     form's visual center should sit; parented under the
- *                     same group that slides/mirrors the back tab, so it
- *                     automatically inherits the tab's open/close slide,
- *                     the back-face mirroring, and (further up the chain)
- *                     the card's drag/tilt/flip/lift transforms.
+ *   camera          - the scene's camera, read for its live
+ *                     projectionMatrix/matrixWorldInverse only after
+ *                     card.js's own render pass has refreshed them for
+ *                     this frame (see above) — never cached across frames
+ *   anchor          - a THREE.Object3D fixed by card.js at the exact spot
+ *                     (and 1/PIXELS_PER_WORLD_UNIT scale) the form's
+ *                     visual center should sit; parented under the back
+ *                     cap itself, so it automatically inherits the
+ *                     back-face mirroring and (further up the chain) the
+ *                     card's drag/tilt/flip/lift transforms. It never
+ *                     moves on its own the way the old note-tab anchor
+ *                     used to — the back face doesn't extend.
  *   hostEl          - element to mount the CSS-3D stage into (card.js
  *                     passes interactionRoot, the same element the WebGL
  *                     canvas is absolutely positioned inside)
  *   fallbackEmail   - shown in the error state so a failed submit is
  *                     never a dead end
- *   progress()      - card.js's own 0..1 open/close progress for the note
- *                     tab (0 whenever the back face isn't actually the one
- *                     showing, e.g. mid-flip or while the front is up).
- *                     Driving opacity from this directly, every frame,
- *                     instead of toggling visibility off a fixed threshold
- *                     with its own separate CSS fade, is what keeps the
- *                     form disappearing in exact lockstep with the tab
- *                     sliding shut rather than lagging behind it.
+ *   progress()      - 0 or 1: whether the back face is actually the one
+ *                     showing and settled (0 mid-flip or while the front
+ *                     is up). Binary, not a slide-driven ramp — the back
+ *                     face doesn't extend, so the form has nothing of its
+ *                     own to lag behind; see the CSS opacity transition on
+ *                     .contact3d-stage for the actual fade.
  *   isCardSettled() - true when the card isn't mid drag/tween/flip;
  *                     gates submit so Enter can't fire mid-animation
  *   onFocusChange(hasFocus) - called when any field gains/loses focus, so
  *                     card.js can suspend/resume ambient sway, hover
  *                     tilt, and drag-initiation while someone is typing
  *   tabWidthPx,
- *   tabHeightPx     - the note tab's own real width/height (its world-unit
- *                     size run through card.js's fixed
+ *   tabHeightPx     - the form's own reserved region on the back face (its
+ *                     world-unit size run through card.js's fixed
  *                     pixels-per-world-unit constant). The panel's CSS box
  *                     is set to exactly this size, once, with overflow
- *                     hidden — pegging the clip region itself to the tab's
- *                     true geometry so the form can never render past the
- *                     tab's own edge into the card above, no matter what
- *                     its content does or what point in an animation it's
- *                     caught at.
+ *                     hidden — pegging the clip region itself to that
+ *                     region's true geometry so the form can never render
+ *                     past its own edge into the contact info above it.
  *
  * returns { update(), blurActive() }
  *   update()      - call once per render frame (after renderer.render(),
@@ -108,7 +132,7 @@ const CONTACT_ENDPOINT = '/api/contact';
 
 export function initContactForm(opts) {
   const {
-    THREE, pixelsPerWorldUnit, invTanHalfFov, anchor, hostEl,
+    THREE, pixelsPerWorldUnit, camera, anchor, hostEl,
     fallbackEmail,
     progress,
     isCardSettled,
@@ -232,19 +256,54 @@ export function initContactForm(opts) {
 
   /* ---------- CSS-3D sync (desktop) ---------- */
   //
-  // Position and orientation are handled separately:
-  //   - position comes from stage's own local center (see
-  //     recomputeCanvasGeometry below) plus the anchor's world XY times
-  //     the fixed pixelsPerWorldUnit constant — see the module doc comment
-  //     for why this reads nothing off the mutable camera object, and
-  //     nothing off getBoundingClientRect() either.
-  //   - orientation (so the panel visibly tilts with the card) comes from
-  //     just the anchor's rotation, isolated from its position/scale via
-  //     Matrix4.extractRotation(), applied through a `perspective` whose
-  //     origin is kept pinned to that same screen position every frame
-  const worldPos = new THREE.Vector3();
-  const rotationOnly = new THREE.Matrix4();
+  // The panel's transform is built as ONE matrix3d that is card.js's own
+  // camera projection, reproduced exactly — not an approximation of it.
+  //
+  // An earlier version computed position (an affine X/Y-to-px scale, later
+  // patched with a manual perspective-divide for the anchor's own Z) and
+  // orientation (Matrix4.extractRotation(), rendered through a separate
+  // CSS `perspective`) as two independent pieces. That worked at the
+  // anchor's own single point by construction, but a *flat panel* isn't a
+  // point — it has extent, and CSS's `perspective` model, driven by a
+  // single distance-in-px number standing in for the camera, doesn't
+  // reproduce Three's actual FOV/aspect-based projection precisely enough
+  // across that extent once the card is rotated: comparing the panel's
+  // rendered corners against the camera's own true projection of the same
+  // world points (Vector3.project) showed a real, measurable gap that
+  // *grows with tilt angle* — a few percent at a large test tilt, present
+  // at any nonzero rotation, invisible at zero. That's exactly the
+  // "reacts to movement but the motion doesn't align" symptom: rotation
+  // was right, the *shape* of the perspective wasn't.
+  //
+  // The fix is to stop approximating the camera and just use it: compose
+  //   local panel px  →  anchor-local world units (unit/flip fix)
+  //                   →  world space (anchor.matrixWorld)
+  //                   →  view space (camera.matrixWorldInverse)
+  //                   →  clip space (camera.projectionMatrix)
+  //                   →  CSS px from the stage's own center
+  // into a single 4×4, and hand it to the browser as one matrix3d. CSS's
+  // own W-divide on that matrix then IS the camera's perspective divide,
+  // not a stand-in for it, so it's correct for every point on the panel,
+  // not just its center — no separate `perspective`/`perspective-origin`
+  // needed at all.
+  //
+  // This is the same `.project(camera)` approach an early version of this
+  // module tried and abandoned (see the module doc comment) — but that
+  // attempt read camera.projectionMatrix directly on every frame with no
+  // guarantee card.js's own resize handling had refreshed it first. Here,
+  // card.js's tick() already calls handleResize() (which refreshes the
+  // camera) before rendering and before contactForm.update() — by the
+  // time this runs, the camera the frame just rendered with and the
+  // camera read here are guaranteed to be the same one.
+  const mvpMatrix = new THREE.Matrix4();
+  // local panel px (Y-down, origin at panel's own center, post
+  // translate(-50%,-50%)) → anchor-local world units (Y-up): a fixed
+  // scale, computed once, since neither the unit conversion nor the
+  // CSS-vs-Three Y convention ever changes.
+  const pxToWorld = new THREE.Matrix4().makeScale(1 / pixelsPerWorldUnit, -1 / pixelsPerWorldUnit, 1);
+  const ndcToPx = new THREE.Matrix4();
   let lastW = 0, lastH = 0;
+  let cachedCanvasCenterX = 0, cachedCanvasCenterY = 0;
 
   // w/h are always the fresh hostEl-derived values from update() (see the
   // comment on why hostEl and not stage) — the canvas fills hostEl exactly
@@ -257,27 +316,15 @@ export function initContactForm(opts) {
   // them applies a zoom/scale — under real browser zoom that stops being
   // true, and a getBoundingClientRect()-based value assigned to
   // style.left/top ends up with the zoom factor applied a second time.
-  let cachedCanvasCenterX = 0, cachedCanvasCenterY = 0, cachedPerspectivePx = 0;
   function recomputeCanvasGeometry(w, h) {
     cachedCanvasCenterX = w / 2;
     cachedCanvasCenterY = h / 2;
-    cachedPerspectivePx = invTanHalfFov * (h / 2);
-  }
-
-  function epsilon(v) { return Math.abs(v) < 1e-10 ? 0 : v; }
-
-  // conjugates the rotation by a Y-axis reflection (F·R·F): Three's local
-  // object space is Y-up, CSS's local element box is Y-down, so the
-  // rotation has to be expressed in the flipped basis to look right once
-  // CSS applies it "downhill". Only components straddling the Y axis
-  // (exactly one of row/col == 1) change sign.
-  function rotationCSSMatrix(m) {
-    const e = m.elements;
-    return 'matrix3d(' +
-      epsilon(e[0]) + ',' + epsilon(-e[1]) + ',' + epsilon(e[2]) + ',0,' +
-      epsilon(-e[4]) + ',' + epsilon(e[5]) + ',' + epsilon(-e[6]) + ',0,' +
-      epsilon(e[8]) + ',' + epsilon(-e[9]) + ',' + epsilon(e[10]) + ',0,' +
-      '0,0,0,1)';
+    // NDC → CSS px *from the stage's own center* (not from its top-left):
+    // panel is pinned at (cachedCanvasCenterX, cachedCanvasCenterY) below,
+    // so the matrix's own output should already be "how far from there",
+    // with no separate offset term — X keeps NDC's sign (right stays
+    // right); Y flips (NDC +Y is up, CSS +Y is down).
+    ndcToPx.makeScale(w / 2, -h / 2, 1);
   }
 
   let interactive = false;
@@ -298,32 +345,22 @@ export function initContactForm(opts) {
     const mobile = window.innerWidth < MOBILE_BREAKPOINT_PX;
     stage.classList.toggle('is-mobile', mobile);
 
+    // p is binary (0 or 1) — the back face is a fixed region, not a slide,
+    // so there's no ramp to compute here; the actual fade is a plain CSS
+    // opacity transition on .contact3d-stage, triggered by this class/
+    // inline-style flip.
     const p = progress();
-    // Opacity tracks the tab's own open/close progress directly, frame by
-    // frame — no separate threshold-plus-CSS-transition of its own to lag
-    // behind (or race ahead of) the tab actually sliding shut. But the
-    // form's own size is fixed while the tab is still only partway out,
-    // so showing it from p=0 would have it visibly poking up into the
-    // card above before there's room for it — REVEAL_START is the
-    // fraction of the slide (empirically, comfortably past where the
-    // panel's own height first clears the card's bottom edge) after
-    // which it's safe to start fading in; it ramps the rest of the way
-    // to fully open. Closing still starts fading out immediately from
-    // p=1, since the same math run in reverse only ever *hides* early,
-    // never re-exposes a clipping problem.
-    const REVEAL_START = 0.85;
-    const opacity = Math.max(0, (p - REVEAL_START) / (1 - REVEAL_START));
-    stage.style.opacity = mobile ? '' : opacity;
-    stage.classList.toggle('is-visible', p > 0.02); // mobile's display toggle only
+    stage.style.opacity = mobile ? '' : p;
+    stage.classList.toggle('is-visible', p > 0); // mobile's display toggle only
 
-    const nextInteractive = p > 0.9;
+    const nextInteractive = p > 0;
     if (nextInteractive !== interactive) {
       interactive = nextInteractive;
       panel.style.pointerEvents = interactive ? 'auto' : 'none';
       if (!interactive) blurActive();
     }
 
-    if (p <= 0.02 || mobile) return;
+    if (p < 1 || mobile) return;
 
     if (w !== lastW || h !== lastH) {
       stage.style.width = w + 'px';
@@ -334,24 +371,27 @@ export function initContactForm(opts) {
       // comment). lastW/lastH start at 0, so this also covers the very
       // first frame the panel becomes visible.
       recomputeCanvasGeometry(w, h);
+      // panel is always pinned at the stage's own center — the matrix
+      // built below carries the *entire* position/rotation/perspective
+      // relative to that one fixed point, so left/top never need to
+      // track the anchor themselves any more.
+      panel.style.left = cachedCanvasCenterX + 'px';
+      panel.style.top = cachedCanvasCenterY + 'px';
     }
 
     anchor.updateMatrixWorld(true);
-    anchor.getWorldPosition(worldPos);
-    // valid because the camera only ever dollies straight down Z looking
-    // at the world origin — for anything at the card's own (~zero) depth,
-    // that makes world-XY-to-screen-px a fixed affine scale by
-    // pixelsPerWorldUnit, not a depth-dependent perspective divide
-    const screenX = cachedCanvasCenterX + worldPos.x * pixelsPerWorldUnit;
-    const screenY = cachedCanvasCenterY - worldPos.y * pixelsPerWorldUnit;
+    // camera.matrixWorldInverse and .projectionMatrix are both already
+    // current: card.js's tick() calls handleResize() (which refreshes
+    // the projection matrix) before renderer.render() (which refreshes
+    // matrixWorldInverse), and only *then* calls contactForm.update().
+    mvpMatrix
+      .copy(ndcToPx)
+      .multiply(camera.projectionMatrix)
+      .multiply(camera.matrixWorldInverse)
+      .multiply(anchor.matrixWorld)
+      .multiply(pxToWorld);
 
-    stage.style.perspectiveOrigin = screenX + 'px ' + screenY + 'px';
-    stage.style.perspective = cachedPerspectivePx + 'px';
-
-    rotationOnly.extractRotation(anchor.matrixWorld);
-    panel.style.left = screenX + 'px';
-    panel.style.top = screenY + 'px';
-    panel.style.transform = 'translate(-50%,-50%) ' + rotationCSSMatrix(rotationOnly);
+    panel.style.transform = 'translate(-50%,-50%) matrix3d(' + mvpMatrix.elements.join(',') + ')';
   }
 
   return { update, blurActive };
@@ -438,7 +478,7 @@ function injectStyles() {
   const style = document.createElement('style');
   style.id = 'contact3d-styles';
   style.textContent = `
-    .contact3d-stage{position:absolute;inset:0;pointer-events:none;overflow:visible;opacity:0;transform-style:preserve-3d;-webkit-transform-style:preserve-3d}
+    .contact3d-stage{position:absolute;inset:0;pointer-events:none;overflow:visible;opacity:0;transition:opacity 0.3s ease;transform-style:preserve-3d;-webkit-transform-style:preserve-3d}
 
     /* fixed to the tab's own real size (set inline, once, from
        tabWidthPx/tabHeightPx) with overflow hidden — this box IS the tab's
@@ -446,35 +486,39 @@ function injectStyles() {
        inside it can never spill past the tab's true edge */
     .contact3d-panel{position:absolute;top:0;left:0;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;will-change:transform}
 
-    /* the actual clip: fixed to the tab's real size, overflow hidden, no
-       3D styling of its own (see the comment where this is built) */
-    .contact3d-clip{box-sizing:border-box;padding:0 28px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    /* the actual clip: fixed to the form's real reserved region, overflow
+       hidden, no 3D styling of its own (see the comment where this is
+       built). Tighter than before — the back face no longer has its own
+       extended tab, so this region shares the rest of CARD_HEIGHT with
+       the contact info/social row above it (see card.js's BACK_* layout
+       constants). */
+    .contact3d-clip{box-sizing:border-box;padding:0 20px;overflow:hidden;display:flex;align-items:center;justify-content:center}
 
     /* belt-and-suspenders: if content still somehow exceeds the clip's
        fixed height (a long wrapped error message, an over-full textarea),
        it scrolls inside its own box instead of visually overflowing it */
-    .contact-form{width:260px;max-height:100%;overflow-y:auto;font-family:'DM Mono',monospace}
-    .cf-field{margin-bottom:13px}
-    .cf-field label{display:block;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(28,20,10,0.45);margin-bottom:4px}
+    .contact-form{width:230px;max-height:100%;overflow-y:auto;font-family:'DM Mono',monospace}
+    .cf-field{margin-bottom:7px}
+    .cf-field label{display:block;font-family:'DM Mono',monospace;font-size:7.5px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(28,20,10,0.45);margin-bottom:2px}
     .cf-field input,.cf-field textarea{
       display:block;width:100%;border:none;border-bottom:0.5px solid rgba(28,20,10,0.28);
-      background:transparent;font-family:'EB Garamond',serif;font-size:15px;color:#1c140a;
-      padding:1px 0 5px;outline:none;resize:none;line-height:1.35
+      background:transparent;font-family:'EB Garamond',serif;font-size:12.5px;color:#1c140a;
+      padding:1px 0 2px;outline:none;resize:none;line-height:1.25
     }
     .cf-field input:focus,.cf-field textarea:focus{border-bottom-color:#1c140a}
-    .cf-field textarea{min-height:44px}
+    .cf-field textarea{min-height:26px}
 
     .cf-honeypot{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
 
-    .cf-submit{all:unset;display:inline-block;margin-top:2px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#1c140a;cursor:pointer;border-bottom:0.5px solid rgba(28,20,10,0.4);padding-bottom:2px;transition:opacity 0.2s ease}
+    .cf-submit{all:unset;display:inline-block;margin-top:0;font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.1em;text-transform:uppercase;color:#1c140a;cursor:pointer;border-bottom:0.5px solid rgba(28,20,10,0.4);padding-bottom:1px;transition:opacity 0.2s ease}
     .cf-submit:hover{border-color:#1c140a}
     .cf-submit:disabled{cursor:default;opacity:0.5}
 
-    .cf-status{margin-top:10px;font-family:'DM Mono',monospace;font-size:9.5px;letter-spacing:0.03em;line-height:1.6;color:rgba(28,20,10,0.55)}
+    .cf-status{margin-top:5px;font-family:'DM Mono',monospace;font-size:7.5px;letter-spacing:0.03em;line-height:1.4;color:rgba(28,20,10,0.55)}
     .cf-status.is-error{color:#a3402a}
     .cf-status.is-error a,.cf-status a{color:inherit}
 
-    .cf-result{font-family:'EB Garamond',serif;font-size:16px;color:#1c140a;line-height:1.5;max-width:240px}
+    .cf-result{font-family:'EB Garamond',serif;font-size:13px;color:#1c140a;line-height:1.4;max-width:210px}
 
     /* below this width the CSS-3D projection is skipped entirely — the
        card's on-screen footprint is small and its tilt is disabled on

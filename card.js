@@ -10,51 +10,67 @@ import { JOBS } from './jobs.js';
  * ('resume-job-click') dispatched on the container — it never calls into
  * the host page's own code directly.
  *
+ * The dropdown (résumé) is a FRONT-ONLY affordance now — the back is a
+ * plain, fixed-size, never-extending face (contact info, social links, a
+ * compact note form). The two states are mutually exclusive by design:
+ * extending hides the flip-to-back option, and flipping to the back hides
+ * the extend option. That isn't just a UX choice — it's what keeps the
+ * back face a PLAIN mesh with no shader/tab machinery of its own (see the
+ * Geometry strategy note below), which is what makes it immune to the
+ * whole class of tab-offset/mirroring bugs the front's own tab had to work
+ * through.
+ *
  * Interactions:
  *   - hover, cursor position         -> small X/Y-axis tilt
  *   - idle (no cursor, no drag)      -> slow ambient Y-axis sway
- *   - click directly on the card (no drag) -> flip 180° between front/back;
- *                             always available regardless of whether the
- *                             dropdown tab is open on either face
- *   - click-hold-drag anywhere in the hero -> picks the card up and moves it
- *                             freely. Dragging is always a temporary
+ *   - click directly on the card (no drag), front face, not extended ->
+ *                             flip 180° to the back
+ *   - click directly on the card (no drag), back face, any time -> flip
+ *                             180° back to the front
+ *   - click-hold-drag anywhere in the hero -> picks the card up and moves
+ *                             it freely. Dragging is always a temporary
  *                             displacement, never a new resting spot — on
  *                             release it eases back to its one home
- *                             position (0,0), whether or not that same
- *                             drag also opened/closed the dropdown. Past
- *                             65% of the way to a screen edge, that side
- *                             glows; release there to throw the card off
- *                             (vCard download on the right, mailto on the
- *                             left), after which it flies back home too.
- *   - drag UPWARD past a threshold and release -> opens the dropdown tab
- *                             (résumé on the front, contact note on the
- *                             back) and parks the card near the top —
- *                             that "staying open" is a separate, persistent
- *                             effect (cardLift) layered on top of the
- *                             drag's own return-home, so the card ends up
- *                             back at X=0 but still lifted for as long as
- *                             the dropdown stays open. Dragging up again
- *                             while already open downloads the résumé PDF
- *                             instead
- *   - drag DOWNWARD past a threshold and release -> closes the dropdown
- *   - click the toggle row ("RÉSUMÉ" / "OR LEAVE A NOTE") -> same
- *                             open/close toggle. Both tabs share ONE
- *                             open/closed state, so whichever face you
- *                             land on after a flip shows its own tab
- *                             already in that same state.
- *   - click a job row on the open résumé tab -> dispatches a
+ *                             position (0,0). Past 65% of the way to a
+ *                             screen edge, that side glows; release there
+ *                             to throw the card off, after which it flies
+ *                             back home too. What a throw *does* depends on
+ *                             whether the résumé is extended: closed, it's
+ *                             vCard-save on the right / mailto on the left;
+ *                             extended, both sides download the résumé PDF
+ *                             (see throwCard)
+ *   - drag UPWARD past a threshold and release, front face, not already
+ *                             extended -> extends the résumé and parks the
+ *                             card near the top — that "staying open" is a
+ *                             separate, persistent effect (cardLift)
+ *                             layered on top of the drag's own return-home,
+ *                             so the card ends up back at X=0 but still
+ *                             lifted for as long as it stays extended.
+ *                             Dragging up again while already extended (or
+ *                             at all while viewing the back) does nothing.
+ *   - drag DOWNWARD past a threshold and release -> un-extends the résumé
+ *   - click the toggle row ("RÉSUMÉ") -> same extend/un-extend toggle
+ *                             (front only; the back has no toggle row)
+ *   - click a job row on the extended résumé -> dispatches a
  *                             'resume-job-click' CustomEvent (detail:
  *                             { jobId }) on the container; the page
  *                             decides what that means (this module never
  *                             navigates or opens anything itself for it)
- *   - click "DOWNLOAD RÉSUMÉ (PDF)" (on the open résumé tab) -> downloads
+ *   - click "DOWNLOAD RÉSUMÉ (PDF)" (on the extended résumé) -> downloads
  *                             the static résumé PDF
+ *   - click a social link on the back face -> opens it (new tab for
+ *                             Instagram/LinkedIn, mailto for Email)
  *
- * Geometry strategy (this is what keeps the type from warping): the card's
- * own front/back caps and the dropdown tab are each built ONCE, at one
- * fixed size, and never rebuilt or rescaled. Opening/closing the dropdown
- * only ever *moves* the tab (and lifts the card) — it never touches
- * geometry or textures, so nothing can ever resample or stretch.
+ * Geometry strategy: the card's own front cap and its résumé tab's cap are
+ * ONE continuous mesh — one shape, one shared texture, built ONCE at a
+ * fixed size and never rebuilt or rescaled (see buildUnifiedCap).
+ * Extending/un-extending moves only the tab-tagged half of that mesh's
+ * vertices, via a small per-frame shader uniform (see
+ * addTabOffsetShader/setDropdownVisual) — it never touches geometry or
+ * textures, so nothing can ever resample, stretch, or drift out of sync
+ * the way two independently positioned objects could. The BACK cap is
+ * deliberately NOT built this way — it's a plain ShapeGeometry with a
+ * plain material, because it never needs to move anything.
  */
 
 const CARD_WIDTH = 3.4;
@@ -108,6 +124,65 @@ function tabRoundedRectShape(w, h, r) {
   return shape;
 }
 
+// A rounded-rect boundary covering only three of its four sides, used for
+// the card's own edge (side-wall) — deliberately omitting the bottom side
+// and both bottom corners, exactly where the résumé tab's own top edge
+// butts up against it once extended. Two independent side walls meeting
+// at that shared boundary — even perfectly matched in color and depth —
+// still read as a hairline shadow under any raking light, since each is
+// its own separate surface with its own normal. Leaving nothing there on
+// either piece (see tabRoundedRectOpenTop below for the tab's matching
+// half) means there's no wall left to catch that shadow: the two caps
+// become one continuous surface at the seam, not just a well-matched one.
+function roundedRectPathOpenBottom(w, h, r) {
+  const path = new THREE.Path();
+  const x = -w / 2, y = -h / 2;
+  path.moveTo(x + w, y + r);
+  path.lineTo(x + w, y + h - r);
+  path.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  path.lineTo(x + r, y + h);
+  path.quadraticCurveTo(x, y + h, x, y + h - r);
+  path.lineTo(x, y + r);
+  return path;
+}
+
+// The tab's matching half: everything except its own TOP edge and both
+// top corners (the side that meets the card's bottom — see
+// tabRoundedRectShape's own comment for why those corners are already the
+// exact same curve as the card's bottom corners).
+function tabRoundedRectPathOpenTop(w, h, r) {
+  const path = new THREE.Path();
+  const x = -w / 2, y = -h / 2;
+  const top = y + h;
+  path.moveTo(x, top + r);
+  path.lineTo(x, y + r);
+  path.quadraticCurveTo(x, y, x + r, y);
+  path.lineTo(x + w - r, y);
+  path.quadraticCurveTo(x + w, y, x + w, y + r);
+  path.lineTo(x + w, top + r);
+  return path;
+}
+
+// Just the side-wall — no caps, since the front/back faces are already
+// covered by frontCap/backCap (or the tab's own cap) — as a ribbon of
+// quads between zTop and zBottom following an open (non-closed) boundary
+// path.
+function buildEdgeStrip(path, zTop, zBottom, segments) {
+  const pts = path.getPoints(segments);
+  const positions = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    positions.push(
+      a.x, a.y, zTop, b.x, b.y, zTop, b.x, b.y, zBottom,
+      a.x, a.y, zTop, b.x, b.y, zBottom, a.x, a.y, zBottom
+    );
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
 const CONTACT = {
   name: 'Matthew Scheffler',
   first: 'Matthew',
@@ -120,18 +195,47 @@ const CONTACT = {
   location: 'Brooklyn, NY'
 };
 
+// same three destinations as the page footer's own social row
+const SOCIAL_LINKS = [
+  { label: 'INSTAGRAM', href: 'https://instagram.com' },
+  { label: 'LINKEDIN', href: 'https://linkedin.com' },
+  { label: 'EMAIL', href: `mailto:${CONTACT.email}` }
+];
+
 const RESUME_PDF_PATH = 'assets/matthew-scheffler-resume.pdf';
 
 // Résumé/tab layout, expressed as fractions of BASE_CARD_HEIGHT measured
 // down from the card's TOP edge. Landmarks derive from each other so
 // there's one place to retune spacing. Everything through
-// TOGGLE_BAND_BOTTOM_F is drawn on the card's own front/back faces;
-// everything from ROWS_TOP_F on lives on the separate dropdown tab (see
-// TAB_F_OFFSET below).
+// TOGGLE_BAND_BOTTOM_F draws in the card's own region of the unified cap
+// (see buildUnifiedCap); everything from ROWS_TOP_F on draws in the tab's
+// region — both on the same canvas now, so these fractions are used
+// directly with no rebasing between the two.
 const TOGGLE_BAND_TOP_F = 0.99;
 const TOGGLE_LABEL_F = 1.075;
 const TOGGLE_BAND_BOTTOM_F = 1.16;
 const CARD_HEIGHT = BASE_CARD_HEIGHT * TOGGLE_BAND_BOTTOM_F;
+
+// Back-face layout, same fraction-of-BASE_CARD_HEIGHT-from-top convention
+// as the front's own *_F constants above, but capped at
+// TOGGLE_BAND_BOTTOM_F (the card's own physical bottom edge) instead of
+// running on into a tab — the back never extends, so everything it needs
+// (contact lines, social row, the note form) has to fit inside the same
+// single CARD_HEIGHT the front's closed face uses.
+const BACK_HEADER_F = 0.1;
+const BACK_LINES_TOP_F = 0.22;
+const BACK_LINE_GAP_F = 0.075;
+const BACK_LINES_BOTTOM_F = BACK_LINES_TOP_F + 3 * BACK_LINE_GAP_F;
+const BACK_SOCIAL_F = BACK_LINES_BOTTOM_F + 0.06;
+const BACK_DIVIDER_F = BACK_SOCIAL_F + 0.04;
+const BACK_FORM_TOP_F = BACK_DIVIDER_F + 0.025;
+const BACK_CONTENT_BOTTOM_F = TOGGLE_BAND_BOTTOM_F;
+const BACK_FORM_CENTER_F = (BACK_FORM_TOP_F + BACK_CONTENT_BOTTOM_F) / 2;
+const BACK_FORM_HEIGHT = (BACK_CONTENT_BOTTOM_F - BACK_FORM_TOP_F) * BASE_CARD_HEIGHT;
+// local Y (card-space) of the form region's own center — CARD_HEIGHT/2 is
+// the card's native top edge, same reference the *_F fractions measure
+// down from everywhere else in this file.
+const BACK_FORM_LOCAL_Y = CARD_HEIGHT / 2 - BACK_FORM_CENTER_F * BASE_CARD_HEIGHT;
 
 const ROWS_TOP_F = TOGGLE_BAND_BOTTOM_F;
 const ROW_HEIGHT_F = 0.155;
@@ -144,11 +248,18 @@ const DOWNLOAD_LABEL_F = DOWNLOAD_BAND_TOP_F + 0.055;
 const DOWNLOAD_BAND_BOTTOM_F = DOWNLOAD_BAND_TOP_F + 0.11;
 const TAB_CONTENT_BOTTOM_F = DOWNLOAD_BAND_BOTTOM_F + 0.05;
 
-// TAB_F_OFFSET (= TOGGLE_BAND_BOTTOM_F) is subtracted off whenever one of
-// these card-relative fractions needs to become a position on the tab's
-// own canvas, whose top edge is this same offset lower down.
+// TAB_F_OFFSET (= TOGGLE_BAND_BOTTOM_F) converts a card-relative fraction
+// into a position on the tab's own separate hitbox (still tab-local, for
+// raycasting only — see tabHitFractionFromTop). The tab's *drawn* content
+// no longer has a separate coordinate space of its own (see
+// UNIFIED_TEX_H below) — only the hit-testing geometry still does.
 const TAB_F_OFFSET = TOGGLE_BAND_BOTTOM_F;
 const TAB_HEIGHT = BASE_CARD_HEIGHT * (TAB_CONTENT_BOTTOM_F - TAB_F_OFFSET);
+// The full open silhouette's height (card + tab). The card's own front/
+// back cap and the tab's own cap are one continuous mesh baked at this
+// combined size — see buildUnifiedCap() — so this is also the one texture
+// canvas both regions share.
+const TOTAL_HEIGHT = BASE_CARD_HEIGHT * TAB_CONTENT_BOTTOM_F;
 
 // How far the card itself rises toward the top of the page when the
 // dropdown opens (world units) — the rest of the tab's height is made up
@@ -163,13 +274,15 @@ const TAB_CLOSED_LOCAL_Y = CARD_BOTTOM_LOCAL_Y + TAB_HEIGHT / 2;
 const TAB_OPEN_LOCAL_Y = CARD_BOTTOM_LOCAL_Y - TAB_HEIGHT / 2;
 
 // Fixed texture resolution. TEX_BASE_PX is the pixel height of one
-// BASE_CARD_HEIGHT — the unit the card's own *_F layout fractions are
-// multiplied by when drawing; the tab canvas uses its own analogous scale
-// (see drawTab/drawNoteTab).
+// BASE_CARD_HEIGHT — the unit both the front's and back's own *_F layout
+// fractions are multiplied by when drawing. UNIFIED_TEX_H is the front
+// canvas's height (card + résumé tab, drawn together — see drawFront).
+// BACK_TEX_H is the back canvas's own, much shorter height, since the
+// back never extends past CARD_HEIGHT.
 const TEX_W = 1024;
-const TEX_H = Math.round(TEX_W * (CARD_HEIGHT / CARD_WIDTH));
 const TEX_BASE_PX = TEX_W * (BASE_CARD_HEIGHT / CARD_WIDTH);
-const TAB_TEX_H = Math.round(TEX_W * (TAB_HEIGHT / CARD_WIDTH));
+const UNIFIED_TEX_H = Math.round(TEX_W * (TOTAL_HEIGHT / CARD_WIDTH));
+const BACK_TEX_H = Math.round(TEX_W * (CARD_HEIGHT / CARD_WIDTH));
 
 const FOV_DEG = 32;
 const TAN_HALF_FOV = Math.tan(THREE.MathUtils.degToRad(FOV_DEG) / 2);
@@ -301,26 +414,27 @@ export function initCard(container) {
   fill.position.set(-3, -1.2, 2.4);
   scene.add(fill);
 
-  /* ---------- textures: fixed resolution, drawn once, never rebuilt ---------- */
+  /* ---------- textures: fixed resolution, drawn once, never rebuilt.
+     The front canvas spans the card's own content AND the résumé tab's
+     together — see buildUnifiedCap() below for why this is what lets the
+     two regions be one continuous mesh instead of two independently-
+     positioned ones. The back canvas is its own, much shorter size — the
+     back never extends, so it only ever needs one CARD_HEIGHT's worth. --- */
 
   const frontCanvas = document.createElement('canvas');
   const backCanvas = document.createElement('canvas');
-  const tabCanvas = document.createElement('canvas');
-  const noteCanvas = document.createElement('canvas');
-  frontCanvas.width = backCanvas.width = tabCanvas.width = noteCanvas.width = TEX_W;
-  frontCanvas.height = backCanvas.height = TEX_H;
-  tabCanvas.height = noteCanvas.height = TAB_TEX_H;
+  frontCanvas.width = backCanvas.width = TEX_W;
+  frontCanvas.height = UNIFIED_TEX_H;
+  backCanvas.height = BACK_TEX_H;
 
   const frontTex = new THREE.CanvasTexture(frontCanvas);
   const backTex = new THREE.CanvasTexture(backCanvas);
-  const tabTex = new THREE.CanvasTexture(tabCanvas);
-  const noteTex = new THREE.CanvasTexture(noteCanvas);
-  [frontTex, backTex, tabTex, noteTex].forEach(t => { t.colorSpace = THREE.SRGBColorSpace; });
+  [frontTex, backTex].forEach(t => { t.colorSpace = THREE.SRGBColorSpace; });
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
-  [frontTex, backTex, tabTex, noteTex].forEach(t => { t.anisotropy = maxAniso; });
+  [frontTex, backTex].forEach(t => { t.anisotropy = maxAniso; });
 
-  // shared toggle-row drawing for the card's own front/back faces — same
-  // spot on both, toggling the same shared open/closed state.
+  // toggle-row drawing for the card's own front face (résumé only — the
+  // back has no toggle row any more, since it never extends).
   function drawToggleRow(ctx, w, bh, pad, label) {
     ctx.save();
     ctx.setLineDash([bh * 0.012, bh * 0.012]);
@@ -343,9 +457,18 @@ export function initCard(container) {
     ctx.restore();
   }
 
+  // Card content (name/title/toggle row) AND the résumé tab's content
+  // (job rows, tag cloud, download link) are drawn into ONE canvas, in
+  // one pass — one fill, one vignette, one grain application — so nothing
+  // about the fine grain pattern's tiling phase, the vignette's falloff,
+  // or the base color can ever drift between the two regions: they're
+  // literally the same pixels, not two canvases kept visually matched by
+  // hand. The *_F constants are already authored as fractions of the
+  // FULL open-silhouette height (see their own comment above), so both
+  // regions draw straight from them with no rebasing.
   function drawFront() {
     const ctx = frontCanvas.getContext('2d');
-    const w = TEX_W, h = TEX_H, bh = TEX_BASE_PX;
+    const w = TEX_W, h = UNIFIED_TEX_H, bh = TEX_BASE_PX;
     const pad = w * CARD_PAD_FRACTION;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -353,11 +476,14 @@ export function initCard(container) {
     ctx.fillStyle = CARD_STOCK_COLOR;
     ctx.fillRect(0, 0, w, h);
 
+    // filled across the *full* canvas height, not just bh — a gradient's
+    // last color stop holds constant beyond its own radius, so painting
+    // the whole canvas lets it fade smoothly into that constant tone.
     const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
     vg.addColorStop(0, 'rgba(28,20,10,0)');
     vg.addColorStop(1, 'rgba(28,20,10,0.06)');
     ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, w, bh);
+    ctx.fillRect(0, 0, w, h);
 
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
@@ -374,57 +500,8 @@ export function initCard(container) {
 
     drawToggleRow(ctx, w, bh, pad, 'RÉSUMÉ');
 
-    applyGrain(ctx, w, h, 0.055);
-    frontTex.needsUpdate = true;
-  }
-
-  function drawBack() {
-    const ctx = backCanvas.getContext('2d');
-    const w = TEX_W, h = TEX_H, bh = TEX_BASE_PX;
-    const pad = w * CARD_PAD_FRACTION;
-
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = CARD_STOCK_COLOR;
-    ctx.fillRect(0, 0, w, h);
-    const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
-    vg.addColorStop(0, 'rgba(28,20,10,0)');
-    vg.addColorStop(1, 'rgba(28,20,10,0.08)');
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, w, bh);
-
-    ctx.textBaseline = 'alphabetic';
-    ctx.textAlign = 'left';
-    drawTracked(ctx, 'CONTACT', pad, bh * 0.18, Math.round(bh * 0.04), 'rgba(28,20,10,0.4)', 3);
-
-    const lines = [CONTACT.email, CONTACT.phoneDisplay, CONTACT.url, CONTACT.location];
-    const startY = bh * 0.38;
-    const lineGap = bh * 0.148;
-    lines.forEach((line, i) => {
-      drawTracked(ctx, line.toUpperCase(), pad, startY + i * lineGap, Math.round(bh * 0.058), '#1c140a', 1.2);
-    });
-
-    drawToggleRow(ctx, w, bh, pad, 'OR LEAVE A NOTE');
-
-    applyGrain(ctx, w, h, 0.055);
-    backTex.needsUpdate = true;
-  }
-
-  // job rows, tag cloud, and the download link — all live on the résumé
-  // tab's own canvas now, rebased so its top edge is TAB_F_OFFSET.
-  function drawTab() {
-    const ctx = tabCanvas.getContext('2d');
-    const w = TEX_W, h = TAB_TEX_H, bh = TEX_BASE_PX;
-    const off = TAB_F_OFFSET;
-    const pad = w * CARD_PAD_FRACTION;
-
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = CARD_STOCK_COLOR;
-    ctx.fillRect(0, 0, w, h);
-
     JOBS.forEach((job, i) => {
-      const rowTopF = ROWS_TOP_F + i * ROW_HEIGHT_F - off;
+      const rowTopF = ROWS_TOP_F + i * ROW_HEIGHT_F;
       ctx.font = `400 ${Math.round(bh * 0.052)}px "EB Garamond", serif`;
       ctx.fillStyle = 'rgba(28,20,10,0.88)';
       ctx.textAlign = 'left';
@@ -453,16 +530,16 @@ export function initCard(container) {
     const half = Math.ceil(allTags.length / 2);
     const line1 = allTags.slice(0, half).join(' · ');
     const line2 = allTags.slice(half).join(' · ');
-    drawTracked(ctx, line1, pad, bh * (TAGCLOUD_TOP_F - off), Math.round(bh * 0.021), 'rgba(28,20,10,0.3)', 1);
-    drawTracked(ctx, line2, pad, bh * (TAGCLOUD_BOTTOM_F - off), Math.round(bh * 0.021), 'rgba(28,20,10,0.3)', 1);
+    drawTracked(ctx, line1, pad, bh * TAGCLOUD_TOP_F, Math.round(bh * 0.021), 'rgba(28,20,10,0.3)', 1);
+    drawTracked(ctx, line2, pad, bh * TAGCLOUD_BOTTOM_F, Math.round(bh * 0.021), 'rgba(28,20,10,0.3)', 1);
 
     const downloadText = 'DOWNLOAD RÉSUMÉ (PDF) →';
     const downloadSize = Math.round(bh * 0.027);
     ctx.font = `400 ${downloadSize}px "DM Mono", monospace`;
     ctx.fillStyle = '#1c140a';
     ctx.textAlign = 'left';
-    ctx.fillText(downloadText, pad, bh * (DOWNLOAD_LABEL_F - off));
-    const underlineY = bh * (DOWNLOAD_LABEL_F - off) + downloadSize * 0.22;
+    ctx.fillText(downloadText, pad, bh * DOWNLOAD_LABEL_F);
+    const underlineY = bh * DOWNLOAD_LABEL_F + downloadSize * 0.22;
     ctx.save();
     ctx.strokeStyle = 'rgba(28,20,10,0.3)';
     ctx.lineWidth = Math.max(1, bh * 0.0015);
@@ -473,26 +550,90 @@ export function initCard(container) {
     ctx.restore();
 
     applyGrain(ctx, w, h, 0.055);
-    tabTex.needsUpdate = true;
+    frontTex.needsUpdate = true;
   }
 
-  // the note tab's own canvas stays a blank stock-color background — the
-  // actual form is a real DOM overlay (contact.js) sitting on top of it,
-  // so there's nothing to draw here beyond matching the card stock.
-  function drawNoteTab() {
-    const ctx = noteCanvas.getContext('2d');
-    const w = TEX_W, h = TAB_TEX_H;
+  // Populated by drawBack() below — each social link's horizontal extent
+  // in UV-u terms (0..1 across the canvas width), for hit-testing clicks
+  // against hitMesh's own uv.x (see handleCardClick's back-face branch).
+  const socialLinkBounds = [];
+
+  // The back face's own fixed content: contact header/lines and a
+  // clickable social row live in the TOP portion; a compact note form
+  // (a real DOM overlay from contact.js) sits in the bottom portion,
+  // below the dashed divider — this canvas only draws the divider itself,
+  // the form's own fields are never canvas-drawn (see drawFront's own
+  // matching comment on the résumé tab for why: real inputs need to be
+  // real DOM nodes).
+  function drawBack() {
+    const ctx = backCanvas.getContext('2d');
+    const w = TEX_W, h = BACK_TEX_H, bh = TEX_BASE_PX;
+    const pad = w * CARD_PAD_FRACTION;
+
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = CARD_STOCK_COLOR;
     ctx.fillRect(0, 0, w, h);
+    const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
+    vg.addColorStop(0, 'rgba(28,20,10,0)');
+    vg.addColorStop(1, 'rgba(28,20,10,0.08)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    drawTracked(ctx, 'CONTACT', pad, bh * BACK_HEADER_F, Math.round(bh * 0.038), 'rgba(28,20,10,0.4)', 3);
+
+    const lines = [CONTACT.email, CONTACT.phoneDisplay, CONTACT.url, CONTACT.location];
+    lines.forEach((line, i) => {
+      drawTracked(ctx, line.toUpperCase(), pad, bh * (BACK_LINES_TOP_F + i * BACK_LINE_GAP_F), Math.round(bh * 0.05), '#1c140a', 1.1);
+    });
+
+    socialLinkBounds.length = 0;
+    let cx = pad;
+    const socialY = bh * BACK_SOCIAL_F;
+    const socialSize = Math.round(bh * 0.03);
+    SOCIAL_LINKS.forEach((link, i) => {
+      const startX = cx;
+      cx = drawTracked(ctx, link.label, cx, socialY, socialSize, 'rgba(28,20,10,0.55)', 1.2);
+      socialLinkBounds.push({ uMin: startX / w, uMax: cx / w, href: link.href });
+      if (i < SOCIAL_LINKS.length - 1) {
+        ctx.font = `400 ${socialSize}px "DM Mono", monospace`;
+        ctx.fillStyle = 'rgba(28,20,10,0.3)';
+        ctx.fillText('  ·  ', cx, socialY);
+        cx += ctx.measureText('  ·  ').width;
+      }
+    });
+
+    // no label below the divider — the form's own "Send note" button
+    // already carries that context, and the gap to BACK_FORM_TOP_F is too
+    // tight to fit one anyway
+    ctx.save();
+    ctx.setLineDash([bh * 0.012, bh * 0.012]);
+    ctx.strokeStyle = 'rgba(28,20,10,0.25)';
+    ctx.lineWidth = Math.max(1, bh * 0.003);
+    ctx.beginPath();
+    ctx.moveTo(pad, bh * BACK_DIVIDER_F);
+    ctx.lineTo(w - pad, bh * BACK_DIVIDER_F);
+    ctx.stroke();
+    ctx.restore();
+
     applyGrain(ctx, w, h, 0.055);
-    noteTex.needsUpdate = true;
+    backTex.needsUpdate = true;
   }
 
+  // One bump texture for the unified front cap (card region + résumé tab
+  // region together) — repeat.y scaled for TOTAL_HEIGHT instead of the
+  // default CARD_HEIGHT-tuned (3,2), so the density this was originally
+  // tuned at holds across the full combined surface. The back cap is its
+  // own plain CARD_HEIGHT-tall surface now (no tab to merge with), so it
+  // gets its own clone at the untouched, CARD_HEIGHT-tuned density.
   const bump = makeBumpTexture();
+  bump.repeat.set(3, 2 * (TOTAL_HEIGHT / CARD_HEIGHT));
+  const backBump = bump.clone();
+  backBump.repeat.set(3, 2);
 
-  function cardStockMaterial(map) {
+  function cardStockMaterial(map, bumpTexture) {
     return new THREE.MeshPhysicalMaterial({
       map,
       roughness: 0.82,
@@ -501,7 +642,7 @@ export function initCard(container) {
       sheen: 0.08,
       sheenRoughness: 0.8,
       sheenColor: new THREE.Color(0xfff6e8),
-      bumpMap: bump,
+      bumpMap: bumpTexture || bump,
       bumpScale: 0.0018
     });
   }
@@ -522,34 +663,160 @@ export function initCard(container) {
      rebuilt or resized again. ---------- */
 
   const frontMat = cardStockMaterial(frontTex);
-  const backMat = cardStockMaterial(backTex);
+  const backMat = cardStockMaterial(backTex, backBump);
   const edgeSideMat = edgeMaterial();
   const edgeCapMat = new THREE.MeshBasicMaterial({ visible: false });
   const hitMat = new THREE.MeshBasicMaterial({ visible: false });
 
   const cardShape = roundedRectShape(CARD_WIDTH, CARD_HEIGHT, CARD_RADIUS);
+  const tabShape = tabRoundedRectShape(CARD_WIDTH, TAB_HEIGHT, CARD_RADIUS);
 
-  function remapUV(geo, w, h) {
+  // Recessed just enough behind the card's own front face to avoid
+  // z-fighting while tucked closed (where the tab sits directly behind
+  // the card, at the same depth, fully hidden by the opaque front face).
+  // This recess is only needed there — once the tab has slid out from
+  // behind the card, nothing overlaps it any more, so the shader offset
+  // below (see addTabOffsetShader) linearly cancels it back out as
+  // progress goes 0->1.
+  const TAB_RECESS = 0.0015;
+  const TAB_CAP_Z = CARD_THICKNESS / 2 - TAB_RECESS;
+
+  // ---- unified FRONT cap geometry: ONE continuous mesh (the card's own
+  // front content AND the résumé tab's), instead of two independently-
+  // positioned objects that have to be kept in sync by hand. Front-only —
+  // the back never extends, so it stays a plain single-shape mesh (see
+  // backCapGeo below), which is also exactly why the back is immune to
+  // any bug in this shader-offset machinery: it doesn't use it at all.
+  // cardShape and tabShape are exactly the same shapes the card's own
+  // edge wall already uses (so the two regions' curves are, by
+  // construction, identical — nothing to separately match), baked at
+  // their OPEN rest position; aTabWeight (0 card / 1 tab) tags which
+  // vertices a small vertex-shader patch (addTabOffsetShader) is allowed
+  // to move when the dropdown opens/closes. Since it's a pure
+  // translation — never a bend — normals need no correction, so lighting
+  // stays exactly right at every point in the animation. The card and tab
+  // regions are two disjoint vertex sets glued only by sharing one
+  // texture/material/draw-call — never welded across the seam — which is
+  // what keeps a rigid slide from shearing the mesh in between: the same
+  // physical relationship two separate objects would have, just built,
+  // matched, and lit as one asset instead of two.
+  // v is measured down from the card's own native top edge (CARD_HEIGHT/2
+  // — never shifted, since the card region below is never shifted either)
+  // so this lines up with the *_F fractions regardless of which piece
+  // (card, at yShift 0, or tab, at yShift TAB_OPEN_LOCAL_Y) is calling it.
+  function remapUVShifted(geo, totalW, totalH, yShift) {
     const uv = geo.attributes.uv;
+    const topY = CARD_HEIGHT / 2;
     for (let i = 0; i < uv.count; i++) {
-      const u = (uv.getX(i) + w / 2) / w;
-      const v = (uv.getY(i) + h / 2) / h;
+      const u = (uv.getX(i) + totalW / 2) / totalW;
+      const v = (uv.getY(i) + yShift - topY + totalH) / totalH;
       uv.setXY(i, u, v);
     }
     uv.needsUpdate = true;
   }
 
-  const frontGeo = new THREE.ShapeGeometry(cardShape, 16);
-  remapUV(frontGeo, CARD_WIDTH, CARD_HEIGHT);
-  const frontCap = new THREE.Mesh(frontGeo, frontMat);
-  frontCap.position.z = CARD_THICKNESS / 2;
+  function taggedCapPart(shape, yShift, tabWeight) {
+    const geo = new THREE.ShapeGeometry(shape, 16);
+    remapUVShifted(geo, CARD_WIDTH, TOTAL_HEIGHT, yShift);
+    geo.translate(0, yShift, CARD_THICKNESS / 2);
+    const count = geo.attributes.position.count;
+    geo.setAttribute('aTabWeight', new THREE.Float32BufferAttribute(new Float32Array(count).fill(tabWeight), 1));
+    return geo;
+  }
 
-  const backGeo = new THREE.ShapeGeometry(cardShape, 16);
-  remapUV(backGeo, CARD_WIDTH, CARD_HEIGHT);
-  const backCap = new THREE.Mesh(backGeo, backMat);
-  backCap.position.z = -CARD_THICKNESS / 2;
+  function mergeCapParts(a, b) {
+    const geo = new THREE.BufferGeometry();
+    const copyAttr = (name, itemSize) => {
+      const A = a.attributes[name], B = b.attributes[name];
+      const arr = new Float32Array(A.array.length + B.array.length);
+      arr.set(A.array, 0);
+      arr.set(B.array, A.array.length);
+      geo.setAttribute(name, new THREE.BufferAttribute(arr, itemSize));
+    };
+    copyAttr('position', 3);
+    copyAttr('normal', 3);
+    copyAttr('uv', 2);
+    copyAttr('aTabWeight', 1);
+
+    const offset = a.attributes.position.count;
+    const total = offset + b.attributes.position.count;
+    const IndexArray = total > 65535 ? Uint32Array : Uint16Array;
+    const indices = new IndexArray(a.index.count + b.index.count);
+    for (let i = 0; i < a.index.count; i++) indices[i] = a.index.getX(i);
+    for (let i = 0; i < b.index.count; i++) indices[a.index.count + i] = b.index.getX(i) + offset;
+    geo.setIndex(new THREE.BufferAttribute(indices, 1));
+    return geo;
+  }
+
+  // cardPart is NOT shifted — its baked position must land exactly where
+  // edgeMesh/hitMesh already sit (both built from the same native,
+  // unshifted cardShape), since the card region never moves and has no
+  // shader offset of its own to correct a mismatch later. tabPart is
+  // shifted by TAB_OPEN_LOCAL_Y — the same constant the old two-object
+  // design used to park the open tab's group — so its native top edge
+  // (TAB_HEIGHT/2) lands exactly on the card's own native bottom edge
+  // (-CARD_HEIGHT/2), open, with zero gap and zero overlap.
+  function buildUnifiedCap() {
+    const cardPart = taggedCapPart(cardShape, 0, 0);
+    const tabPart = taggedCapPart(tabShape, TAB_OPEN_LOCAL_Y, 1);
+    return mergeCapParts(cardPart, tabPart);
+  }
+
+  // Injects a tiny vertex offset: tab-region vertices (aTabWeight=1) move
+  // by uTabOffset (local Y, local Z); card-region vertices never move.
+  // offsetUniform is a plain {value: THREE.Vector2} kept by the caller —
+  // mutating .value in place each frame (see setDropdownVisual) is picked
+  // up automatically without recompiling the shader.
+  function addTabOffsetShader(material, offsetUniform) {
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uTabOffset = offsetUniform;
+      shader.vertexShader =
+        'attribute float aTabWeight;\nuniform vec2 uTabOffset;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\n\ttransformed.y += aTabWeight * uTabOffset.x;\n\ttransformed.z += aTabWeight * uTabOffset.y;'
+      );
+    };
+    // Per-material, not a shared constant: two materials returning the
+    // *same* cache key make Three.js reuse one already-linked WebGLProgram
+    // for the second material without re-running its own onBeforeCompile,
+    // so its uTabOffset never gets wired to its own offsetUniform (it
+    // silently inherits whatever the first material's program last bound,
+    // which — since frontMat and backMat drive independent uniforms —
+    // is wrong). material.uuid keeps every material's program distinct.
+    material.customProgramCacheKey = () => 'unifiedCap-' + material.uuid;
+  }
+
+  const capGeometry = buildUnifiedCap();
+
+  const tabOffsetFront = { value: new THREE.Vector2(0, 0) };
+  addTabOffsetShader(frontMat, tabOffsetFront);
+
+  const frontCap = new THREE.Mesh(capGeometry, frontMat);
+
+  // The back cap, deliberately built the plain way — one ShapeGeometry,
+  // one un-shifted UV remap (yShift 0 reduces remapUVShifted to an
+  // ordinary 0..1 mapping), no aTabWeight, no onBeforeCompile. It never
+  // needs to move any of its own vertices, so it doesn't carry any of the
+  // machinery that would let it.
+  const backCapGeo = new THREE.ShapeGeometry(cardShape, 16);
+  remapUVShifted(backCapGeo, CARD_WIDTH, CARD_HEIGHT, 0);
+  backCapGeo.translate(0, 0, CARD_THICKNESS / 2);
+  const backCap = new THREE.Mesh(backCapGeo, backMat);
   backCap.rotation.y = Math.PI;
 
+  // Full perimeter, deliberately NOT open along the bottom — only the
+  // résumé tab rig's own top edge is omitted (see makeTabRig below).
+  // Omitting the edge wall from *both* pieces at the seam killed the
+  // double-wall crease, but it also stripped the corner's own "3D
+  // thickness" bevel from exactly that curve, while the straight edges
+  // right next to it (still fully walled) kept theirs — the corner read
+  // as a visible flat notch/step relative to its neighbors under any
+  // raking angle. Keeping the card's wall whole and omitting only the
+  // tab's gives exactly one continuous bevel at the boundary instead of
+  // zero or two: no doubled crease, and the corner's thickness cue stays
+  // consistent all the way around the card's own perimeter — including
+  // the back, which has no tab of its own to worry about at all.
   const edgeGeo = new THREE.ExtrudeGeometry(cardShape, { depth: CARD_THICKNESS, bevelEnabled: false, curveSegments: 16 });
   edgeGeo.translate(0, 0, -CARD_THICKNESS / 2);
   const edgeMesh = new THREE.Mesh(edgeGeo, [edgeCapMat, edgeSideMat]);
@@ -557,63 +824,45 @@ export function initCard(container) {
   const hitGeo = new THREE.BoxGeometry(CARD_WIDTH, CARD_HEIGHT, CARD_THICKNESS * 3);
   const hitMesh = new THREE.Mesh(hitGeo, hitMat);
 
-  /* ---------- tab meshes: two second, entirely separate fixed-size
-     objects — one behind the front face (résumé), one behind the back
-     (contact note). Neither ever scales or rebuilds; opening/closing
-     either only ever *moves* it (and the card), never reshapes anything.
-     Both are built by the same makeTab() so the two stay identical in
-     construction; mirrored=true is the only thing that differs for the
-     back one, flipping it to face the same way backCap does. ---------- */
+  /* ---------- résumé tab rig: edge wall + invisible hitbox only — the
+     cap itself lives in the unified front mesh above. Front-only, since
+     the back never extends and so has no rig of its own any more. Never
+     scales or rebuilds; extending/un-extending only ever *moves* it (in
+     lockstep with the same progress driving the cap's shader offset). -- */
 
-  const tabShape = tabRoundedRectShape(CARD_WIDTH, TAB_HEIGHT, CARD_RADIUS);
-  // Recessed just enough behind the card's own front face to avoid
-  // z-fighting while tucked closed (where the tab sits directly behind
-  // the card, at the same depth, fully hidden by the opaque front face).
-  // This recess is only needed there — once the tab has slid out from
-  // behind the card, nothing overlaps it any more, so setDropdownVisual()
-  // linearly cancels it back out via tabGroup/noteGroup's own position.z
-  // as progress goes 0->1. Left uncancelled, the tab's cap sits ever so
-  // slightly behind the card's own face plane even at full open, and that
-  // tiny depth step reads as a visible crease/shadow right at the seam
-  // under the scene's raking key light — worse now the card itself is
-  // this thin, since TAB_RECESS didn't shrink along with CARD_THICKNESS.
-  const TAB_RECESS = 0.0015;
-  const TAB_CAP_Z = CARD_THICKNESS / 2 - TAB_RECESS;
-
-  function makeTab(texture, mirrored) {
-    const capGeo = new THREE.ShapeGeometry(tabShape, 16);
-    remapUV(capGeo, CARD_WIDTH, TAB_HEIGHT);
-    const cap = new THREE.Mesh(capGeo, cardStockMaterial(texture));
-    cap.position.z = TAB_CAP_Z;
-
-    const edgeGeo2 = new THREE.ExtrudeGeometry(tabShape, { depth: CARD_THICKNESS, bevelEnabled: false, curveSegments: 16 });
-    edgeGeo2.translate(0, 0, TAB_CAP_Z - CARD_THICKNESS);
-    const edge = new THREE.Mesh(edgeGeo2, [edgeCapMat, edgeSideMat]);
+  function makeTabRig() {
+    // open along the top — the side that meets the card's own (also-open)
+    // bottom once the tab slides out
+    const edgeGeo2 = buildEdgeStrip(
+      tabRoundedRectPathOpenTop(CARD_WIDTH, TAB_HEIGHT, CARD_RADIUS),
+      TAB_CAP_Z, TAB_CAP_Z - CARD_THICKNESS, 64
+    );
+    const edge = new THREE.Mesh(edgeGeo2, edgeSideMat);
 
     const hitGeo2 = new THREE.BoxGeometry(CARD_WIDTH, TAB_HEIGHT, CARD_THICKNESS * 3);
     const hit = new THREE.Mesh(hitGeo2, hitMat);
 
     const group = new THREE.Group();
-    group.add(cap, edge, hit);
-    if (mirrored) group.rotation.y = Math.PI;
+    group.add(edge, hit);
     group.position.y = TAB_CLOSED_LOCAL_Y;
     return { group, hit };
   }
 
-  const { group: tabGroup, hit: tabHitMesh } = makeTab(tabTex, false);
-  const { group: noteGroup } = makeTab(noteTex, true);
+  const { group: tabGroup, hit: tabHitMesh } = makeTabRig();
 
-  // anchor for the contact form's CSS-3D panel (see contact.js):
-  // positioned in the *same* unmirrored local convention as the note
-  // tab's own cap, so it automatically inherits the tab's open/close
-  // slide, the mirrored (back-facing) orientation, and — further up the
-  // chain — the card's own drag/tilt/flip/lift transform.
-  const noteAnchor = new THREE.Object3D();
-  noteAnchor.position.set(0, 0, TAB_CAP_Z + 0.001);
-  noteGroup.add(noteAnchor);
+  // anchor for the note form's CSS-3D panel (see contact.js): a plain
+  // child of backCap, so it automatically inherits the mirrored (back-
+  // facing) orientation and — further up the chain — the card's own
+  // drag/tilt/flip/lift transform. Fixed at the form region's own center
+  // (BACK_FORM_LOCAL_Y) — unlike the old note-tab anchor, this never
+  // moves on its own; the back face doesn't extend, so there's nothing
+  // for it to track.
+  const backFormAnchor = new THREE.Object3D();
+  backFormAnchor.position.set(0, BACK_FORM_LOCAL_Y, CARD_THICKNESS / 2 + 0.001);
+  backCap.add(backFormAnchor);
 
   const cardMesh = new THREE.Group();
-  cardMesh.add(edgeMesh, frontCap, backCap, hitMesh, tabGroup, noteGroup);
+  cardMesh.add(edgeMesh, frontCap, backCap, hitMesh, tabGroup);
 
   const cardGroup = new THREE.Group();
   cardGroup.add(cardMesh);
@@ -630,45 +879,55 @@ export function initCard(container) {
     handleResize();
   }
 
-  // declared ahead of the initial draw calls below since drawFront()/
-  // drawBack() read this to decide which way the chevron glyph points
+  // declared ahead of the initial draw calls below since drawFront() reads
+  // this to decide which way the chevron glyph points
   let dropdownOpen = false;
-  let dropdownProgress = 0; // both tabs' current, shared 0..1 slide progress
+  let dropdownProgress = 0; // résumé tab's current 0..1 slide progress
   let cardLift = 0;
   let cancelDropdownTween = null;
 
+  // tabGroup's own resting position is already baked in at construction
+  // (group.position.y = TAB_CLOSED_LOCAL_Y in makeTabRig), but the
+  // unified cap's shader offset has no such default — its uniform starts
+  // at (0,0), which is the *open* offset in the baked-at-open convention
+  // above. This establishes the actual closed state before the first
+  // frame ever renders. (Not routed through the full
+  // setDropdownVisual()/updateHeroPadding() — that reaches into
+  // handleResize()'s own lastResizeW/lastResizeH, which aren't
+  // initialized yet this early in setup.)
+  tabOffsetFront.value.set(TAB_HEIGHT, -TAB_RECESS);
+
   drawFront();
   drawBack();
-  drawTab();
-  drawNoteTab();
 
   // regenerate all text once webfonts are confirmed loaded, for crisp type
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => {
       drawFront();
       drawBack();
-      drawTab();
     });
   }
 
-  /* ---------- open/close: a single shared state drives both tabs at
-     once, in lockstep, animating the card and both tabs' positions; the
-     page grows to match. No geometry or texture is touched by any of
-     this. Flipping never opens or closes anything by itself — whichever
-     face you land on after a flip shows its own tab already in the same
-     open/closed state, since both tabs always move together. ---------- */
+  /* ---------- extend/un-extend: front-only now. Animates the résumé
+     tab's position and the card's own lift; the page grows to match. No
+     geometry or texture is touched by any of this. ---------- */
 
   function setDropdownVisual(progress) {
     dropdownProgress = progress;
     const y = TAB_CLOSED_LOCAL_Y + (TAB_OPEN_LOCAL_Y - TAB_CLOSED_LOCAL_Y) * progress;
     tabGroup.position.y = y;
-    noteGroup.position.y = y;
-    // cancels the tab's built-in closed-state z-recess (see TAB_RECESS)
-    // as it slides out, so its cap ends up perfectly coplanar with the
-    // card's own face at full open — one continuous surface, no seam.
-    const z = TAB_RECESS * progress;
-    tabGroup.position.z = z;
-    noteGroup.position.z = z;
+    // cancels the tab rig's built-in closed-state z-recess (see
+    // TAB_RECESS) as it slides out, so the edge wall ends up flush with
+    // the card's own face at full open.
+    tabGroup.position.z = TAB_RECESS * progress;
+
+    // Same slide, expressed as a shader offset on the unified cap's
+    // tagged tab-region vertices: baked rest state is the OPEN position
+    // (0 offset), so closed is +TAB_HEIGHT in local Y and -TAB_RECESS in
+    // local Z.
+    const closedAmount = 1 - progress;
+    tabOffsetFront.value.set(TAB_HEIGHT * closedAmount, -TAB_RECESS * closedAmount);
+
     cardLift = PARKED_LIFT * progress;
     updateHeroPadding(progress);
   }
@@ -684,10 +943,13 @@ export function initCard(container) {
   }
 
   function openDropdown() {
-    if (dropdownOpen) return;
+    // front-only: the back has nothing to extend, and extending is how
+    // flipping-to-the-back gets disabled in the first place (see
+    // toggleFlip), so a flipped/flipping card should never reach here —
+    // this guard is just belt-and-suspenders against a stray caller.
+    if (dropdownOpen || flipped || flipping) return;
     dropdownOpen = true;
     drawFront();
-    drawBack();
     animateDropdown(1);
   }
 
@@ -695,7 +957,6 @@ export function initCard(container) {
     if (!dropdownOpen) return;
     dropdownOpen = false;
     drawFront();
-    drawBack();
     animateDropdown(0);
   }
 
@@ -769,9 +1030,8 @@ export function initCard(container) {
   function hitsCard(clientX, clientY) {
     setNdcFromClient(clientX, clientY);
     if (raycaster.intersectObject(hitMesh, false).length > 0) return true;
-    // the note tab has no click target of its own (it's a real DOM form,
-    // not canvas-drawn) — only the résumé tab's own hit region needs a
-    // hit test, and only when the front face is actually the one showing.
+    // the résumé tab only has its own separate hit region while it's
+    // actually extended and the front face is the one showing
     if (!flipped && dropdownOpen) return raycaster.intersectObject(tabHitMesh, false).length > 0;
     return false;
   }
@@ -785,6 +1045,18 @@ export function initCard(container) {
     if (!hits.length || !hits[0].uv) return null;
     const worldFromTop = (1 - hits[0].uv.y) * CARD_HEIGHT;
     return worldFromTop / BASE_CARD_HEIGHT;
+  }
+
+  // same idea, but also returns the horizontal position (u, 0..1 across
+  // CARD_WIDTH) — needed for the back face's social-link row, which
+  // (unlike the front's single-column job rows) sits side by side rather
+  // than stacked, so a Y-band alone can't tell the links apart.
+  function hitUVOnCard(clientX, clientY) {
+    setNdcFromClient(clientX, clientY);
+    const hits = raycaster.intersectObject(hitMesh, false);
+    if (!hits.length || !hits[0].uv) return null;
+    const worldFromTop = (1 - hits[0].uv.y) * CARD_HEIGHT;
+    return { u: hits[0].uv.x, vFrac: worldFromTop / BASE_CARD_HEIGHT };
   }
 
   // same idea, against the résumé tab's own hitbox — only meaningful while
@@ -807,9 +1079,10 @@ export function initCard(container) {
     // everything; it just means it missed the card proper.
     const frac = hitFractionFromTop(clientX, clientY);
 
-    // the toggle row sits at the same spot on both faces and toggles the
-    // same shared open/closed state regardless of which one you click
-    if (frac !== null && frac >= TOGGLE_BAND_TOP_F && frac <= TOGGLE_BAND_BOTTOM_F) {
+    // the toggle row is front-only now — the back has no toggle row (and
+    // nothing of its own to extend), so this branch simply doesn't apply
+    // there any more
+    if (!flipped && frac !== null && frac >= TOGGLE_BAND_TOP_F && frac <= TOGGLE_BAND_BOTTOM_F) {
       if (dropdownOpen) closeDropdown(); else openDropdown();
       return;
     }
@@ -829,6 +1102,19 @@ export function initCard(container) {
         }
         if (tfrac >= DOWNLOAD_BAND_TOP_F && tfrac <= DOWNLOAD_BAND_BOTTOM_F) {
           downloadResumePdf();
+          return;
+        }
+      }
+    }
+
+    // back-only: the social row (drawn by drawBack, bounds recorded in
+    // socialLinkBounds each time it redraws)
+    if (flipped) {
+      const hit = hitUVOnCard(clientX, clientY);
+      if (hit !== null && hit.vFrac >= BACK_SOCIAL_F - 0.055 && hit.vFrac <= BACK_SOCIAL_F + 0.03) {
+        const link = socialLinkBounds.find(b => hit.u >= b.uMin && hit.u <= b.uMax);
+        if (link) {
+          window.open(link.href, '_blank', 'noopener');
           return;
         }
       }
@@ -928,7 +1214,13 @@ export function initCard(container) {
   /* ---------- flip ---------- */
 
   function toggleFlip() {
-    if (flipping || dragging || mode !== 'idle') return;
+    // Extending and flipping-to-the-back are mutually exclusive: the
+    // résumé is a front-only affordance, so while it's extended (and only
+    // reachable from the front, since dropdownOpen can't become true
+    // while flipped — see openDropdown) flipping away from it is blocked.
+    // Flipping back to the front from the back is always allowed, since
+    // the back never extends and so never has this conflict.
+    if (flipping || dragging || mode !== 'idle' || (dropdownOpen && !flipped)) return;
     flipping = true;
     const from = flipYaw;
     const to = flipYaw + Math.PI;
@@ -997,7 +1289,10 @@ export function initCard(container) {
     const travelY = posY - dragStartY;
 
     if (travelY > worldH * DRAG_UP_THRESHOLD_FRACTION) {
-      if (dropdownOpen) downloadResumePdf(); else openDropdown();
+      // no effect while already extended (that's what left/right-drag are
+      // for now — see throwCard) or while viewing the back (which never
+      // extends at all)
+      if (!dropdownOpen && !flipped) openDropdown();
     } else if (travelY < -worldH * DRAG_DOWN_THRESHOLD_FRACTION) {
       closeDropdown();
     }
@@ -1038,7 +1333,14 @@ export function initCard(container) {
     const homeX = 0;
     const homeY = 0;
 
-    if (direction === 'right') {
+    // Extended, both edges grab the résumé instead — throwing either way
+    // reads as "here, take this" regardless of side once the résumé is
+    // what's actually showing; the vCard/mailto split only makes sense
+    // for the closed, contact-card-first state.
+    if (dropdownOpen) {
+      downloadResumePdf();
+      showConfirmation('downloading résumé…');
+    } else if (direction === 'right') {
       downloadVCard();
       showConfirmation('contact saved');
     } else {
@@ -1128,32 +1430,34 @@ export function initCard(container) {
   }
   window.addEventListener('scroll', onFirstScroll, { passive: true });
 
-  /* ---------- contact form (back-face note tab) ---------- */
+  /* ---------- contact form (fixed region on the back face) ---------- */
 
   const contactForm = initContactForm({
     THREE,
-    // these two fixed constants replace passing the mutable `camera`
-    // object directly — see contact.js's own doc comment for why reading
-    // position off the live camera (or off getBoundingClientRect(), which
-    // has its own zoom/replaced-element pitfalls) was the actual source
-    // of the panel drifting away from the card
     pixelsPerWorldUnit: PIXELS_PER_WORLD_UNIT,
-    invTanHalfFov: 1 / TAN_HALF_FOV,
-    anchor: noteAnchor,
+    // contact.js reads projectionMatrix/matrixWorldInverse off this each
+    // frame, only after tick() below has already refreshed both (via
+    // handleResize() and renderer.render()) — see contact.js's own doc
+    // comment for why that ordering makes it safe to read the live
+    // camera here, unlike getBoundingClientRect() (its own zoom/
+    // replaced-element pitfalls) or the earlier position-only approaches.
+    camera,
+    anchor: backFormAnchor,
     hostEl: interactionRoot,
     fallbackEmail: CONTACT.email,
-    // driven directly off the same progress moving the tab itself, so the
-    // form fades in/out in exact lockstep with the drawer sliding rather
-    // than lagging behind on its own timer
-    progress: () => (flipped && !flipping) ? dropdownProgress : 0,
+    // binary now, not a slide-driven ramp — the back face doesn't extend
+    // any more, so the form has nothing to lag behind or race ahead of;
+    // it just fades with the flip settling (see contact.js's own CSS
+    // transition on this)
+    progress: () => (flipped && !flipping) ? 1 : 0,
     isCardSettled,
     onFocusChange: setPhysicsSuspended,
-    // the note tab's true footprint, in the same px units the CSS-3D
-    // projection already uses — lets contact.js hard-clip the form to the
-    // tab's own real size instead of trusting its natural content height
-    // to always stay inside it
+    // the form's own reserved region on the back face, in the same px
+    // units the CSS-3D projection already uses — lets contact.js
+    // hard-clip the form to that region instead of trusting its natural
+    // content height to always stay inside it
     tabWidthPx: CARD_WIDTH * PIXELS_PER_WORLD_UNIT,
-    tabHeightPx: TAB_HEIGHT * PIXELS_PER_WORLD_UNIT
+    tabHeightPx: BACK_FORM_HEIGHT * PIXELS_PER_WORLD_UNIT
   });
 
   /* ---------- resize ---------- */
