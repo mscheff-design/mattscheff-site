@@ -270,6 +270,15 @@ const TAN_HALF_FOV = Math.tan(THREE.MathUtils.degToRad(FOV_DEG) / 2);
 const REFERENCE_CARD_PX_HEIGHT = 366;
 const PIXELS_PER_WORLD_UNIT = REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT;
 
+// Card half-extents in screen px, used only to place/fade the hover
+// guides (see the "DOM overlays" section's guide block) — derived from
+// the same fixed on-screen size as everything else above, so the guides
+// track the card's real edges at any viewport size with no separate
+// tuning of their own.
+const GUIDE_HALF_W_PX = (CARD_WIDTH / 2) * PIXELS_PER_WORLD_UNIT;
+const GUIDE_HALF_H_PX = (CARD_HEIGHT / 2) * PIXELS_PER_WORLD_UNIT;
+const GUIDE_TAB_H_PX = TAB_HEIGHT * PIXELS_PER_WORLD_UNIT;
+
 // how far a drag-release must TRAVEL (relative to where that drag started,
 // as a fraction of viewport height) before it opens/closes the dropdown.
 const DRAG_UP_THRESHOLD_FRACTION = 0.16;
@@ -984,6 +993,7 @@ export function initCard(container) {
     if (dropdownOpen || flipped || flipping) return;
     dropdownOpen = true;
     redrawToggleChevron();
+    updateGuideContent();
     animateDropdown(1);
   }
 
@@ -991,6 +1001,7 @@ export function initCard(container) {
     if (!dropdownOpen) return;
     dropdownOpen = false;
     redrawToggleChevron();
+    updateGuideContent();
     animateDropdown(0);
   }
 
@@ -1196,14 +1207,13 @@ export function initCard(container) {
     pointerDownOnCard = hitsCard(e.clientX, e.clientY);
     // Nothing in the page marks any of its own text unselectable, and a
     // drag can legitimately sweep well outside the card itself — up past
-    // the fixed nav bar (dragging up to extend the résumé) or down past
-    // the "scroll" cue (dragging down to close it), both real, plain DOM
-    // text. Without this, the browser's native mouse-drag text-selection
-    // starts the instant the cursor crosses any of that text, producing a
-    // blue highlight flash right around release — exactly the flicker
-    // reported on both of those gestures and nowhere else, since no other
-    // interaction here involves a sustained mouse-down drag over ordinary
-    // page text. Set from pointerdown (not just once a drag is confirmed
+    // the fixed nav bar's real, plain DOM text while dragging up to
+    // extend the résumé (the hover guides' own captions are exempt,
+    // being pointer-events:none). Without this, the browser's native
+    // mouse-drag text-selection starts the instant the cursor crosses
+    // that text, producing a blue highlight flash right around release —
+    // exactly the flicker this gesture used to trigger. Set from
+    // pointerdown (not just once a drag is confirmed
     // past DRAG_THRESHOLD in beginDrag) so the few px before that
     // threshold — still real mouse-down movement — can't start one
     // either; cleared in pointerup below regardless of whether this
@@ -1213,6 +1223,7 @@ export function initCard(container) {
 
   window.addEventListener('pointermove', (e) => {
     if (!dragging) updateHoverTilt(e.clientX, e.clientY);
+    if (!dragging) updateGuideHints(e.clientX, e.clientY);
 
     if (isPointerDown && potentialDrag && !dragging) {
       const dx = e.clientX - pointerDownClient.x;
@@ -1244,6 +1255,7 @@ export function initCard(container) {
     hovering = false;
     tiltTargetX = 0;
     tiltTargetY = 0;
+    hideGuides();
   });
 
   document.addEventListener('keydown', (e) => {
@@ -1300,6 +1312,7 @@ export function initCard(container) {
     if (cancelReturnTween) { cancelReturnTween(); cancelReturnTween = null; }
     dragging = true;
     hovering = false;
+    hideGuides();
     mode = 'dragging';
     dragOriginClientX = clientX;
     dragOriginClientY = clientY;
@@ -1475,7 +1488,7 @@ export function initCard(container) {
     window.location.href = `mailto:${CONTACT.email}?subject=${encodeURIComponent('Hello from mattscheff.com')}`;
   }
 
-  /* ---------- DOM overlays: drop zones, confirmation, scroll cue ---------- */
+  /* ---------- DOM overlays: drop zones, confirmation ---------- */
 
   const zoneRight = document.createElement('div');
   zoneRight.className = 'card3d-zone card3d-zone--right';
@@ -1495,15 +1508,106 @@ export function initCard(container) {
     confirmTimer = setTimeout(() => confirmEl.classList.remove('is-visible'), 1500);
   }
 
-  const scrollEl = document.createElement('div');
-  scrollEl.className = 'card3d-scroll';
-  scrollEl.textContent = 'scroll';
-  container.appendChild(scrollEl);
-  function onFirstScroll() {
-    scrollEl.classList.add('is-hidden');
-    window.removeEventListener('scroll', onFirstScroll);
+  /* ---------- hover guides: faint per-edge drag hints, same font/weight
+     as the card's other small caption text. Each one fades in as the cursor nears the
+     card edge its gesture belongs to (and out again as it leaves), so
+     they read as a property of hovering that spot rather than a fixed
+     label — see updateGuideHints() below for the proximity math, and its
+     own call site (alongside updateHoverTilt) for why both are driven off
+     the same pointermove. ---------- */
+
+  const ICON_ARROW = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 7l4-4 4 4"/></svg>';
+  const ICON_CURVE = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.2c-2.6 3-6.3 4.4-9.8 3.9"/><path d="M6.4 6.3L2.9 9.2l2.7 2.6"/></svg>';
+  const ICON_FLIP = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.3 8.4a4.7 4.7 0 0 1 8-3.3M12.7 7.6a4.7 4.7 0 0 1-8 3.3"/><path d="M11 2.6v2.8H8.2M5 13.4v-2.8h2.8"/></svg>';
+
+  function makeGuide(extraClass) {
+    const el = document.createElement('div');
+    el.className = 'card3d-guide' + (extraClass ? ' ' + extraClass : '');
+    el.innerHTML = '<span class="card3d-guide-icon"></span><span class="card3d-guide-text"></span>';
+    container.appendChild(el);
+    return el;
   }
-  window.addEventListener('scroll', onFirstScroll, { passive: true });
+
+  const guideTop = makeGuide('card3d-guide--top');
+  const guideLeft = makeGuide('card3d-guide--left');
+  const guideRight = makeGuide('card3d-guide--right');
+  const guideFlip = makeGuide('card3d-guide--flip');
+  const guideIcon = { top: guideTop.querySelector('.card3d-guide-icon'), left: guideLeft.querySelector('.card3d-guide-icon'), right: guideRight.querySelector('.card3d-guide-icon'), flip: guideFlip.querySelector('.card3d-guide-icon') };
+  const guideText = { top: guideTop.querySelector('.card3d-guide-text'), left: guideLeft.querySelector('.card3d-guide-text'), right: guideRight.querySelector('.card3d-guide-text'), flip: guideFlip.querySelector('.card3d-guide-text') };
+  guideIcon.left.innerHTML = ICON_CURVE;
+  guideIcon.right.innerHTML = ICON_CURVE;
+  guideIcon.flip.innerHTML = ICON_FLIP;
+  guideText.flip.textContent = 'click to flip';
+
+  // Only the top/left/right guides' TEXT (and the top guide's icon
+  // direction) change with state — updated once per actual state
+  // transition (here and in openDropdown/closeDropdown), not per frame;
+  // updateGuideHints() below only ever touches position/opacity.
+  function updateGuideContent() {
+    guideIcon.top.innerHTML = ICON_ARROW;
+    guideIcon.top.classList.toggle('is-down', dropdownOpen);
+    guideText.top.textContent = dropdownOpen ? 'drag down to close' : 'drag up to view résumé';
+    guideText.left.textContent = dropdownOpen ? 'drag to save résumé' : 'drag left to send an email';
+    guideText.right.textContent = dropdownOpen ? 'drag to save résumé' : 'drag right to save contact info';
+  }
+  updateGuideContent();
+
+  function hideGuides() {
+    guideTop.style.opacity = 0;
+    guideLeft.style.opacity = 0;
+    guideRight.style.opacity = 0;
+    guideFlip.style.opacity = 0;
+  }
+
+  function updateGuideHints(clientX, clientY) {
+    if (physicsSuspended || mode !== 'idle' || flipping) { hideGuides(); return; }
+
+    // World origin (the card's resting center) projects to the exact
+    // center of interactionRoot's own box (canvas fills it via inset:0,
+    // camera looks straight at the origin — see the renderer/camera
+    // setup above) — NOT the center of `container`, which the guides are
+    // actually appended to (matching confirmEl's own convention)
+    // and which can sit off-center inside interactionRoot whenever its
+    // host layout pads asymmetrically (true here: the hero section's own
+    // top/bottom padding differ). So the shared center point is computed
+    // in interactionRoot-space, then re-expressed in container-space
+    // (originX/Y below) for the actual left/top writes.
+    const hostRect = interactionRoot.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const centerX = hostRect.width / 2;
+    const centerY = hostRect.height / 2 - cardLift * PIXELS_PER_WORLD_UNIT;
+    const px = clientX - hostRect.left - centerX;
+    const py = clientY - hostRect.top - centerY;
+
+    const bottomLimit = GUIDE_HALF_H_PX + (dropdownOpen ? GUIDE_TAB_H_PX : 0);
+    const inside = Math.abs(px) <= GUIDE_HALF_W_PX * 1.08
+      && py >= -GUIDE_HALF_H_PX * 1.08 && py <= bottomLimit * 1.05;
+
+    const topStrength = inside && !flipped ? THREE.MathUtils.clamp(-py / GUIDE_HALF_H_PX, 0, 1) : 0;
+    const leftStrength = inside ? THREE.MathUtils.clamp(-px / GUIDE_HALF_W_PX, 0, 1) : 0;
+    const rightStrength = inside ? THREE.MathUtils.clamp(px / GUIDE_HALF_W_PX, 0, 1) : 0;
+    const flipStrength = inside && !dropdownOpen
+      ? THREE.MathUtils.clamp(1 - Math.hypot(px / GUIDE_HALF_W_PX, py / GUIDE_HALF_H_PX), 0, 1)
+      : 0;
+    const GUIDE_MAX_OPACITY = 0.85;
+
+    guideTop.style.opacity = topStrength * GUIDE_MAX_OPACITY;
+    guideLeft.style.opacity = leftStrength * GUIDE_MAX_OPACITY;
+    guideRight.style.opacity = rightStrength * GUIDE_MAX_OPACITY;
+    guideFlip.style.opacity = flipStrength * GUIDE_MAX_OPACITY;
+
+    const GUIDE_MARGIN_PX = 22;
+    const originX = (hostRect.left + centerX) - containerRect.left;
+    const originY = (hostRect.top + centerY) - containerRect.top;
+    guideTop.style.left = originX + 'px';
+    guideTop.style.top = (originY - GUIDE_HALF_H_PX - GUIDE_MARGIN_PX) + 'px';
+    guideLeft.style.left = (originX - GUIDE_HALF_W_PX - GUIDE_MARGIN_PX) + 'px';
+    guideLeft.style.top = originY + 'px';
+    guideRight.style.left = (originX + GUIDE_HALF_W_PX + GUIDE_MARGIN_PX) + 'px';
+    guideRight.style.top = originY + 'px';
+    guideFlip.style.left = originX + 'px';
+    guideFlip.style.top = (originY + GUIDE_HALF_H_PX + GUIDE_MARGIN_PX) + 'px';
+  }
 
   /* ---------- contact form (fixed region on the back face) ---------- */
 
@@ -1697,8 +1801,14 @@ function injectStyles() {
     .card3d-confirm{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#F4811F;text-shadow:0 0 6px rgba(244,129,31,0.5);opacity:0;pointer-events:none;transition:opacity 0.35s ease;white-space:nowrap;z-index:5}
     .card3d-confirm.is-visible{opacity:1}
 
-    .card3d-scroll{position:absolute;left:50%;bottom:0;transform:translateX(-50%);font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.25);letter-spacing:0.1em;text-transform:uppercase;transition:opacity 0.4s ease;z-index:4}
-    .card3d-scroll.is-hidden{opacity:0}
+    .card3d-guide{position:absolute;display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.32);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.25s ease;z-index:4}
+    .card3d-guide-icon{display:flex;line-height:0}
+    .card3d-guide--top{transform:translate(-50%,-100%);flex-direction:column-reverse;gap:4px}
+    .card3d-guide--top .card3d-guide-icon.is-down{transform:rotate(180deg)}
+    .card3d-guide--flip{transform:translate(-50%,0);flex-direction:column;gap:4px}
+    .card3d-guide--left{transform:translate(calc(-100% - 4px),-50%)}
+    .card3d-guide--right{transform:translate(calc(4px),-50%);flex-direction:row-reverse}
+    .card3d-guide--right .card3d-guide-icon{transform:scaleX(-1)}
   `;
   document.head.appendChild(style);
 }
