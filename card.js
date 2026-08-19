@@ -1195,6 +1195,21 @@ export function initCard(container) {
     pointerDownClient = { x: e.clientX, y: e.clientY };
     pointerDownTime = performance.now();
     pointerDownOnCard = hitsCard(e.clientX, e.clientY);
+    // Nothing in the page marks any of its own text unselectable, and a
+    // drag can legitimately sweep well outside the card itself — up past
+    // the fixed nav bar (dragging up to extend the résumé) or down past
+    // the "scroll" cue (dragging down to close it), both real, plain DOM
+    // text. Without this, the browser's native mouse-drag text-selection
+    // starts the instant the cursor crosses any of that text, producing a
+    // blue highlight flash right around release — exactly the flicker
+    // reported on both of those gestures and nowhere else, since no other
+    // interaction here involves a sustained mouse-down drag over ordinary
+    // page text. Set from pointerdown (not just once a drag is confirmed
+    // past DRAG_THRESHOLD in beginDrag) so the few px before that
+    // threshold — still real mouse-down movement — can't start one
+    // either; cleared in pointerup below regardless of whether this
+    // turned into a drag, a click, or neither.
+    document.body.style.userSelect = 'none';
   });
 
   window.addEventListener('pointermove', (e) => {
@@ -1223,6 +1238,7 @@ export function initCard(container) {
     }
     isPointerDown = false;
     potentialDrag = false;
+    document.body.style.userSelect = '';
   });
 
   interactionRoot.addEventListener('pointerleave', () => {
