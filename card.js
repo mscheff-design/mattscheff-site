@@ -434,6 +434,64 @@ export function initCard(container) {
     ctx.restore();
   }
 
+  // Redraws ONLY the toggle chevron, not the whole front canvas — dropdownOpen
+  // (which flips its rotation) is the ONLY thing about drawFront()'s output
+  // that ever changes after the initial draw, so openDropdown()/closeDropdown()
+  // used to call the full drawFront() just to flip one glyph: a complete
+  // redraw of every job row, the tag cloud, the download link, the vignette,
+  // and the grain composite, for a change that only ever touches a few dozen
+  // px around one character. drawFront() alone runs dozens of fillText/
+  // measureText calls (drawTracked draws letter-spaced text one character at
+  // a time — see its own comment) plus gradient/grain compositing, easily
+  // several ms of synchronous main-thread work landing at the exact instant
+  // a drag-release opens or closes the résumé — a very plausible source of
+  // the flicker reported on exactly that gesture and no other (nothing else
+  // in this file calls drawFront() after initial load). This clips to a
+  // small fixed box around the chevron's own known position, repaints just
+  // that box's stock color + the (cheap, since it's clip-bounded regardless
+  // of the gradient's own extent) vignette and grain, then redraws the
+  // glyph — everything else on the canvas is left untouched. The GPU-side
+  // texture reupload (frontTex.needsUpdate) still re-sends the whole canvas
+  // either way — CanvasTexture has no partial-update path — but that upload
+  // is comparatively cheap; the CPU-side drawing work is what dominated.
+  function redrawToggleChevron() {
+    const ctx = frontCanvas.getContext('2d');
+    const w = TEX_W, h = UNIFIED_TEX_H, bh = TEX_BASE_PX;
+    const pad = w * CARD_PAD_FRACTION;
+    const cx = w - pad - bh * 0.02;
+    const cy = bh * (TOGGLE_LABEL_F - 0.01);
+    const half = bh * 0.045; // comfortably covers the glyph's ink at either rotation
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cx - half, cy - half, half * 2, half * 2);
+    ctx.clip();
+
+    ctx.clearRect(cx - half, cy - half, half * 2, half * 2);
+    ctx.fillStyle = CARD_STOCK_COLOR;
+    ctx.fillRect(cx - half, cy - half, half * 2, half * 2);
+
+    // same vignette formula as drawFront() — fillRect is clip-bounded to the
+    // small box above regardless of the gradient's own (canvas-spanning) extent
+    const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
+    vg.addColorStop(0, 'rgba(28,20,10,0)');
+    vg.addColorStop(1, 'rgba(28,20,10,0.06)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(cx - half, cy - half, half * 2, half * 2);
+
+    applyGrain(ctx, w, h, 0.055); // also clip-bounded to the small box
+
+    ctx.font = `400 ${Math.round(bh * 0.04)}px "DM Mono", monospace`;
+    ctx.fillStyle = 'rgba(28,20,10,0.55)';
+    ctx.textAlign = 'center';
+    ctx.translate(cx, cy);
+    ctx.rotate(dropdownOpen ? Math.PI : 0);
+    ctx.fillText('⌄', 0, 0);
+    ctx.restore();
+
+    frontTex.needsUpdate = true;
+  }
+
   // Card content (name/title/toggle row) AND the résumé tab's content
   // (job rows, tag cloud, download link) are drawn into ONE canvas, in
   // one pass — one fill, one vignette, one grain application — so nothing
@@ -926,14 +984,14 @@ export function initCard(container) {
     // this guard is just belt-and-suspenders against a stray caller.
     if (dropdownOpen || flipped || flipping) return;
     dropdownOpen = true;
-    drawFront();
+    redrawToggleChevron();
     animateDropdown(1);
   }
 
   function closeDropdown() {
     if (!dropdownOpen) return;
     dropdownOpen = false;
-    drawFront();
+    redrawToggleChevron();
     animateDropdown(0);
   }
 
