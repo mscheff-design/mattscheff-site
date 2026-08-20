@@ -296,6 +296,10 @@ let PIXELS_PER_WORLD_UNIT = REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT;
 // updateGuideConstants().
 let GUIDE_HALF_W_PX = (CARD_WIDTH / 2) * PIXELS_PER_WORLD_UNIT;
 let GUIDE_HALF_H_PX = (CARD_HEIGHT / 2) * PIXELS_PER_WORLD_UNIT;
+// Fixed regardless of scale — shared with the tilt-prompt's own
+// positioning (see positionTiltPrompt) so both sit the same distance off
+// the card's edge.
+const GUIDE_MARGIN_PX = 22;
 let GUIDE_TAB_H_PX = TAB_HEIGHT * PIXELS_PER_WORLD_UNIT;
 function updateGuideConstants() {
   GUIDE_HALF_W_PX = (CARD_WIDTH / 2) * PIXELS_PER_WORLD_UNIT;
@@ -1117,6 +1121,29 @@ export function initCard(container) {
   const TILT_DAMPING = 0.8;
   let hovering = false;
 
+  // ---- gyroscope tilt (touch devices only) ----
+  // coarse pointer = no fine hover, which is the actual thing that
+  // determines whether a device can ever produce hover-tilt on its own —
+  // matches the intent better than a viewport-width check (a touchscreen
+  // laptop with a wide window still has no hover; a narrow desktop window
+  // still has a mouse).
+  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+  const gyroSupported = typeof DeviceOrientationEvent !== 'undefined';
+  let gyroActive = false;
+  // The angles a phone rests at "flat/neutral" in someone's hand vary a
+  // lot person to person — captured from the first real reading after
+  // permission is granted (see handleDeviceOrientation), not assumed to
+  // be some fixed "device lying flat" or "held bolt upright" value, so
+  // the card starts centered from wherever they're actually holding it
+  // rather than snapping to whatever tilt that assumption was off by.
+  let gyroBaseline = null;
+  // how many degrees of phone tilt (off that baseline) reach the same
+  // TILT_MAX the mouse-hover version reaches at the card's own edge —
+  // small enough to be reachable by wrist movement without needing to
+  // wave the whole phone around, generous enough that it doesn't feel
+  // twitchy at rest (ordinary hand tremor is a fraction of a degree).
+  const GYRO_MAX_DEG = 16;
+
   let physicsSuspended = false;
   function setPhysicsSuspended(v) {
     physicsSuspended = v;
@@ -1308,7 +1335,15 @@ export function initCard(container) {
   });
 
   window.addEventListener('pointermove', (e) => {
-    if (!dragging) updateHoverTilt(e.clientX, e.clientY);
+    // A touch drag fires pointermove too, and this device's actual tilt
+    // is being driven by handleDeviceOrientation() once gyro is active —
+    // letting a touch's own position also feed tiltTargetX/Y through
+    // updateHoverTilt would just have the two constantly overwriting each
+    // other. gyroSupported alone (not gyroActive) is enough to gate this:
+    // once a device has a gyroscope to ask about, its touch position was
+    // never a meaningful stand-in for "where is this being looked at from"
+    // the way a mouse's is, permission granted or not.
+    if (!dragging && !(e.pointerType === 'touch' && gyroSupported)) updateHoverTilt(e.clientX, e.clientY);
     if (!dragging) updateGuideHints(e.clientX, e.clientY);
 
     if (isPointerDown && potentialDrag && !dragging) {
@@ -1368,6 +1403,60 @@ export function initCard(container) {
     const ny = ((clientY - rect.top) / rect.height) * 2 - 1;
     tiltTargetX = THREE.MathUtils.clamp(-ny * TILT_MAX, -TILT_MAX, TILT_MAX);
     tiltTargetY = THREE.MathUtils.clamp(nx * TILT_MAX, -TILT_MAX, TILT_MAX);
+  }
+
+  /* ---------- gyroscope tilt (touch devices only, opt-in — see the
+     tilt-prompt in the DOM overlays section for the permission gesture) ---------- */
+
+  // beta/gamma's sign conventions are notoriously inconsistent across iOS
+  // vs Android and even across browser versions on the same OS, and there
+  // is no way to test an actual accelerometer through this session's
+  // tooling — this mapping (tilting the phone's top edge back → card tilts
+  // the same way beta moved; tilting it left/right → card tilts that way
+  // with gamma) is a best-guess best matching the mouse-hover version's own
+  // "vertical → X tilt, horizontal → Y tilt" convention just above. If it
+  // reads as backwards on a real device, flip the sign on the two
+  // assignments below — everything else (baseline capture, clamping,
+  // feeding the existing tiltTargetX/Y spring-damper) stays correct either
+  // way.
+  function handleDeviceOrientation(e) {
+    if (e.beta === null || e.gamma === null) return;
+    // First real reading becomes "centered" — see gyroBaseline's own
+    // comment for why this isn't a fixed assumed angle.
+    if (!gyroBaseline) { gyroBaseline = { beta: e.beta, gamma: e.gamma }; return; }
+    // A drag or an open form field should visually dominate over ambient
+    // tilt during that gesture, same as hover already yields to dragging
+    // (see the pointermove listener) and to physicsSuspended (see
+    // setPhysicsSuspended) — this is the gyro's equivalent of both gates.
+    if (physicsSuspended || dragging) return;
+    const dBeta = THREE.MathUtils.clamp(e.beta - gyroBaseline.beta, -GYRO_MAX_DEG, GYRO_MAX_DEG);
+    const dGamma = THREE.MathUtils.clamp(e.gamma - gyroBaseline.gamma, -GYRO_MAX_DEG, GYRO_MAX_DEG);
+    tiltTargetX = (dBeta / GYRO_MAX_DEG) * TILT_MAX;
+    tiltTargetY = (dGamma / GYRO_MAX_DEG) * TILT_MAX;
+  }
+
+  // The actual permission gesture, called from the tilt-prompt's own
+  // click handler (DOM overlays section) — iOS requires this to run
+  // synchronously inside a real user gesture (a tap), every page load,
+  // even for a device that granted it last time; Android and desktop
+  // browsers with the interface at all just skip straight to attaching
+  // the listener since they never gate it behind a permission prompt.
+  async function enableGyro() {
+    if (gyroActive || !gyroSupported) return;
+    try {
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const result = await DeviceOrientationEvent.requestPermission();
+        if (result !== 'granted') { hideTiltPrompt(); return; }
+      }
+      window.addEventListener('deviceorientation', handleDeviceOrientation);
+      gyroActive = true;
+      hideTiltPrompt();
+    } catch (_) {
+      // Permission API present but the call itself failed (not run from a
+      // trusted gesture, or the browser's own quirks) — leave the card on
+      // its existing touch-drag/flip behavior rather than retrying.
+      hideTiltPrompt();
+    }
   }
 
   /* ---------- flip ---------- */
@@ -1636,6 +1725,43 @@ export function initCard(container) {
   }
   updateGuideContent();
 
+  // Touch-only, opt-in "tap to enable tilt" affordance for the gyroscope
+  // (see handleDeviceOrientation/enableGyro above) — shown until tapped
+  // (granted, denied, or the request itself failing all hide it the same
+  // way — see enableGyro) or until this device turns out to have no
+  // DeviceOrientationEvent interface at all. Positioned once per resize
+  // (see positionTiltPrompt, called from handleResize()) rather than
+  // driven by pointermove like the hover guides above: touch has nothing
+  // resembling continuous hover to reposition it with.
+  const tiltPrompt = document.createElement('div');
+  tiltPrompt.className = 'card3d-tilt-prompt';
+  tiltPrompt.textContent = 'tap to enable tilt';
+  container.appendChild(tiltPrompt);
+  if (isTouchDevice && gyroSupported) {
+    tiltPrompt.addEventListener('click', enableGyro);
+  } else {
+    tiltPrompt.style.display = 'none';
+  }
+  function hideTiltPrompt() {
+    tiltPrompt.style.opacity = 0;
+    tiltPrompt.style.pointerEvents = 'none';
+  }
+  function positionTiltPrompt() {
+    if (!isTouchDevice || !gyroSupported || gyroActive) return;
+    // Same origin math as updateGuideHints() above (see its own comment
+    // for why interactionRoot's center, re-expressed in container-space,
+    // is the shared reference point every DOM overlay here positions off).
+    const hostRect = interactionRoot.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const centerX = hostRect.width / 2;
+    const centerY = hostRect.height / 2 - cardLift * PIXELS_PER_WORLD_UNIT;
+    const originX = (hostRect.left + centerX) - containerRect.left;
+    const originY = (hostRect.top + centerY) - containerRect.top;
+    tiltPrompt.style.left = originX + 'px';
+    tiltPrompt.style.top = (originY + GUIDE_HALF_H_PX + GUIDE_MARGIN_PX) + 'px';
+    tiltPrompt.style.opacity = 1;
+  }
+
   function hideGuides() {
     guideTop.style.opacity = 0;
     guideLeft.style.opacity = 0;
@@ -1680,7 +1806,6 @@ export function initCard(container) {
     guideRight.style.opacity = rightStrength * GUIDE_MAX_OPACITY;
     guideFlip.style.opacity = flipStrength * GUIDE_MAX_OPACITY;
 
-    const GUIDE_MARGIN_PX = 22;
     const originX = (hostRect.left + centerX) - containerRect.left;
     const originY = (hostRect.top + centerY) - containerRect.top;
     guideTop.style.left = originX + 'px';
@@ -1792,6 +1917,7 @@ export function initCard(container) {
       tabHeightPx: BACK_FORM_HEIGHT * PIXELS_PER_WORLD_UNIT,
       formScale: scale
     });
+    positionTiltPrompt();
   }
   const resizeObserver = new ResizeObserver(handleResize);
   resizeObserver.observe(interactionRoot);
@@ -1921,6 +2047,12 @@ function injectStyles() {
     .card3d-guide--left{transform:translate(calc(-100% - 4px),-50%)}
     .card3d-guide--right{transform:translate(calc(4px),-50%);flex-direction:row-reverse}
     .card3d-guide--right .card3d-guide-icon{transform:scaleX(-1)}
+
+    /* same font/size/color as the hover guides above, but always-on
+       (opacity written directly in positionTiltPrompt/hideTiltPrompt, not
+       proximity-faded like theirs — touch has no hover to fade in from)
+       and actually clickable, since tapping it is the whole point. */
+    .card3d-tilt-prompt{position:absolute;transform:translate(-50%,0);font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.32);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:auto;cursor:pointer;transition:opacity 0.25s ease;z-index:4}
   `;
   document.head.appendChild(style);
 }
