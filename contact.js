@@ -105,8 +105,7 @@
  *                     face doesn't extend, so the form has nothing of its
  *                     own to lag behind. This no longer drives visibility
  *                     (see update()'s own comment) — it only gates
- *                     pointer-events/focus and, on mobile, the plain
- *                     display toggle.
+ *                     pointer-events/focus.
  *   backActive()    - true whenever the back cap could conceivably be
  *                     facing the camera (flipped or mid-flip either way);
  *                     false while the card just sits resting on the
@@ -131,19 +130,28 @@
  *                     hidden — pegging the clip region itself to that
  *                     region's true geometry so the form can never render
  *                     past its own edge into the contact info above it.
- *   cardHalfHeightPx - the card's own current on-screen half-height in px
- *                     (same figure card.js's hover guides use). Only
- *                     consulted on mobile, where the panel places itself
- *                     this far below hostEl's center — see update()'s own
- *                     comment for why that replaced letting flexbox stack
- *                     it after the card.
+ *   formScale       - card.js's own current width-cap scale factor (1 at
+ *                     every viewport wide enough to fit the card at its
+ *                     normal size; smaller only once a narrow viewport
+ *                     forces it down — see card.js's NATURAL_CARD_WIDTH_PX).
+ *                     tabWidthPx/tabHeightPx already shrink the *clip*
+ *                     region to match the card, but the form's own content
+ *                     (fixed px font sizes, a fixed-width layout) doesn't
+ *                     shrink on its own — set as a --fs CSS custom
+ *                     property the form's own stylesheet drives every
+ *                     size off via calc(), rather than a transform:scale
+ *                     (which shrinks how the form paints but not the box
+ *                     its own max-height/overflow-y math reasons about —
+ *                     see that CSS's own comment), so its content
+ *                     actually gets smaller together with the card it's
+ *                     printed on.
  *
- * returns { update(), blurActive(), updateGeometry(), getMobileExtraPx() }
+ * returns { update(), blurActive(), updateGeometry() }
  *   update()      - call once per render frame (after renderer.render(),
  *                   so camera/anchor matrices are current) to refresh the
  *                   panel's CSS transform and visibility
  *   updateGeometry({ pixelsPerWorldUnit, tabWidthPx, tabHeightPx,
- *                   cardHalfHeightPx }) - call whenever card.js's own
+ *                   formScale }) - call whenever card.js's own
  *                   on-screen scale might have changed (its handleResize()
  *                   does, on every resize) to keep this module's cached
  *                   figures in sync — any key can be omitted to leave that
@@ -153,22 +161,8 @@
  *                   Escape handler calls this first, before its own
  *                   existing close-the-tab behavior, per the requested
  *                   key-handling hierarchy.
- *   getMobileExtraPx() - 0 unless the mobile fallback panel is the thing
- *                   actually on screen right now, in which case its own
- *                   current rendered height (+ its fixed offset gap).
- *                   card.js calls this every frame to grow hostEl's own
- *                   padding-bottom to match — see its
- *                   updateMobileFormPadding().
  */
 
-// Exported so card.js can gate its own mouse-hover guide hints off at the
-// same width — those hints and this module's mobile fallback panel land
-// in almost the same place below the card (both are "card's own half
-// height + a ~20px margin" from the same center point), so leaving the
-// hover guides live past this point means they render right on top of
-// the mobile form the instant a real mouse (not a touch device — narrow
-// desktop window, trackpad, etc.) gets near the card.
-export const MOBILE_BREAKPOINT_PX = 640;
 const CONTACT_ENDPOINT = '/api/contact';
 
 export function initContactForm(opts) {
@@ -180,18 +174,16 @@ export function initContactForm(opts) {
     isCardSettled,
     onFocusChange
   } = opts;
-  // These four scale with card.js's on-screen card size, which can change
+  // These five scale with card.js's on-screen card size, which can change
   // after a narrow-viewport resize (see updateGeometry() and card.js's
   // own handleResize()) — mutable, not destructured as consts, so that
   // update() and updateGeometry() always see the current value rather
   // than whatever was true when initContactForm() first ran.
-  let { pixelsPerWorldUnit, tabWidthPx, tabHeightPx, cardHalfHeightPx } = opts;
-
-  const MOBILE_GAP_PX = 24;
+  let { pixelsPerWorldUnit, tabWidthPx, tabHeightPx, formScale } = opts;
 
   injectStyles();
 
-  /* ---------- DOM: CSS-3D stage (desktop) + plain fallback (mobile) ---------- */
+  /* ---------- DOM: CSS-3D stage ---------- */
 
   // stage: a perspective-bearing, always-present, pointer-events:none
   // layer the same size as the canvas. Only the form panel inside it ever
@@ -228,6 +220,9 @@ export function initContactForm(opts) {
 
   const { formEl, els, setState } = buildFormDOM(fallbackEmail);
   clip.appendChild(formEl);
+  // See updateGeometry()'s own comment — this is the initial value, from
+  // whatever card.js's scale already was at construction time.
+  if (formScale !== undefined) clip.style.setProperty('--fs', formScale);
 
   /* ---------- focus -> physics suspension ---------- */
 
@@ -400,15 +395,10 @@ export function initContactForm(opts) {
     const w = hostEl.clientWidth, h = hostEl.clientHeight;
     if (!w || !h) return;
 
-    const mobile = window.innerWidth < MOBILE_BREAKPOINT_PX;
-    stage.classList.toggle('is-mobile', mobile);
-
     // p is binary (0 or 1) — the back face is a fixed region, not a slide,
     // so there's no ramp to compute here. It no longer drives visibility
-    // on desktop (see the transform block below for why); it still gates
-    // interactivity and, on mobile, the plain display toggle.
+    // (see the transform block below for why); it still gates interactivity.
     const p = progress();
-    stage.classList.toggle('is-visible', p > 0); // mobile's display toggle only
 
     const nextInteractive = p > 0;
     if (nextInteractive !== interactive) {
@@ -426,36 +416,12 @@ export function initContactForm(opts) {
       // comment). lastW/lastH start at 0, so this also covers the very
       // first frame the panel becomes visible.
       recomputeCanvasGeometry(w, h);
-      // panel is always pinned at the stage's own center — both branches
-      // below (mobile's plain offset and desktop's full matrix3d) build
-      // their own transform from this one fixed anchor point, so left/top
-      // never need to track anything themselves beyond this.
+      // panel is always pinned at the stage's own center — the matrix
+      // built below carries the *entire* position/rotation/perspective
+      // relative to that one fixed point, so left/top never need to
+      // track the anchor themselves any more.
       panel.style.left = cachedCanvasCenterX + 'px';
       panel.style.top = cachedCanvasCenterY + 'px';
-    }
-
-    if (mobile) {
-      // A plain, non-perspective offset from the same hostEl-center point
-      // desktop's matrix3d also pins to: centered horizontally, with its
-      // own top edge cardHalfHeightPx + a fixed gap below center — i.e.
-      // just past the card's own fixed bottom edge, whatever hostEl's
-      // actual size is. This used to be "position:static, let flexbox
-      // stack it after the card" — that broke because hostEl is the whole
-      // hero *section*, not the small card-sized box: flexbox was
-      // centering this panel against an invisible sizing placeholder
-      // (.card3d-container) that sits at a different place than where the
-      // WebGL canvas actually renders the card, not against the card
-      // itself, so the two would drift apart and land overlapping instead
-      // of stacked. This anchors to the one point that's already provably
-      // correct (recomputeCanvasGeometry's own center — the same one the
-      // hover guides and the desktop matrix both use), so it can't drift.
-      panel.style.transform = `translate(-50%, ${cardHalfHeightPx + MOBILE_GAP_PX}px)`;
-      // mobile's show/hide is done via the .is-visible class on `stage`
-      // (display:none) further up, not via facing-test visibility below —
-      // so unlike desktop, nothing else in this function ever clears the
-      // CSS default set on .contact3d-panel above; do it here instead.
-      panel.style.visibility = 'visible';
-      return;
     }
 
     // The back cap can only possibly be facing the camera while flipped
@@ -521,35 +487,31 @@ export function initContactForm(opts) {
   // Called by card.js's handleResize() whenever the card's own on-screen
   // scale might have changed (see NATURAL_CARD_WIDTH_PX there) — updates
   // the few figures this module derived from that scale once at
-  // construction: the clip region's hard px size, the mobile fallback's
-  // offset, and (via the mutable pixelsPerWorldUnit binding update() reads
+  // construction: the clip region's hard px size, the form's own content
+  // scale, and (via the mutable pixelsPerWorldUnit binding update() reads
   // every frame) the CSS-3D matrix's world-to-px conversion.
   function updateGeometry(next) {
     if (next.pixelsPerWorldUnit !== undefined) pixelsPerWorldUnit = next.pixelsPerWorldUnit;
-    if (next.cardHalfHeightPx !== undefined) cardHalfHeightPx = next.cardHalfHeightPx;
     if (next.tabWidthPx !== undefined) tabWidthPx = next.tabWidthPx;
     if (next.tabHeightPx !== undefined) tabHeightPx = next.tabHeightPx;
     if (tabWidthPx && tabHeightPx) {
       clip.style.width = tabWidthPx + 'px';
       clip.style.height = tabHeightPx + 'px';
     }
+    if (next.formScale !== undefined) {
+      formScale = next.formScale;
+      // tabWidthPx/tabHeightPx above already shrink the *clip region* to
+      // match the card, but the form's own content is a fixed-px design
+      // (see .contact-form's own CSS) that doesn't shrink on its own —
+      // the --fs custom property drives every size in that CSS via
+      // calc(), so this actually re-lays the form out smaller rather than
+      // just rendering a still-full-size layout at a smaller visual scale
+      // (see that CSS's own comment for why the distinction matters).
+      clip.style.setProperty('--fs', formScale);
+    }
   }
 
-  // How far past the card's own bottom edge the mobile panel currently
-  // extends (its own rendered height, plus the same gap it's offset by —
-  // see update()'s mobile branch) — 0 whenever the mobile panel isn't
-  // actually the thing on screen. card.js folds this into hostEl's own
-  // padding-bottom every frame (see its updateMobileFormPadding()), since
-  // this panel is position:absolute and does nothing on its own to keep
-  // page content below the hero from overlapping it. Short-circuits before
-  // touching layout (panel.offsetHeight) in the by-far-most-common case
-  // (desktop, or resting on the front) where it doesn't matter anyway.
-  function getMobileExtraPx() {
-    if (window.innerWidth >= MOBILE_BREAKPOINT_PX || progress() <= 0) return 0;
-    return panel.offsetHeight + MOBILE_GAP_PX;
-  }
-
-  return { update, blurActive, updateGeometry, getMobileExtraPx };
+  return { update, blurActive, updateGeometry };
 }
 
 /* ---------- form markup ---------- */
@@ -665,50 +627,61 @@ function injectStyles() {
        layout rather than a composed one; anchoring to the top keeps the
        form immediately following the divider, and lets the (real, but
        now unremarkable) spare room fall to the bottom instead, where
-       trailing whitespace reads as intentional. */
-    .contact3d-clip{box-sizing:border-box;padding:12px 20px 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center}
+       trailing whitespace reads as intentional. Padding scales via --fs
+       too (set here, not on .contact-form, specifically so it inherits
+       down to that rule's own var(--fs) reads as well) — left fixed, this
+       padding stays a constant 12px regardless of how small tabHeightPx
+       (this box's own explicit height, set in JS) shrinks, eating a
+       growing share of it at small scales until there wasn't enough left
+       for the form's own (correctly-scaled) content and it had to scroll
+       again anyway. */
+    .contact3d-clip{box-sizing:border-box;padding:calc(12px * var(--fs, 1)) calc(20px * var(--fs, 1)) 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center}
 
-    /* belt-and-suspenders: if content still somehow exceeds the clip's
-       fixed height (a long wrapped error message, an over-full textarea),
-       it scrolls inside its own box instead of visually overflowing it */
-    .contact-form{width:230px;max-height:100%;overflow-y:auto;font-family:'DM Mono',monospace}
-    .cf-field{margin-bottom:7px}
-    .cf-field label{display:block;font-family:'DM Mono',monospace;font-size:7.5px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(28,20,10,0.45);margin-bottom:2px}
+    /* --fs (set in updateGeometry(), see its own comment) is card.js's
+       current width-cap scale factor — every size below is a calc() off
+       it rather than a fixed px value, so the form's actual LAYOUT gets
+       smaller together with the card, not just its rendered appearance.
+       That distinction matters: an earlier version used a CSS
+       transform:scale() on the whole form instead, which shrinks how it
+       *paints* but not the box the layout engine (and this rule's own
+       max-height/overflow-y below) reasons about — so at any scale below
+       1, the still-full-size unscaled layout would "overflow" a
+       max-height sized for the *scaled* clip and force a scrollbar, even
+       though the visually-shrunk result would have fit fine. calc()
+       makes the box itself genuinely smaller, so that comparison — and
+       the belt-and-suspenders scroll it's still there for (a long
+       wrapped error message, an over-full textarea) — stays correct at
+       any scale. The +4px on max-height is slack for that comparison
+       itself: this many independent calc()s each round sub-pixel values
+       slightly differently, so the form's true content height can land a
+       stray ~1px over its own max-height purely from that rounding —
+       enough to make overflow-y:auto show a full scrollbar over content
+       that actually fits. 4px absorbs that noise without meaningfully
+       weakening the real guard: genuine overflow (an error message,
+       autofilled content) still exceeds it by far more than that. */
+    .contact-form{width:calc(230px * var(--fs, 1));max-height:calc(100% + 4px);overflow-y:auto;font-family:'DM Mono',monospace}
+    .cf-field{margin-bottom:calc(7px * var(--fs, 1))}
+    .cf-field label{display:block;font-family:'DM Mono',monospace;font-size:calc(7.5px * var(--fs, 1));letter-spacing:0.1em;text-transform:uppercase;color:rgba(28,20,10,0.45);margin-bottom:calc(2px * var(--fs, 1))}
     .cf-field input,.cf-field textarea{
       display:block;width:100%;border:none;border-bottom:0.5px solid rgba(28,20,10,0.28);
-      background:transparent;font-family:'EB Garamond',serif;font-size:12.5px;color:#1c140a;
-      padding:1px 0 2px;outline:none;resize:none;line-height:1.25
+      background:transparent;font-family:'EB Garamond',serif;font-size:calc(12.5px * var(--fs, 1));color:#1c140a;
+      padding:calc(1px * var(--fs, 1)) 0 calc(2px * var(--fs, 1));outline:none;resize:none;line-height:1.25
     }
     .cf-field input:focus,.cf-field textarea:focus{border-bottom-color:#1c140a}
-    .cf-field textarea{min-height:26px}
+    .cf-field textarea{min-height:calc(26px * var(--fs, 1))}
 
     .cf-honeypot{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
 
-    .cf-submit{all:unset;display:inline-block;margin-top:0;font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.1em;text-transform:uppercase;color:#1c140a;cursor:pointer;border-bottom:0.5px solid rgba(28,20,10,0.4);padding-bottom:1px;transition:opacity 0.2s ease}
+    .cf-submit{all:unset;display:inline-block;margin-top:0;font-family:'DM Mono',monospace;font-size:calc(8.5px * var(--fs, 1));letter-spacing:0.1em;text-transform:uppercase;color:#1c140a;cursor:pointer;border-bottom:0.5px solid rgba(28,20,10,0.4);padding-bottom:calc(1px * var(--fs, 1));transition:opacity 0.2s ease}
     .cf-submit:hover{border-color:#1c140a}
     .cf-submit:disabled{cursor:default;opacity:0.5}
 
-    .cf-status{margin-top:5px;font-family:'DM Mono',monospace;font-size:7.5px;letter-spacing:0.03em;line-height:1.4;color:rgba(28,20,10,0.55)}
+    .cf-status{margin-top:calc(5px * var(--fs, 1));font-family:'DM Mono',monospace;font-size:calc(7.5px * var(--fs, 1));letter-spacing:0.03em;line-height:1.4;color:rgba(28,20,10,0.55)}
     .cf-status.is-error{color:#a3402a}
     .cf-status.is-error a,.cf-status a{color:inherit}
 
-    .cf-result{font-family:'EB Garamond',serif;font-size:13px;color:#1c140a;line-height:1.4;max-width:210px}
+    .cf-result{font-family:'EB Garamond',serif;font-size:calc(13px * var(--fs, 1));color:#1c140a;line-height:1.4;max-width:calc(210px * var(--fs, 1))}
 
-    /* below this width the CSS-3D projection is skipped entirely — the
-       card's on-screen footprint is small and its tilt is disabled on
-       touch anyway, so a plain in-flow panel reads far better than a
-       shrunken, perspective-warped one. Still position:absolute, same as
-       desktop — an earlier version switched this to position:static and
-       let flexbox stack it after the card, but hostEl is the whole hero
-       *section*, not the small card-sized box, so that ended up centering
-       the panel against an unrelated invisible sizing placeholder
-       instead of the card itself (see update()'s own comment). The
-       panel's own position (a plain translate, not a matrix3d) is set in
-       JS either way, so no positioning is set here. */
-    .contact3d-stage.is-mobile{perspective:none;opacity:1;pointer-events:auto}
-    .contact3d-stage.is-mobile:not(.is-visible){display:none}
-    .contact3d-stage.is-mobile .contact3d-clip{width:auto !important;height:auto !important;overflow:visible;padding:0}
-    .contact3d-stage.is-mobile .contact-form{width:100%;max-width:340px;max-height:none;overflow-y:visible;margin:0 auto;pointer-events:auto}
   `;
   document.head.appendChild(style);
 }

@@ -1,5 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { initContactForm, MOBILE_BREAKPOINT_PX } from './contact.js';
+import { initContactForm } from './contact.js';
 import { JOBS } from './jobs.js';
 
 /**
@@ -288,11 +288,10 @@ const CARD_VIEWPORT_MARGIN_PX = 24;
 let PIXELS_PER_WORLD_UNIT = REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT;
 
 // Card half-extents in screen px, used only to place/fade the hover
-// guides (see the "DOM overlays" section's guide block) and to place the
-// contact form's mobile fallback (see contactForm.updateGeometry below) —
-// derived from the same on-screen scale as everything else above, so
-// they track the card's real edges at any viewport size with no separate
-// tuning of their own. Recomputed by handleResize() alongside
+// guides (see the "DOM overlays" section's guide block) — derived from
+// the same on-screen scale as everything else above, so they track the
+// card's real edges at any viewport size with no separate tuning of
+// their own. Recomputed by handleResize() alongside
 // PIXELS_PER_WORLD_UNIT itself whenever that changes — see
 // updateGuideConstants().
 let GUIDE_HALF_W_PX = (CARD_WIDTH / 2) * PIXELS_PER_WORLD_UNIT;
@@ -995,36 +994,14 @@ export function initCard(container) {
   scene.add(cardGroup);
 
   let basePaddingBottomPx = null;
-  // How far past the card's own bottom edge the mobile contact form's
-  // plain (non-3D) panel currently extends — see updateMobileFormPadding().
-  // Folded into interactionRoot's own padding-bottom, same as the résumé
-  // dropdown's growthPx below: the panel is position:absolute (see
-  // contact.js), so nothing about it growing interactionRoot's own box on
-  // its own — without this, a tall form (long wrapped error text, an
-  // autofilled textarea) just overlaps whatever page content comes after
-  // the hero instead of pushing it down.
-  let mobileFormExtraPx = 0;
 
   function updateHeroPadding(progress) {
     if (basePaddingBottomPx === null) {
       basePaddingBottomPx = parseFloat(getComputedStyle(interactionRoot).paddingBottom) || 0;
     }
     const growthPx = PAGE_GROWTH_WORLD * progress * PIXELS_PER_WORLD_UNIT;
-    interactionRoot.style.paddingBottom = (basePaddingBottomPx + growthPx + mobileFormExtraPx) + 'px';
+    interactionRoot.style.paddingBottom = (basePaddingBottomPx + growthPx) + 'px';
     handleResize();
-  }
-
-  // Called every tick() frame (cheap: contactForm.getMobileExtraPx() short-
-  // circuits to 0 without touching layout at all unless the mobile form is
-  // actually the thing currently on screen) — only actually writes/resizes
-  // when the measured amount changes, e.g. on flip, on a submit-state
-  // change that changes the form's own content height, or on a resize
-  // that re-wraps its text.
-  function updateMobileFormPadding() {
-    const extra = contactForm.getMobileExtraPx();
-    if (extra === mobileFormExtraPx) return;
-    mobileFormExtraPx = extra;
-    updateHeroPadding(dropdownProgress);
   }
 
   // declared ahead of the initial draw calls below since drawFront() reads
@@ -1667,14 +1644,7 @@ export function initCard(container) {
   }
 
   function updateGuideHints(clientX, clientY) {
-    // Below this width, contact.js switches the contact form to its own
-    // plain mobile fallback panel — positioned in almost this exact spot
-    // below the card (see MOBILE_BREAKPOINT_PX's own comment in
-    // contact.js) — so these hover-only hints have to stay off past that
-    // point too, or a mouse near the card (a narrow desktop window, not
-    // necessarily an actual touch device) renders "CLICK TO FLIP" right on
-    // top of the form's own fields.
-    if (physicsSuspended || mode !== 'idle' || flipping || window.innerWidth < MOBILE_BREAKPOINT_PX) { hideGuides(); return; }
+    if (physicsSuspended || mode !== 'idle' || flipping) { hideGuides(); return; }
 
     // World origin (the card's resting center) projects to the exact
     // center of interactionRoot's own box (canvas fills it via inset:0,
@@ -1740,11 +1710,11 @@ export function initCard(container) {
     fallbackEmail: CONTACT.email,
     // binary now, not a slide-driven ramp — the back face doesn't extend
     // any more, so the form has nothing to lag behind or race ahead of.
-    // This only gates pointer-events/focus (and mobile's plain display
-    // toggle) — the panel's own transform tracks backFormAnchor every
-    // frame it's active (see backActive below), so it visually spins with
-    // the card through the flip tween itself; see contact.js's update()
-    // for how it hides at the right moment without this flag's help.
+    // This only gates pointer-events/focus — the panel's own transform
+    // tracks backFormAnchor every frame it's active (see backActive
+    // below), so it visually spins with the card through the flip tween
+    // itself; see contact.js's update() for how it hides at the right
+    // moment without this flag's help.
     progress: () => (flipped && !flipping) ? 1 : 0,
     // Gates whether contact.js does ANY per-frame work at all — the back
     // cap can only possibly be facing the camera while flipped or mid-flip
@@ -1763,12 +1733,10 @@ export function initCard(container) {
     // content height to always stay inside it
     tabWidthPx: CARD_WIDTH * PIXELS_PER_WORLD_UNIT,
     tabHeightPx: BACK_FORM_HEIGHT * PIXELS_PER_WORLD_UNIT,
-    // mobile's plain (non-3D) panel positions itself this far below hostEl's
-    // own center — the same fixed card-half-height the hover guides use
-    // (see GUIDE_HALF_H_PX) — rather than trusting flexbox to stack it
-    // under the card on its own; see contact.js's own comment for why that
-    // didn't work.
-    cardHalfHeightPx: GUIDE_HALF_H_PX
+    // 1 (no shrink) initially — handleResize()'s own synchronous first
+    // call, right after this, immediately corrects it via updateGeometry()
+    // if a narrow viewport actually needs it smaller (see NATURAL_CARD_WIDTH_PX).
+    formScale: 1
   });
 
   /* ---------- resize ---------- */
@@ -1814,15 +1782,15 @@ export function initCard(container) {
     renderer.setSize(w, h, false);
 
     // contact.js caches a few of its own geometry figures derived from
-    // this same scale (its clip region's hard px size, the mobile
-    // fallback's offset, the CSS-3D matrix's world-to-px conversion) —
-    // push the current values down whenever they might have changed,
-    // same as everything else in this function.
+    // this same scale (its clip region's hard px size, the form's own
+    // content scale, the CSS-3D matrix's world-to-px conversion) — push
+    // the current values down whenever they might have changed, same as
+    // everything else in this function.
     contactForm.updateGeometry({
       pixelsPerWorldUnit: PIXELS_PER_WORLD_UNIT,
       tabWidthPx: CARD_WIDTH * PIXELS_PER_WORLD_UNIT,
       tabHeightPx: BACK_FORM_HEIGHT * PIXELS_PER_WORLD_UNIT,
-      cardHalfHeightPx: GUIDE_HALF_H_PX
+      formScale: scale
     });
   }
   const resizeObserver = new ResizeObserver(handleResize);
@@ -1924,7 +1892,6 @@ export function initCard(container) {
 
     renderer.render(scene, camera);
     contactForm.update();
-    updateMobileFormPadding();
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
