@@ -1,5 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { initContactForm } from './contact.js';
+import { initContactForm, MOBILE_BREAKPOINT_PX } from './contact.js';
 import { JOBS } from './jobs.js';
 
 /**
@@ -1667,7 +1667,14 @@ export function initCard(container) {
   }
 
   function updateGuideHints(clientX, clientY) {
-    if (physicsSuspended || mode !== 'idle' || flipping) { hideGuides(); return; }
+    // Below this width, contact.js switches the contact form to its own
+    // plain mobile fallback panel — positioned in almost this exact spot
+    // below the card (see MOBILE_BREAKPOINT_PX's own comment in
+    // contact.js) — so these hover-only hints have to stay off past that
+    // point too, or a mouse near the card (a narrow desktop window, not
+    // necessarily an actual touch device) renders "CLICK TO FLIP" right on
+    // top of the form's own fields.
+    if (physicsSuspended || mode !== 'idle' || flipping || window.innerWidth < MOBILE_BREAKPOINT_PX) { hideGuides(); return; }
 
     // World origin (the card's resting center) projects to the exact
     // center of interactionRoot's own box (canvas fills it via inset:0,

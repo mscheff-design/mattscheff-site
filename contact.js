@@ -161,7 +161,14 @@
  *                   updateMobileFormPadding().
  */
 
-const MOBILE_BREAKPOINT_PX = 640;
+// Exported so card.js can gate its own mouse-hover guide hints off at the
+// same width — those hints and this module's mobile fallback panel land
+// in almost the same place below the card (both are "card's own half
+// height + a ~20px margin" from the same center point), so leaving the
+// hover guides live past this point means they render right on top of
+// the mobile form the instant a real mouse (not a touch device — narrow
+// desktop window, trackpad, etc.) gets near the card.
+export const MOBILE_BREAKPOINT_PX = 640;
 const CONTACT_ENDPOINT = '/api/contact';
 
 export function initContactForm(opts) {
