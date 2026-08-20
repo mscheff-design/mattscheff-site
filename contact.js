@@ -128,6 +128,12 @@
  *                     hidden — pegging the clip region itself to that
  *                     region's true geometry so the form can never render
  *                     past its own edge into the contact info above it.
+ *   cardHalfHeightPx - the card's own fixed on-screen half-height in px
+ *                     (same figure card.js's hover guides use). Only
+ *                     consulted on mobile, where the panel places itself
+ *                     this far below hostEl's center — see update()'s own
+ *                     comment for why that replaced letting flexbox stack
+ *                     it after the card.
  *
  * returns { update(), blurActive() }
  *   update()      - call once per render frame (after renderer.render(),
@@ -151,8 +157,11 @@ export function initContactForm(opts) {
     backActive,
     isCardSettled,
     onFocusChange,
-    tabWidthPx, tabHeightPx
+    tabWidthPx, tabHeightPx,
+    cardHalfHeightPx
   } = opts;
+
+  const MOBILE_GAP_PX = 24;
 
   injectStyles();
 
@@ -380,7 +389,46 @@ export function initContactForm(opts) {
       if (!interactive) blurActive();
     }
 
-    if (mobile) return;
+    if (w !== lastW || h !== lastH) {
+      stage.style.width = w + 'px';
+      stage.style.height = h + 'px';
+      lastW = w; lastH = h;
+      // the canvas's on-screen box just changed size — refresh the cached
+      // geometry derived from it (see recomputeCanvasGeometry's own
+      // comment). lastW/lastH start at 0, so this also covers the very
+      // first frame the panel becomes visible.
+      recomputeCanvasGeometry(w, h);
+      // panel is always pinned at the stage's own center — both branches
+      // below (mobile's plain offset and desktop's full matrix3d) build
+      // their own transform from this one fixed anchor point, so left/top
+      // never need to track anything themselves beyond this.
+      panel.style.left = cachedCanvasCenterX + 'px';
+      panel.style.top = cachedCanvasCenterY + 'px';
+    }
+
+    if (mobile) {
+      // A plain, non-perspective offset from the same hostEl-center point
+      // desktop's matrix3d also pins to: centered horizontally, with its
+      // own top edge cardHalfHeightPx + a fixed gap below center — i.e.
+      // just past the card's own fixed bottom edge, whatever hostEl's
+      // actual size is. This used to be "position:static, let flexbox
+      // stack it after the card" — that broke because hostEl is the whole
+      // hero *section*, not the small card-sized box: flexbox was
+      // centering this panel against an invisible sizing placeholder
+      // (.card3d-container) that sits at a different place than where the
+      // WebGL canvas actually renders the card, not against the card
+      // itself, so the two would drift apart and land overlapping instead
+      // of stacked. This anchors to the one point that's already provably
+      // correct (recomputeCanvasGeometry's own center — the same one the
+      // hover guides and the desktop matrix both use), so it can't drift.
+      panel.style.transform = `translate(-50%, ${cardHalfHeightPx + MOBILE_GAP_PX}px)`;
+      // mobile's show/hide is done via the .is-visible class on `stage`
+      // (display:none) further up, not via facing-test visibility below —
+      // so unlike desktop, nothing else in this function ever clears the
+      // CSS default set on .contact3d-panel above; do it here instead.
+      panel.style.visibility = 'visible';
+      return;
+    }
 
     // The back cap can only possibly be facing the camera while flipped
     // or mid-flip (see backActive's own doc comment) — resting on the
@@ -394,23 +442,6 @@ export function initContactForm(opts) {
     if (!backActive()) {
       if (panel.style.visibility !== 'hidden') panel.style.visibility = 'hidden';
       return;
-    }
-
-    if (w !== lastW || h !== lastH) {
-      stage.style.width = w + 'px';
-      stage.style.height = h + 'px';
-      lastW = w; lastH = h;
-      // the canvas's on-screen box just changed size — refresh the cached
-      // geometry derived from it (see recomputeCanvasGeometry's own
-      // comment). lastW/lastH start at 0, so this also covers the very
-      // first frame the panel becomes visible.
-      recomputeCanvasGeometry(w, h);
-      // panel is always pinned at the stage's own center — the matrix
-      // built below carries the *entire* position/rotation/perspective
-      // relative to that one fixed point, so left/top never need to
-      // track the anchor themselves any more.
-      panel.style.left = cachedCanvasCenterX + 'px';
-      panel.style.top = cachedCanvasCenterY + 'px';
     }
 
     // Runs every frame regardless of p, including mid-flip: the anchor is
@@ -549,8 +580,17 @@ function injectStyles() {
        silhouette as far as the form is concerned, so centering the form
        inside it can never spill past the tab's true edge. Visibility
        (facing-camera test) is computed in JS, not via CSS
-       backface-visibility — see update()'s own comment for why. */
-    .contact3d-panel{position:absolute;top:0;left:0;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;will-change:transform}
+       backface-visibility — see update()'s own comment for why.
+       Starts hidden: the panel exists in the DOM (and, before its first
+       update(), sits untransformed at the stage's own top:0;left:0) from
+       the moment initContactForm() runs, which can be a frame or more
+       before the first update() call gets a chance to position/hide it
+       correctly — without this, that gap painted as a full, unclipped
+       form flashing at the corner of the hero region on load. update()
+       always overrides this with an explicit visibility on every frame
+       it runs (see both branches below), so this default only ever
+       matters for that one pre-first-frame window. */
+    .contact3d-panel{position:absolute;top:0;left:0;visibility:hidden;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;will-change:transform}
 
     /* the actual clip: fixed to the form's real reserved region, overflow
        hidden, no 3D styling of its own (see the comment where this is
@@ -597,10 +637,16 @@ function injectStyles() {
     /* below this width the CSS-3D projection is skipped entirely — the
        card's on-screen footprint is small and its tilt is disabled on
        touch anyway, so a plain in-flow panel reads far better than a
-       shrunken, perspective-warped one. */
-    .contact3d-stage.is-mobile{position:static;transform:none !important;perspective:none;opacity:1;pointer-events:auto;margin-top:14px}
+       shrunken, perspective-warped one. Still position:absolute, same as
+       desktop — an earlier version switched this to position:static and
+       let flexbox stack it after the card, but hostEl is the whole hero
+       *section*, not the small card-sized box, so that ended up centering
+       the panel against an unrelated invisible sizing placeholder
+       instead of the card itself (see update()'s own comment). The
+       panel's own position (a plain translate, not a matrix3d) is set in
+       JS either way, so no positioning is set here. */
+    .contact3d-stage.is-mobile{perspective:none;opacity:1;pointer-events:auto}
     .contact3d-stage.is-mobile:not(.is-visible){display:none}
-    .contact3d-stage.is-mobile .contact3d-panel{position:static;transform:none !important}
     .contact3d-stage.is-mobile .contact3d-clip{width:auto !important;height:auto !important;overflow:visible;padding:0}
     .contact3d-stage.is-mobile .contact-form{width:100%;max-width:340px;max-height:none;overflow-y:visible;margin:0 auto;pointer-events:auto}
   `;

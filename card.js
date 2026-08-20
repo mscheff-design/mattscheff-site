@@ -1713,7 +1713,13 @@ export function initCard(container) {
     // hard-clip the form to that region instead of trusting its natural
     // content height to always stay inside it
     tabWidthPx: CARD_WIDTH * PIXELS_PER_WORLD_UNIT,
-    tabHeightPx: BACK_FORM_HEIGHT * PIXELS_PER_WORLD_UNIT
+    tabHeightPx: BACK_FORM_HEIGHT * PIXELS_PER_WORLD_UNIT,
+    // mobile's plain (non-3D) panel positions itself this far below hostEl's
+    // own center — the same fixed card-half-height the hover guides use
+    // (see GUIDE_HALF_H_PX) — rather than trusting flexbox to stack it
+    // under the card on its own; see contact.js's own comment for why that
+    // didn't work.
+    cardHalfHeightPx: GUIDE_HALF_H_PX
   });
 
   /* ---------- resize ---------- */
