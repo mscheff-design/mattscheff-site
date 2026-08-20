@@ -77,8 +77,11 @@
  *
  * opts:
  *   THREE           - the Three.js module card.js already imported
- *   pixelsPerWorldUnit - card.js's one fixed world-units-to-CSS-px
- *                     constant (never viewport-dependent by construction)
+ *   pixelsPerWorldUnit - card.js's current world-units-to-CSS-px figure.
+ *                     Fixed for any one viewport width, but can change on
+ *                     a resize narrow enough to trigger card.js's own
+ *                     width cap — see updateGeometry() below for how this
+ *                     module stays in sync with that.
  *   camera          - the scene's camera, read for its live
  *                     projectionMatrix/matrixWorldInverse only after
  *                     card.js's own render pass has refreshed them for
@@ -128,17 +131,23 @@
  *                     hidden — pegging the clip region itself to that
  *                     region's true geometry so the form can never render
  *                     past its own edge into the contact info above it.
- *   cardHalfHeightPx - the card's own fixed on-screen half-height in px
+ *   cardHalfHeightPx - the card's own current on-screen half-height in px
  *                     (same figure card.js's hover guides use). Only
  *                     consulted on mobile, where the panel places itself
  *                     this far below hostEl's center — see update()'s own
  *                     comment for why that replaced letting flexbox stack
  *                     it after the card.
  *
- * returns { update(), blurActive() }
+ * returns { update(), blurActive(), updateGeometry() }
  *   update()      - call once per render frame (after renderer.render(),
  *                   so camera/anchor matrices are current) to refresh the
  *                   panel's CSS transform and visibility
+ *   updateGeometry({ pixelsPerWorldUnit, tabWidthPx, tabHeightPx,
+ *                   cardHalfHeightPx }) - call whenever card.js's own
+ *                   on-screen scale might have changed (its handleResize()
+ *                   does, on every resize) to keep this module's cached
+ *                   figures in sync — any key can be omitted to leave that
+ *                   figure unchanged.
  *   blurActive()  - if a field currently holds focus, blurs it and
  *                   returns true; otherwise returns false. card.js's
  *                   Escape handler calls this first, before its own
@@ -151,15 +160,19 @@ const CONTACT_ENDPOINT = '/api/contact';
 
 export function initContactForm(opts) {
   const {
-    THREE, pixelsPerWorldUnit, camera, anchor, hostEl,
+    THREE, camera, anchor, hostEl,
     fallbackEmail,
     progress,
     backActive,
     isCardSettled,
-    onFocusChange,
-    tabWidthPx, tabHeightPx,
-    cardHalfHeightPx
+    onFocusChange
   } = opts;
+  // These four scale with card.js's on-screen card size, which can change
+  // after a narrow-viewport resize (see updateGeometry() and card.js's
+  // own handleResize()) — mutable, not destructured as consts, so that
+  // update() and updateGeometry() always see the current value rather
+  // than whatever was true when initContactForm() first ran.
+  let { pixelsPerWorldUnit, tabWidthPx, tabHeightPx, cardHalfHeightPx } = opts;
 
   const MOBILE_GAP_PX = 24;
 
@@ -327,10 +340,12 @@ export function initContactForm(opts) {
   const toCamera = new THREE.Vector3();
   const anchorWorldPos = new THREE.Vector3();
   // local panel px (Y-down, origin at panel's own center, post
-  // translate(-50%,-50%)) → anchor-local world units (Y-up): a fixed
-  // scale, computed once, since neither the unit conversion nor the
-  // CSS-vs-Three Y convention ever changes.
-  const pxToWorld = new THREE.Matrix4().makeScale(1 / pixelsPerWorldUnit, -1 / pixelsPerWorldUnit, 1);
+  // translate(-50%,-50%)) → anchor-local world units (Y-up). The
+  // CSS-vs-Three Y convention never changes, but pixelsPerWorldUnit itself
+  // can (see updateGeometry()) — rebuilt from the current value inside
+  // update() every frame rather than cached once, since a stale scale
+  // here would throw the form's whole position off after a resize.
+  const pxToWorld = new THREE.Matrix4();
   const ndcToPx = new THREE.Matrix4();
   let lastW = 0, lastH = 0;
   let cachedCanvasCenterX = 0, cachedCanvasCenterY = 0;
@@ -479,6 +494,7 @@ export function initContactForm(opts) {
     // current: card.js's tick() calls handleResize() (which refreshes
     // the projection matrix) before renderer.render() (which refreshes
     // matrixWorldInverse), and only *then* calls contactForm.update().
+    pxToWorld.makeScale(1 / pixelsPerWorldUnit, -1 / pixelsPerWorldUnit, 1);
     mvpMatrix
       .copy(ndcToPx)
       .multiply(camera.projectionMatrix)
@@ -489,7 +505,24 @@ export function initContactForm(opts) {
     panel.style.transform = 'translate(-50%,-50%) matrix3d(' + mvpMatrix.elements.join(',') + ')';
   }
 
-  return { update, blurActive };
+  // Called by card.js's handleResize() whenever the card's own on-screen
+  // scale might have changed (see NATURAL_CARD_WIDTH_PX there) — updates
+  // the few figures this module derived from that scale once at
+  // construction: the clip region's hard px size, the mobile fallback's
+  // offset, and (via the mutable pixelsPerWorldUnit binding update() reads
+  // every frame) the CSS-3D matrix's world-to-px conversion.
+  function updateGeometry(next) {
+    if (next.pixelsPerWorldUnit !== undefined) pixelsPerWorldUnit = next.pixelsPerWorldUnit;
+    if (next.cardHalfHeightPx !== undefined) cardHalfHeightPx = next.cardHalfHeightPx;
+    if (next.tabWidthPx !== undefined) tabWidthPx = next.tabWidthPx;
+    if (next.tabHeightPx !== undefined) tabHeightPx = next.tabHeightPx;
+    if (tabWidthPx && tabHeightPx) {
+      clip.style.width = tabWidthPx + 'px';
+      clip.style.height = tabHeightPx + 'px';
+    }
+  }
+
+  return { update, blurActive, updateGeometry };
 }
 
 /* ---------- form markup ---------- */

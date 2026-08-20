@@ -269,20 +269,40 @@ const BACK_TEX_H = Math.round(TEX_W * (CARD_HEIGHT / CARD_WIDTH));
 
 const FOV_DEG = 32;
 const TAN_HALF_FOV = Math.tan(THREE.MathUtils.degToRad(FOV_DEG) / 2);
-// preserves the card's on-screen size regardless of viewport — fixed to
-// BASE_CARD_HEIGHT so the page growing to reveal the dropdown never itself
-// changes how big anything already on screen appears. See handleResize().
+// The card's on-screen size is held fixed at this height regardless of
+// viewport — so the page growing to reveal the résumé dropdown never
+// itself changes how big anything already on screen appears — with one
+// exception: a viewport narrower than the card's own natural width at
+// this height would just overflow it off both edges rather than "not
+// resizing" (see handleResize(), which is the only place PIXELS_PER_WORLD_UNIT
+// ever gets a smaller value than this implies). Every viewport wide enough
+// to fit the card at this size renders identically to before.
 const REFERENCE_CARD_PX_HEIGHT = 366;
-const PIXELS_PER_WORLD_UNIT = REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT;
+const NATURAL_CARD_WIDTH_PX = CARD_WIDTH * (REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT);
+// Minimum breathing room left on each side when the width cap above
+// kicks in, so a narrow phone screen doesn't run the card edge-to-edge —
+// the canvas itself ignores the hero section's own CSS padding (it's
+// inset:0 on the hero, which the hero's padding doesn't constrain), so
+// nothing else already provides this margin.
+const CARD_VIEWPORT_MARGIN_PX = 24;
+let PIXELS_PER_WORLD_UNIT = REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT;
 
 // Card half-extents in screen px, used only to place/fade the hover
-// guides (see the "DOM overlays" section's guide block) — derived from
-// the same fixed on-screen size as everything else above, so the guides
-// track the card's real edges at any viewport size with no separate
-// tuning of their own.
-const GUIDE_HALF_W_PX = (CARD_WIDTH / 2) * PIXELS_PER_WORLD_UNIT;
-const GUIDE_HALF_H_PX = (CARD_HEIGHT / 2) * PIXELS_PER_WORLD_UNIT;
-const GUIDE_TAB_H_PX = TAB_HEIGHT * PIXELS_PER_WORLD_UNIT;
+// guides (see the "DOM overlays" section's guide block) and to place the
+// contact form's mobile fallback (see contactForm.updateGeometry below) —
+// derived from the same on-screen scale as everything else above, so
+// they track the card's real edges at any viewport size with no separate
+// tuning of their own. Recomputed by handleResize() alongside
+// PIXELS_PER_WORLD_UNIT itself whenever that changes — see
+// updateGuideConstants().
+let GUIDE_HALF_W_PX = (CARD_WIDTH / 2) * PIXELS_PER_WORLD_UNIT;
+let GUIDE_HALF_H_PX = (CARD_HEIGHT / 2) * PIXELS_PER_WORLD_UNIT;
+let GUIDE_TAB_H_PX = TAB_HEIGHT * PIXELS_PER_WORLD_UNIT;
+function updateGuideConstants() {
+  GUIDE_HALF_W_PX = (CARD_WIDTH / 2) * PIXELS_PER_WORLD_UNIT;
+  GUIDE_HALF_H_PX = (CARD_HEIGHT / 2) * PIXELS_PER_WORLD_UNIT;
+  GUIDE_TAB_H_PX = TAB_HEIGHT * PIXELS_PER_WORLD_UNIT;
+}
 
 // how far a drag-release must TRAVEL (relative to where that drag started,
 // as a fraction of viewport height) before it opens/closes the dropdown.
@@ -1744,6 +1764,18 @@ export function initCard(container) {
     if (w === lastResizeW && h === lastResizeH) return;
     lastResizeW = w;
     lastResizeH = h;
+
+    // See NATURAL_CARD_WIDTH_PX's own comment: the card's on-screen size
+    // is normally fixed, but a viewport too narrow to fit it at that size
+    // needs it scaled down instead of left to overflow. scale is 1 (no
+    // change from the fixed reference) for every viewport wide enough —
+    // this only ever makes the card *smaller* than REFERENCE_CARD_PX_HEIGHT
+    // implies, never bigger.
+    const availableWidthPx = w - CARD_VIEWPORT_MARGIN_PX * 2;
+    const scale = Math.min(1, availableWidthPx / NATURAL_CARD_WIDTH_PX);
+    PIXELS_PER_WORLD_UNIT = (REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT) * scale;
+    updateGuideConstants();
+
     camera.aspect = w / h;
     // hold on-screen scale constant so the résumé reveal growing
     // interactionRoot's own height — via updateHeroPadding() — never
@@ -1751,6 +1783,18 @@ export function initCard(container) {
     camera.position.z = h / (2 * TAN_HALF_FOV * PIXELS_PER_WORLD_UNIT);
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
+
+    // contact.js caches a few of its own geometry figures derived from
+    // this same scale (its clip region's hard px size, the mobile
+    // fallback's offset, the CSS-3D matrix's world-to-px conversion) —
+    // push the current values down whenever they might have changed,
+    // same as everything else in this function.
+    contactForm.updateGeometry({
+      pixelsPerWorldUnit: PIXELS_PER_WORLD_UNIT,
+      tabWidthPx: CARD_WIDTH * PIXELS_PER_WORLD_UNIT,
+      tabHeightPx: BACK_FORM_HEIGHT * PIXELS_PER_WORLD_UNIT,
+      cardHalfHeightPx: GUIDE_HALF_H_PX
+    });
   }
   const resizeObserver = new ResizeObserver(handleResize);
   resizeObserver.observe(interactionRoot);
