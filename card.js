@@ -995,14 +995,36 @@ export function initCard(container) {
   scene.add(cardGroup);
 
   let basePaddingBottomPx = null;
+  // How far past the card's own bottom edge the mobile contact form's
+  // plain (non-3D) panel currently extends — see updateMobileFormPadding().
+  // Folded into interactionRoot's own padding-bottom, same as the résumé
+  // dropdown's growthPx below: the panel is position:absolute (see
+  // contact.js), so nothing about it growing interactionRoot's own box on
+  // its own — without this, a tall form (long wrapped error text, an
+  // autofilled textarea) just overlaps whatever page content comes after
+  // the hero instead of pushing it down.
+  let mobileFormExtraPx = 0;
 
   function updateHeroPadding(progress) {
     if (basePaddingBottomPx === null) {
       basePaddingBottomPx = parseFloat(getComputedStyle(interactionRoot).paddingBottom) || 0;
     }
     const growthPx = PAGE_GROWTH_WORLD * progress * PIXELS_PER_WORLD_UNIT;
-    interactionRoot.style.paddingBottom = (basePaddingBottomPx + growthPx) + 'px';
+    interactionRoot.style.paddingBottom = (basePaddingBottomPx + growthPx + mobileFormExtraPx) + 'px';
     handleResize();
+  }
+
+  // Called every tick() frame (cheap: contactForm.getMobileExtraPx() short-
+  // circuits to 0 without touching layout at all unless the mobile form is
+  // actually the thing currently on screen) — only actually writes/resizes
+  // when the measured amount changes, e.g. on flip, on a submit-state
+  // change that changes the form's own content height, or on a resize
+  // that re-wraps its text.
+  function updateMobileFormPadding() {
+    const extra = contactForm.getMobileExtraPx();
+    if (extra === mobileFormExtraPx) return;
+    mobileFormExtraPx = extra;
+    updateHeroPadding(dropdownProgress);
   }
 
   // declared ahead of the initial draw calls below since drawFront() reads
@@ -1895,6 +1917,7 @@ export function initCard(container) {
 
     renderer.render(scene, camera);
     contactForm.update();
+    updateMobileFormPadding();
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);

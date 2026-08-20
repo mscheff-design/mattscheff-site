@@ -138,7 +138,7 @@
  *                     comment for why that replaced letting flexbox stack
  *                     it after the card.
  *
- * returns { update(), blurActive(), updateGeometry() }
+ * returns { update(), blurActive(), updateGeometry(), getMobileExtraPx() }
  *   update()      - call once per render frame (after renderer.render(),
  *                   so camera/anchor matrices are current) to refresh the
  *                   panel's CSS transform and visibility
@@ -153,6 +153,12 @@
  *                   Escape handler calls this first, before its own
  *                   existing close-the-tab behavior, per the requested
  *                   key-handling hierarchy.
+ *   getMobileExtraPx() - 0 unless the mobile fallback panel is the thing
+ *                   actually on screen right now, in which case its own
+ *                   current rendered height (+ its fixed offset gap).
+ *                   card.js calls this every frame to grow hostEl's own
+ *                   padding-bottom to match — see its
+ *                   updateMobileFormPadding().
  */
 
 const MOBILE_BREAKPOINT_PX = 640;
@@ -522,7 +528,21 @@ export function initContactForm(opts) {
     }
   }
 
-  return { update, blurActive, updateGeometry };
+  // How far past the card's own bottom edge the mobile panel currently
+  // extends (its own rendered height, plus the same gap it's offset by —
+  // see update()'s mobile branch) — 0 whenever the mobile panel isn't
+  // actually the thing on screen. card.js folds this into hostEl's own
+  // padding-bottom every frame (see its updateMobileFormPadding()), since
+  // this panel is position:absolute and does nothing on its own to keep
+  // page content below the hero from overlapping it. Short-circuits before
+  // touching layout (panel.offsetHeight) in the by-far-most-common case
+  // (desktop, or resting on the front) where it doesn't matter anyway.
+  function getMobileExtraPx() {
+    if (window.innerWidth >= MOBILE_BREAKPOINT_PX || progress() <= 0) return 0;
+    return panel.offsetHeight + MOBILE_GAP_PX;
+  }
+
+  return { update, blurActive, updateGeometry, getMobileExtraPx };
 }
 
 /* ---------- form markup ---------- */
