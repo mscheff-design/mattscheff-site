@@ -166,18 +166,15 @@ const CONTACT = {
   first: 'Matthew',
   last: 'Scheffler',
   title: 'Digital Strategy · E-Commerce · Content & Visual Direction',
-  email: 'matthew.scheffler14@gmail.com',
-  phone: '7325397388',
-  phoneDisplay: '(732) 539-7388',
-  url: 'mattscheff.com',
-  location: 'Brooklyn, NY'
+  email: 'hello@mattscheff.com',
+  url: 'mattscheff.com'
 };
 
-// same three destinations as the page footer's own social row
+// icon + handle, not a labeled link — email isn't repeated here since the
+// address is already shown above and the edge-drag swipe already sends one
 const SOCIAL_LINKS = [
-  { label: 'INSTAGRAM', href: 'https://instagram.com' },
-  { label: 'LINKEDIN', href: 'https://linkedin.com' },
-  { label: 'EMAIL', href: `mailto:${CONTACT.email}` }
+  { icon: 'instagram', handle: '@matt_scheff', href: 'https://instagram.com/matt_scheff' },
+  { icon: 'linkedin', handle: 'mattscheffler', href: 'https://linkedin.com/mattscheffler' }
 ];
 
 const RESUME_PDF_PATH = 'assets/matthew-scheffler-resume.pdf';
@@ -200,12 +197,20 @@ const CARD_HEIGHT = BASE_CARD_HEIGHT * TOGGLE_BAND_BOTTOM_F;
 // running on into a tab — the back never extends, so everything it needs
 // (contact lines, social row, the note form) has to fit inside the same
 // single CARD_HEIGHT the front's closed face uses.
-const BACK_HEADER_F = 0.1;
-const BACK_LINES_TOP_F = 0.22;
-const BACK_LINE_GAP_F = 0.075;
-const BACK_LINES_BOTTOM_F = BACK_LINES_TOP_F + 3 * BACK_LINE_GAP_F;
-const BACK_SOCIAL_F = BACK_LINES_BOTTOM_F + 0.06;
-const BACK_DIVIDER_F = BACK_SOCIAL_F + 0.04;
+const BACK_HEADER_F = 0.075;
+// Four stacked rows now: email, url, then the Instagram and LinkedIn
+// icon+handle rows (folded into this same list instead of a separate
+// "social row" below it — see the SOCIAL_LINKS loop in drawBack). Same
+// top/gap this back face has used for a 4-row stack before.
+const BACK_LINES_TOP_F = 0.245;
+const BACK_LINE_GAP_F = 0.095;
+// The divider/form's own anchor — pinned to a fixed absolute position
+// rather than expressed as an offset from where the info rows end, so
+// they stay exactly where they are regardless of how many rows the list
+// above ends up with. That coupling (divider drifting whenever the row
+// count/spacing above it changed) is what caused problems before.
+const BACK_DIVIDER_ANCHOR_F = 0.555;
+const BACK_DIVIDER_F = BACK_DIVIDER_ANCHOR_F + 0.04;
 const BACK_FORM_TOP_F = BACK_DIVIDER_F + 0.025;
 const BACK_CONTENT_BOTTOM_F = TOGGLE_BAND_BOTTOM_F;
 const BACK_FORM_CENTER_F = (BACK_FORM_TOP_F + BACK_CONTENT_BOTTOM_F) / 2;
@@ -348,6 +353,50 @@ function drawTracked(ctx, text, x, y, size, color, spacing, font) {
   }
   return cx;
 }
+
+// Minimal line-icon glyphs for the back face's social row (see SOCIAL_LINKS).
+// `y` is the text baseline the icon sits beside — sized/positioned off it
+// rather than an independent box so it lines up with the handle next to it
+// regardless of what socialSize the caller is using.
+function drawInstagramGlyph(ctx, x, y, size, color) {
+  const top = y - size * 0.82;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, size * 0.09);
+  ctx.beginPath();
+  ctx.roundRect(x, top, size, size, size * 0.28);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x + size / 2, top + size / 2, size * 0.26, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x + size * 0.78, top + size * 0.22, size * 0.06, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
+  return x + size;
+}
+
+function drawLinkedinGlyph(ctx, x, y, size, color) {
+  const top = y - size * 0.82;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, size * 0.09);
+  ctx.beginPath();
+  ctx.roundRect(x, top, size, size, size * 0.18);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.font = `700 ${Math.round(size * 0.6)}px "DM Mono", monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('in', x + size / 2, top + size / 2 + size * 0.03);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+  return x + size;
+}
+
+const SOCIAL_GLYPHS = { instagram: drawInstagramGlyph, linkedin: drawLinkedinGlyph };
 
 function makeBumpTexture() {
   const s = 256;
@@ -531,21 +580,21 @@ export function initCard(container) {
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
     ctx.fillStyle = '#1c140a';
-    ctx.font = `400 ${Math.round(bh * 0.155)}px "EB Garamond", serif`;
+    ctx.font = `700 ${Math.round(bh * 0.155)}px "Space Grotesk", sans-serif`;
     ctx.fillText(CONTACT.first, pad, bh * 0.42);
     ctx.fillStyle = 'rgba(28,20,10,0.55)';
-    ctx.font = `italic 400 ${Math.round(bh * 0.155)}px "EB Garamond", serif`;
+    ctx.font = `italic 700 ${Math.round(bh * 0.155)}px "Space Grotesk", sans-serif`;
     ctx.fillText(CONTACT.last, pad, bh * 0.6);
 
     drawTracked(ctx, 'DIGITAL STRATEGY · E-COMMERCE', pad, bh * 0.75, Math.round(bh * 0.04), 'rgba(28,20,10,0.5)', 1.4);
     drawTracked(ctx, 'CONTENT & VISUAL DIRECTION', pad, bh * 0.82, Math.round(bh * 0.04), 'rgba(28,20,10,0.5)', 1.4);
-    drawTracked(ctx, 'BROOKLYN, NY  ·  2026', pad, bh * 0.93, Math.round(bh * 0.036), 'rgba(28,20,10,0.32)', 1.4);
+    drawTracked(ctx, '2026', pad, bh * 0.93, Math.round(bh * 0.036), 'rgba(28,20,10,0.32)', 1.4);
 
     drawToggleRow(ctx, w, bh, pad, 'RÉSUMÉ');
 
     JOBS.forEach((job, i) => {
       const rowTopF = ROWS_TOP_F + i * ROW_HEIGHT_F;
-      ctx.font = `400 ${Math.round(bh * 0.052)}px "EB Garamond", serif`;
+      ctx.font = `500 ${Math.round(bh * 0.052)}px "Space Grotesk", sans-serif`;
       ctx.fillStyle = 'rgba(28,20,10,0.88)';
       ctx.textAlign = 'left';
       ctx.fillText(job.name, pad, bh * (rowTopF + 0.075));
@@ -627,25 +676,39 @@ export function initCard(container) {
     ctx.textAlign = 'left';
     drawTracked(ctx, 'CONTACT', pad, bh * BACK_HEADER_F, Math.round(bh * 0.038), 'rgba(28,20,10,0.4)', 3);
 
-    const lines = [CONTACT.email, CONTACT.phoneDisplay, CONTACT.url, CONTACT.location];
-    lines.forEach((line, i) => {
-      drawTracked(ctx, line.toUpperCase(), pad, bh * (BACK_LINES_TOP_F + i * BACK_LINE_GAP_F), Math.round(bh * 0.05), '#1c140a', 1.1);
+    // Space Grotesk, plain fillText, normal case — matching the front
+    // face's own job-title treatment (see JOBS.forEach in drawFront)
+    // rather than the tracked-mono-uppercase style every *label* on the
+    // card uses. The two social rows share this exact size/weight/color
+    // too (icon substituting for nothing, handle set the same as email/
+    // url) so the whole thing reads as one stacked contact-info list —
+    // icon rows included — rather than a separate link row floating
+    // below it.
+    const infoSize = Math.round(bh * 0.052);
+    ctx.font = `400 ${infoSize}px "Space Grotesk", sans-serif`;
+    ctx.fillStyle = 'rgba(28,20,10,0.85)';
+    [CONTACT.email, CONTACT.url].forEach((line, i) => {
+      ctx.fillText(line, pad, bh * (BACK_LINES_TOP_F + i * BACK_LINE_GAP_F));
     });
 
     socialLinkBounds.length = 0;
-    let cx = pad;
-    const socialY = bh * BACK_SOCIAL_F;
-    const socialSize = Math.round(bh * 0.03);
+    const iconSize = Math.round(infoSize * 1.05);
     SOCIAL_LINKS.forEach((link, i) => {
-      const startX = cx;
-      cx = drawTracked(ctx, link.label, cx, socialY, socialSize, 'rgba(28,20,10,0.55)', 1.2);
-      socialLinkBounds.push({ uMin: startX / w, uMax: cx / w, href: link.href });
-      if (i < SOCIAL_LINKS.length - 1) {
-        ctx.font = `400 ${socialSize}px "DM Mono", monospace`;
-        ctx.fillStyle = 'rgba(28,20,10,0.3)';
-        ctx.fillText('  ·  ', cx, socialY);
-        cx += ctx.measureText('  ·  ').width;
-      }
+      const rowFrac = BACK_LINES_TOP_F + (i + 2) * BACK_LINE_GAP_F;
+      const rowY = bh * rowFrac;
+      let cx = SOCIAL_GLYPHS[link.icon](ctx, pad, rowY, iconSize, 'rgba(28,20,10,0.55)');
+      cx += infoSize * 0.35;
+      ctx.font = `400 ${infoSize}px "Space Grotesk", sans-serif`;
+      ctx.fillStyle = 'rgba(28,20,10,0.85)';
+      ctx.fillText(link.handle, cx, rowY);
+      const handleEnd = cx + ctx.measureText(link.handle).width;
+      socialLinkBounds.push({
+        uMin: pad / w,
+        uMax: handleEnd / w,
+        vMin: rowFrac - 0.05,
+        vMax: rowFrac + 0.02,
+        href: link.href
+      });
     });
 
     // no label below the divider — the form's own "Send note" button
@@ -1163,12 +1226,16 @@ export function initCard(container) {
       }
     }
 
-    // back-only: the social row (drawn by drawBack, bounds recorded in
-    // socialLinkBounds each time it redraws)
+    // back-only: the Instagram/LinkedIn icon+handle rows (drawn by
+    // drawBack, bounds recorded in socialLinkBounds each time it redraws —
+    // each is its own row now, so bounds carry their own v-range rather
+    // than sharing one row's band)
     if (flipped) {
       const hit = hitUVOnCard(clientX, clientY);
-      if (hit !== null && hit.vFrac >= BACK_SOCIAL_F - 0.055 && hit.vFrac <= BACK_SOCIAL_F + 0.03) {
-        const link = socialLinkBounds.find(b => hit.u >= b.uMin && hit.u <= b.uMax);
+      if (hit !== null) {
+        const link = socialLinkBounds.find(b =>
+          hit.u >= b.uMin && hit.u <= b.uMax && hit.vFrac >= b.vMin && hit.vFrac <= b.vMax
+        );
         if (link) {
           window.open(link.href, '_blank', 'noopener');
           return;
@@ -1468,9 +1535,7 @@ export function initCard(container) {
       `FN:${CONTACT.name}`,
       `TITLE:${CONTACT.title}`,
       `EMAIL:${CONTACT.email}`,
-      `TEL:${CONTACT.phone}`,
       `URL:${CONTACT.url}`,
-      `ADR:;;${CONTACT.location};;;;`,
       'END:VCARD'
     ].join('\r\n');
     const blob = new Blob([vcard], { type: 'text/vcard' });

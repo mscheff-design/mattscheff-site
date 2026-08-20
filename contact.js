@@ -557,8 +557,16 @@ function injectStyles() {
        built). Tighter than before — the back face no longer has its own
        extended tab, so this region shares the rest of CARD_HEIGHT with
        the contact info/social row above it (see card.js's BACK_* layout
-       constants). */
-    .contact3d-clip{box-sizing:border-box;padding:0 20px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+       constants). Top-aligned, not centered — that region runs all the
+       way down to the card's own bottom edge with real room to spare
+       once the form's own handful of fields are done, and centering the
+       form inside all of it left a dead gap floating between the divider
+       above and the first field, reading as an unbalanced, accidental
+       layout rather than a composed one; anchoring to the top keeps the
+       form immediately following the divider, and lets the (real, but
+       now unremarkable) spare room fall to the bottom instead, where
+       trailing whitespace reads as intentional. */
+    .contact3d-clip{box-sizing:border-box;padding:12px 20px 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center}
 
     /* belt-and-suspenders: if content still somehow exceeds the clip's
        fixed height (a long wrapped error message, an over-full textarea),
