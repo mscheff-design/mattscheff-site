@@ -73,8 +73,29 @@ import { JOBS } from './jobs.js';
  * plain material, because it never needs to move anything.
  */
 
-const CARD_WIDTH = 3.4;
-const BASE_CARD_HEIGHT = 2.14;
+// Module-scope, not per-initCard() — there is only ever one card on the
+// page, and the device it's running on doesn't change mid-session, so this
+// is decided once, before any of the geometry/texture math below (all of
+// which is itself only ever computed once, at module load — see the
+// Geometry strategy note above) rather than threaded through as a
+// parameter. Same detection contact.js's own touch/gyro gating uses
+// (coarse pointer = no fine hover), so both stay in sync by construction.
+const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
+// Portrait on touch devices — same two numbers as landscape, just swapped,
+// rather than a new ratio: a deliberately symmetric choice (same "how much
+// taller/wider than the other dimension" proportion, just rotated) instead
+// of a from-scratch aspect ratio no one's actually seen yet. Everything
+// below this — geometry, texture resolution, every layout fraction in
+// drawFront/drawBack — derives from these two numbers, so this one branch
+// is what makes the entire rest of the file portrait-aware without
+// touching the geometry-building code at all (see fitText for the one
+// class of thing that DOES still need its own portrait-awareness: text
+// sized as a fraction of card height renders at the same on-screen px
+// size regardless of aspect ratio, but a portrait card gives it much less
+// on-screen WIDTH to fit that same size into).
+const CARD_WIDTH = isTouchDevice ? 2.14 : 3.4;
+const BASE_CARD_HEIGHT = isTouchDevice ? 3.4 : 2.14;
 // thin, real-cardstock feel — paper texture/detailing gets layered on top
 // of this later, so the object itself has to read as thin first.
 const CARD_THICKNESS = 0.026;
@@ -377,6 +398,48 @@ function drawTracked(ctx, text, x, y, size, color, spacing, font) {
   return cx;
 }
 
+// fitTextSize's own logic (see its comment below), but for drawTracked's
+// per-character-plus-spacing layout instead of a single ctx.measureText()
+// call — tracking (spacing) itself stays fixed rather than shrinking too,
+// same as line-height on the regular fitTextSize text: a little tighter
+// tracking at a smaller size reads as normal, not as a second, independent
+// shrink stacking on top of the font-size one.
+function fitTrackedSize(ctx, texts, maxWidthPx, basePx, spacing, font) {
+  let px = basePx;
+  for (const t of texts) {
+    ctx.font = `${font || '400'} ${px}px "DM Mono", monospace`;
+    let width = -spacing;
+    for (const ch of t) width += ctx.measureText(ch).width + spacing;
+    if (width > maxWidthPx) px = Math.min(px, Math.floor(px * (maxWidthPx / width)));
+  }
+  return px;
+}
+
+// Font sizes throughout drawFront/drawBack are fractions of card HEIGHT in
+// texture-pixel space — which, because the texture's own width is fixed
+// (TEX_W) regardless of aspect ratio, happens to render at the same
+// on-screen pixel size no matter what CARD_WIDTH/BASE_CARD_HEIGHT are (the
+// aspect-ratio term cancels out between the texture math and the fixed
+// on-screen card height — see REFERENCE_CARD_PX_HEIGHT). That's fine on
+// the landscape card, wide enough that text sized this way was never at
+// risk of not fitting, but the portrait card gives the same-size text much
+// less on-screen WIDTH to fit into. fontBuilder(px) => a full ctx.font
+// string for that size (so callers can bake in weight/style/family);
+// shrinks (never grows) basePx just enough that every string in `texts`
+// fits within maxWidthPx, all at the SAME final size — a name's two lines,
+// for instance, shrinking independently would read as an accidental
+// mismatch rather than one design choice.
+function fitTextSize(ctx, texts, maxWidthPx, basePx, fontBuilder) {
+  let px = basePx;
+  for (const t of texts) {
+    ctx.font = fontBuilder(px);
+    const textWidth = ctx.measureText(t).width;
+    if (textWidth > maxWidthPx) px = Math.min(px, Math.floor(px * (maxWidthPx / textWidth)));
+  }
+  ctx.font = fontBuilder(px);
+  return px;
+}
+
 // Minimal line-icon glyphs for the back face's social row (see SOCIAL_LINKS).
 // `y` is the text baseline the icon sits beside — sized/positioned off it
 // rather than an independent box so it lines up with the handle next to it
@@ -602,22 +665,46 @@ export function initCard(container) {
 
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
+    // Shrunk together (see fitTextSize's own comment) to fit the card's
+    // actual on-screen width — a no-op on the landscape card, which
+    // always had room to spare, but load-bearing on the narrower portrait
+    // one, where "Scheffler" at the un-fit size would run past the edge.
+    const nameMaxWidthPx = w - pad * 2;
+    const namePx = fitTextSize(
+      ctx, [CONTACT.first, CONTACT.last], nameMaxWidthPx, Math.round(bh * 0.155),
+      (px) => `700 ${px}px "Space Grotesk", sans-serif`
+    );
     ctx.fillStyle = '#1c140a';
-    ctx.font = `700 ${Math.round(bh * 0.155)}px "Space Grotesk", sans-serif`;
+    ctx.font = `700 ${namePx}px "Space Grotesk", sans-serif`;
     ctx.fillText(CONTACT.first, pad, bh * 0.42);
     ctx.fillStyle = 'rgba(28,20,10,0.55)';
-    ctx.font = `italic 700 ${Math.round(bh * 0.155)}px "Space Grotesk", sans-serif`;
+    ctx.font = `italic 700 ${namePx}px "Space Grotesk", sans-serif`;
     ctx.fillText(CONTACT.last, pad, bh * 0.6);
 
-    drawTracked(ctx, 'DIGITAL STRATEGY · E-COMMERCE', pad, bh * 0.75, Math.round(bh * 0.04), 'rgba(28,20,10,0.5)', 1.4);
-    drawTracked(ctx, 'CONTENT & VISUAL DIRECTION', pad, bh * 0.82, Math.round(bh * 0.04), 'rgba(28,20,10,0.5)', 1.4);
+    const titleMaxWidthPx = w - pad * 2;
+    const titlePx = fitTrackedSize(
+      ctx, ['DIGITAL STRATEGY · E-COMMERCE', 'CONTENT & VISUAL DIRECTION'],
+      titleMaxWidthPx, Math.round(bh * 0.04), 1.4
+    );
+    drawTracked(ctx, 'DIGITAL STRATEGY · E-COMMERCE', pad, bh * 0.75, titlePx, 'rgba(28,20,10,0.5)', 1.4);
+    drawTracked(ctx, 'CONTENT & VISUAL DIRECTION', pad, bh * 0.82, titlePx, 'rgba(28,20,10,0.5)', 1.4);
     drawTracked(ctx, '2026', pad, bh * 0.93, Math.round(bh * 0.036), 'rgba(28,20,10,0.32)', 1.4);
 
     drawToggleRow(ctx, w, bh, pad, 'RÉSUMÉ');
 
     JOBS.forEach((job, i) => {
       const rowTopF = ROWS_TOP_F + i * ROW_HEIGHT_F;
-      ctx.font = `500 ${Math.round(bh * 0.052)}px "Space Grotesk", sans-serif`;
+
+      // Dates measured first (fixed size, right-aligned) so the name's own
+      // fit below reserves the actual room they take instead of the two
+      // just overlapping on a narrow portrait row.
+      ctx.font = `400 ${Math.round(bh * 0.027)}px "DM Mono", monospace`;
+      const datesWidthPx = ctx.measureText(job.dates).width;
+      const nameMaxWidthPx = w - pad * 2 - datesWidthPx - bh * 0.02;
+      const namePx = fitTextSize(
+        ctx, [job.name], nameMaxWidthPx, Math.round(bh * 0.052),
+        (px) => `500 ${px}px "Space Grotesk", sans-serif`
+      );
       ctx.fillStyle = 'rgba(28,20,10,0.88)';
       ctx.textAlign = 'left';
       ctx.fillText(job.name, pad, bh * (rowTopF + 0.075));
@@ -629,7 +716,9 @@ export function initCard(container) {
       ctx.fillText(job.dates, w - pad, bh * (rowTopF + 0.07));
       ctx.restore();
 
-      drawTracked(ctx, job.tags.join(' · '), pad, bh * (rowTopF + 0.11), Math.round(bh * 0.023), 'rgba(28,20,10,0.35)', 1.1);
+      const tagsText = job.tags.join(' · ');
+      const tagsPx = fitTrackedSize(ctx, [tagsText], w - pad * 2, Math.round(bh * 0.023), 1.1);
+      drawTracked(ctx, tagsText, pad, bh * (rowTopF + 0.11), tagsPx, 'rgba(28,20,10,0.35)', 1.1);
 
       ctx.save();
       ctx.strokeStyle = 'rgba(28,20,10,0.1)';
@@ -645,11 +734,22 @@ export function initCard(container) {
     const half = Math.ceil(allTags.length / 2);
     const line1 = allTags.slice(0, half).join(' · ');
     const line2 = allTags.slice(half).join(' · ');
-    drawTracked(ctx, line1, pad, bh * TAGCLOUD_TOP_F, Math.round(bh * 0.021), 'rgba(28,20,10,0.3)', 1);
-    drawTracked(ctx, line2, pad, bh * TAGCLOUD_BOTTOM_F, Math.round(bh * 0.021), 'rgba(28,20,10,0.3)', 1);
+    // Still 2 lines on portrait, same as landscape — reflowing into more,
+    // shorter lines would read better there, but that shifts
+    // TAGCLOUD_BOTTOM_F and cascades into every fraction below it
+    // (DOWNLOAD_BAND_TOP_F, TAB_CONTENT_BOTTOM_F, TAB_HEIGHT itself) for
+    // this pass, fitting the existing 2 lines to width is the safer,
+    // lower-risk fix; a real reflow is exactly the kind of thing worth
+    // doing once this is visible and can be tuned by eye.
+    const tagCloudPx = fitTrackedSize(ctx, [line1, line2], w - pad * 2, Math.round(bh * 0.021), 1);
+    drawTracked(ctx, line1, pad, bh * TAGCLOUD_TOP_F, tagCloudPx, 'rgba(28,20,10,0.3)', 1);
+    drawTracked(ctx, line2, pad, bh * TAGCLOUD_BOTTOM_F, tagCloudPx, 'rgba(28,20,10,0.3)', 1);
 
     const downloadText = 'DOWNLOAD RÉSUMÉ (PDF) →';
-    const downloadSize = Math.round(bh * 0.027);
+    const downloadSize = fitTextSize(
+      ctx, [downloadText], w - pad * 2, Math.round(bh * 0.027),
+      (px) => `400 ${px}px "DM Mono", monospace`
+    );
     ctx.font = `400 ${downloadSize}px "DM Mono", monospace`;
     ctx.fillStyle = '#1c140a';
     ctx.textAlign = 'left';
@@ -707,8 +807,20 @@ export function initCard(container) {
     // url) so the whole thing reads as one stacked contact-info list —
     // icon rows included — rather than a separate link row floating
     // below it.
-    const infoSize = Math.round(bh * 0.052);
-    ctx.font = `400 ${infoSize}px "Space Grotesk", sans-serif`;
+    // Fit against every row this size is shared with (see fitTextSize's
+    // own comment) — email/url plus both handle rows below, even though
+    // the handles' own icon+gap prefix isn't accounted for here (using
+    // the base, pre-fit size for that allowance rather than solving it
+    // circularly) — close enough in practice since the email address is
+    // almost always the longest of the four anyway.
+    const baseInfoSize = Math.round(bh * 0.052);
+    const iconAllowancePx = baseInfoSize * 1.05 + baseInfoSize * 0.35;
+    const infoSize = fitTextSize(
+      ctx,
+      [CONTACT.email, CONTACT.url, ...SOCIAL_LINKS.map((l) => l.handle)],
+      w - pad * 2 - iconAllowancePx, baseInfoSize,
+      (px) => `400 ${px}px "Space Grotesk", sans-serif`
+    );
     ctx.fillStyle = 'rgba(28,20,10,0.85)';
     [CONTACT.email, CONTACT.url].forEach((line, i) => {
       ctx.fillText(line, pad, bh * (BACK_LINES_TOP_F + i * BACK_LINE_GAP_F));
@@ -1122,12 +1234,11 @@ export function initCard(container) {
   let hovering = false;
 
   // ---- gyroscope tilt (touch devices only) ----
-  // coarse pointer = no fine hover, which is the actual thing that
-  // determines whether a device can ever produce hover-tilt on its own —
-  // matches the intent better than a viewport-width check (a touchscreen
-  // laptop with a wide window still has no hover; a narrow desktop window
-  // still has a mouse).
-  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+  // isTouchDevice itself is module-scope now (see its own comment, up by
+  // CARD_WIDTH/BASE_CARD_HEIGHT) — the same portrait-or-landscape decision
+  // and this tilt-source decision both need to be made from the exact same
+  // check, so there's one place it's computed rather than two that could
+  // theoretically drift apart.
   const gyroSupported = typeof DeviceOrientationEvent !== 'undefined';
   let gyroActive = false;
   // The angles a phone rests at "flat/neutral" in someone's hand vary a
@@ -1143,6 +1254,26 @@ export function initCard(container) {
   // wave the whole phone around, generous enough that it doesn't feel
   // twitchy at rest (ordinary hand tremor is a fraction of a degree).
   const GYRO_MAX_DEG = 16;
+  // Raw beta/gamma readings carry real sensor noise — a phone held
+  // perfectly still still reports small (sub-degree, but not zero) frame-
+  // to-frame fluctuations. tiltTargetX/Y's own spring-damper (TILT_
+  // STIFFNESS/DAMPING) smooths whatever it's fed, but feeding it already-
+  // noisy raw degrees still reads as a faint, restless "buzz" at rest
+  // rather than a genuinely still card. gyroSmoothed is a light low-pass
+  // filter on the readings themselves, applied before anything else
+  // (including baseline capture, so the baseline isn't itself one noisy
+  // sample) — GYRO_SMOOTHING is how much of each new reading gets blended
+  // in per event (lower = smoother but more lag; DeviceOrientationEvent
+  // fires often enough, ~60Hz on most devices, that even a fairly small
+  // value here still tracks real movement responsively).
+  let gyroSmoothed = null;
+  const GYRO_SMOOTHING = 0.35;
+  // Below this many degrees of (smoothed) deviation from baseline, treat
+  // it as noise/hand tremor rather than an intentional tilt — without
+  // this, the smoothing above still lets sub-threshold jitter through as
+  // a barely-perceptible drift, which reads as "not quite settled" even
+  // once smoothed.
+  const GYRO_DEADZONE_DEG = 0.6;
 
   let physicsSuspended = false;
   function setPhysicsSuspended(v) {
@@ -1419,20 +1550,40 @@ export function initCard(container) {
   // assignments below — everything else (baseline capture, clamping,
   // feeding the existing tiltTargetX/Y spring-damper) stays correct either
   // way.
+  // Soft deadzone: subtracts GYRO_DEADZONE_DEG from the magnitude rather
+  // than hard-clamping everything below it to exactly zero, so crossing
+  // the threshold doesn't read as a sudden jump from "nothing" to
+  // "something" — then rescales the remaining span so a tilt of exactly
+  // GYRO_MAX_DEG still reaches TILT_MAX rather than falling just short of
+  // it by the deadzone amount.
+  function gyroDeltaToTilt(deltaDeg) {
+    const sign = Math.sign(deltaDeg);
+    const mag = Math.max(0, Math.abs(deltaDeg) - GYRO_DEADZONE_DEG);
+    const t = Math.min(1, mag / (GYRO_MAX_DEG - GYRO_DEADZONE_DEG));
+    return sign * t * TILT_MAX;
+  }
+
   function handleDeviceOrientation(e) {
     if (e.beta === null || e.gamma === null) return;
-    // First real reading becomes "centered" — see gyroBaseline's own
-    // comment for why this isn't a fixed assumed angle.
-    if (!gyroBaseline) { gyroBaseline = { beta: e.beta, gamma: e.gamma }; return; }
+    // Smoothed before anything else touches it, including baseline
+    // capture below — see gyroSmoothed's own comment. First reading has
+    // nothing to blend with yet.
+    if (!gyroSmoothed) {
+      gyroSmoothed = { beta: e.beta, gamma: e.gamma };
+    } else {
+      gyroSmoothed.beta += (e.beta - gyroSmoothed.beta) * GYRO_SMOOTHING;
+      gyroSmoothed.gamma += (e.gamma - gyroSmoothed.gamma) * GYRO_SMOOTHING;
+    }
+    // First (already-smoothed) reading becomes "centered" — see
+    // gyroBaseline's own comment for why this isn't a fixed assumed angle.
+    if (!gyroBaseline) { gyroBaseline = { beta: gyroSmoothed.beta, gamma: gyroSmoothed.gamma }; return; }
     // A drag or an open form field should visually dominate over ambient
     // tilt during that gesture, same as hover already yields to dragging
     // (see the pointermove listener) and to physicsSuspended (see
     // setPhysicsSuspended) — this is the gyro's equivalent of both gates.
     if (physicsSuspended || dragging) return;
-    const dBeta = THREE.MathUtils.clamp(e.beta - gyroBaseline.beta, -GYRO_MAX_DEG, GYRO_MAX_DEG);
-    const dGamma = THREE.MathUtils.clamp(e.gamma - gyroBaseline.gamma, -GYRO_MAX_DEG, GYRO_MAX_DEG);
-    tiltTargetX = (dBeta / GYRO_MAX_DEG) * TILT_MAX;
-    tiltTargetY = (dGamma / GYRO_MAX_DEG) * TILT_MAX;
+    tiltTargetX = gyroDeltaToTilt(gyroSmoothed.beta - gyroBaseline.beta);
+    tiltTargetY = gyroDeltaToTilt(gyroSmoothed.gamma - gyroBaseline.gamma);
   }
 
   // The actual permission gesture, called from the tilt-prompt's own
@@ -1692,6 +1843,10 @@ export function initCard(container) {
   const ICON_ARROW = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 7l4-4 4 4"/></svg>';
   const ICON_CURVE = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.2c-2.6 3-6.3 4.4-9.8 3.9"/><path d="M6.4 6.3L2.9 9.2l2.7 2.6"/></svg>';
   const ICON_FLIP = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.3 8.4a4.7 4.7 0 0 1 8-3.3M12.7 7.6a4.7 4.7 0 0 1-8 3.3"/><path d="M11 2.6v2.8H8.2M5 13.4v-2.8h2.8"/></svg>';
+  // A tilted phone outline, rocking between two angles — the little
+  // curved arrows either side read as "the same motion this label is
+  // asking permission for," not just a static phone glyph.
+  const ICON_TILT = '<svg width="14" height="13" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="6.7" y="1.3" width="6.6" height="12" rx="1.5" transform="rotate(-13 10 7.3)"/><path d="M2.3 4.2a7 7 0 0 0 0 6.2"/><path d="M17.7 4.2a7 7 0 0 1 0 6.2"/></svg>';
 
   function makeGuide(extraClass) {
     const el = document.createElement('div');
@@ -1735,7 +1890,7 @@ export function initCard(container) {
   // resembling continuous hover to reposition it with.
   const tiltPrompt = document.createElement('div');
   tiltPrompt.className = 'card3d-tilt-prompt';
-  tiltPrompt.textContent = 'tap to enable tilt';
+  tiltPrompt.innerHTML = '<span class="card3d-guide-icon">' + ICON_TILT + '</span><span>tap to enable tilt</span>';
   container.appendChild(tiltPrompt);
   if (isTouchDevice && gyroSupported) {
     tiltPrompt.addEventListener('click', enableGyro);
@@ -2048,11 +2203,12 @@ function injectStyles() {
     .card3d-guide--right{transform:translate(calc(4px),-50%);flex-direction:row-reverse}
     .card3d-guide--right .card3d-guide-icon{transform:scaleX(-1)}
 
-    /* same font/size/color as the hover guides above, but always-on
-       (opacity written directly in positionTiltPrompt/hideTiltPrompt, not
-       proximity-faded like theirs — touch has no hover to fade in from)
-       and actually clickable, since tapping it is the whole point. */
-    .card3d-tilt-prompt{position:absolute;transform:translate(-50%,0);font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.32);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:auto;cursor:pointer;transition:opacity 0.25s ease;z-index:4}
+    /* same font/size/color/icon layout as the hover guides above, but
+       always-on (opacity written directly in positionTiltPrompt/
+       hideTiltPrompt, not proximity-faded like theirs — touch has no
+       hover to fade in from) and actually clickable, since tapping it is
+       the whole point. */
+    .card3d-tilt-prompt{position:absolute;display:flex;align-items:center;gap:6px;transform:translate(-50%,0);font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.32);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:auto;cursor:pointer;transition:opacity 0.25s ease;z-index:4}
   `;
   document.head.appendChild(style);
 }
