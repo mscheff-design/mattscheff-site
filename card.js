@@ -1432,7 +1432,18 @@ export function initCard(container) {
 
   /* ---------- pointer handling: click-on-card = flip/toggle, drag-anywhere = move/throw ---------- */
 
-  interactionRoot.style.touchAction = 'none';
+  // Base: fully permissive. interactionRoot is the whole hero *section*
+  // (see its own definition above) — on a phone that's close to the full
+  // viewport height, so 'none' applied here unconditionally (the previous
+  // approach) made every touch anywhere in that mostly-empty region a dead
+  // zone for scrolling, not just touches on the card itself, which read as
+  // the page being unscrollable from a phone. Narrowed to 'none' only for
+  // the duration of a touch that actually lands on the card (see
+  // pointerdown below, and its pointerup/pointercancel counterpart) — that
+  // still lets the card's own drag gesture (both axes; a phone has no
+  // hover to fall back on, only this) fully win over native scrolling
+  // exactly like before, without claiming the rest of the hero too.
+  interactionRoot.style.touchAction = 'auto';
   document.body.style.cursor = 'grab';
 
   interactionRoot.addEventListener('pointerdown', (e) => {
@@ -1449,6 +1460,14 @@ export function initCard(container) {
     pointerDownClient = { x: e.clientX, y: e.clientY };
     pointerDownTime = performance.now();
     pointerDownOnCard = hitsCard(e.clientX, e.clientY);
+    // See interactionRoot.style.touchAction's own comment, just above —
+    // this is the per-touch narrowing that comment describes. A mouse
+    // pointerdown ignores touch-action entirely, so gating on pointerType
+    // isn't load-bearing, just avoids writing a style that can't do
+    // anything on desktop.
+    if (e.pointerType === 'touch') {
+      interactionRoot.style.touchAction = pointerDownOnCard ? 'none' : 'auto';
+    }
     // Nothing in the page marks any of its own text unselectable, and a
     // drag can legitimately sweep well outside the card itself — up past
     // the fixed nav bar's real, plain DOM text while dragging up to
@@ -1501,6 +1520,25 @@ export function initCard(container) {
     isPointerDown = false;
     potentialDrag = false;
     document.body.style.userSelect = '';
+    interactionRoot.style.touchAction = 'auto';
+  });
+
+  // A touch sequence can end without ever reaching pointerup — the OS
+  // intercepting it for its own gesture (e.g. an edge-swipe system
+  // action), an incoming call, etc. Without also resetting here, that
+  // leaves touch-action stuck at 'none' from whatever pointerdown last set
+  // it to, silently killing scroll in the hero until another full
+  // pointerdown/pointerup cycle happens to reset it — worse than the
+  // original bug this all exists to fix, since it'd look intermittent.
+  window.addEventListener('pointercancel', () => {
+    // Same as pointerup's own dragging branch — a cancel mid-drag still
+    // needs the card physics settled back to its resting state, not just
+    // left mid-air wherever the gesture happened to be interrupted.
+    if (dragging) endDrag();
+    isPointerDown = false;
+    potentialDrag = false;
+    document.body.style.userSelect = '';
+    interactionRoot.style.touchAction = 'auto';
   });
 
   interactionRoot.addEventListener('pointerleave', () => {
