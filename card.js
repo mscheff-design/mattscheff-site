@@ -82,19 +82,24 @@ import { JOBS } from './jobs.js';
 // (coarse pointer = no fine hover), so both stay in sync by construction.
 const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
-// Portrait on touch devices — same two numbers as landscape, just swapped,
-// rather than a new ratio: a deliberately symmetric choice (same "how much
-// taller/wider than the other dimension" proportion, just rotated) instead
-// of a from-scratch aspect ratio no one's actually seen yet. Everything
-// below this — geometry, texture resolution, every layout fraction in
-// drawFront/drawBack — derives from these two numbers, so this one branch
-// is what makes the entire rest of the file portrait-aware without
-// touching the geometry-building code at all (see fitText for the one
-// class of thing that DOES still need its own portrait-awareness: text
-// sized as a fraction of card height renders at the same on-screen px
-// size regardless of aspect ratio, but a portrait card gives it much less
-// on-screen WIDTH to fit that same size into).
-const CARD_WIDTH = isTouchDevice ? 2.14 : 3.4;
+// Portrait on touch devices. NOT the landscape numbers swapped — an
+// earlier version tried that (a literal 90° rotation, same 1.59:1 ratio
+// either way), but on-screen HEIGHT is fixed regardless of orientation
+// (REFERENCE_CARD_PX_HEIGHT, below — BASE_CARD_HEIGHT world units always
+// maps to that same 366px), so a straight swap only ever changes on-screen
+// WIDTH, and 1.59:1 at a fixed height reads as noticeably narrower turned
+// on its side than it does wide — a real ~1.59:1 object (a credit card)
+// looks proportioned lying flat and skinny stood on end. This ratio
+// (~1.3:1) is deliberately less extreme, closer to a vertical ID card than
+// a rotated credit card. Everything below this — geometry, texture
+// resolution, every layout fraction in drawFront/drawBack — derives from
+// these two numbers, so this one branch is what makes the entire rest of
+// the file portrait-aware without touching the geometry-building code at
+// all (see fitText for the one class of thing that DOES still need its
+// own portrait-awareness: text sized as a fraction of card height renders
+// at the same on-screen px size regardless of aspect ratio, but a portrait
+// card gives it less on-screen WIDTH to fit that same size into).
+const CARD_WIDTH = isTouchDevice ? 2.6 : 3.4;
 const BASE_CARD_HEIGHT = isTouchDevice ? 3.4 : 2.14;
 // thin, real-cardstock feel — paper texture/detailing gets layered on top
 // of this later, so the object itself has to read as thin first.
@@ -199,6 +204,24 @@ const SOCIAL_LINKS = [
 ];
 
 const RESUME_PDF_PATH = 'assets/matthew-scheffler-resume.pdf';
+
+// Front face's own name/title/year rhythm — independent of the résumé/tab
+// block below (nothing here cascades into TOGGLE_BAND_TOP_F or anything
+// downstream of it, unlike that block's own landmarks, so these are safe
+// to branch per orientation on their own). On-screen card HEIGHT is fixed
+// regardless of orientation (BASE_CARD_HEIGHT always maps to
+// REFERENCE_CARD_PX_HEIGHT — see its own comment), so these fractions
+// land at the same on-screen Y either way; what changes is that a
+// landscape business card reads fine dense, but the same spacing on a
+// narrower portrait one reads as leftover landscape rhythm rather than
+// something composed for it — YEAR_Y_F stays put either way since it's
+// pinned close to TOGGLE_BAND_TOP_F, but the block above it gets more
+// deliberate breathing room on portrait instead.
+const NAME_FIRST_Y_F = isTouchDevice ? 0.40 : 0.42;
+const NAME_LAST_Y_F = isTouchDevice ? 0.57 : 0.6;
+const TITLE_LINE1_Y_F = isTouchDevice ? 0.74 : 0.75;
+const TITLE_LINE2_Y_F = isTouchDevice ? 0.81 : 0.82;
+const YEAR_Y_F = 0.93;
 
 // Résumé/tab layout, expressed as fractions of BASE_CARD_HEIGHT measured
 // down from the card's TOP edge. Landmarks derive from each other so
@@ -676,19 +699,19 @@ export function initCard(container) {
     );
     ctx.fillStyle = '#1c140a';
     ctx.font = `700 ${namePx}px "Space Grotesk", sans-serif`;
-    ctx.fillText(CONTACT.first, pad, bh * 0.42);
+    ctx.fillText(CONTACT.first, pad, bh * NAME_FIRST_Y_F);
     ctx.fillStyle = 'rgba(28,20,10,0.55)';
     ctx.font = `italic 700 ${namePx}px "Space Grotesk", sans-serif`;
-    ctx.fillText(CONTACT.last, pad, bh * 0.6);
+    ctx.fillText(CONTACT.last, pad, bh * NAME_LAST_Y_F);
 
     const titleMaxWidthPx = w - pad * 2;
     const titlePx = fitTrackedSize(
       ctx, ['DIGITAL STRATEGY · E-COMMERCE', 'CONTENT & VISUAL DIRECTION'],
       titleMaxWidthPx, Math.round(bh * 0.04), 1.4
     );
-    drawTracked(ctx, 'DIGITAL STRATEGY · E-COMMERCE', pad, bh * 0.75, titlePx, 'rgba(28,20,10,0.5)', 1.4);
-    drawTracked(ctx, 'CONTENT & VISUAL DIRECTION', pad, bh * 0.82, titlePx, 'rgba(28,20,10,0.5)', 1.4);
-    drawTracked(ctx, '2026', pad, bh * 0.93, Math.round(bh * 0.036), 'rgba(28,20,10,0.32)', 1.4);
+    drawTracked(ctx, 'DIGITAL STRATEGY · E-COMMERCE', pad, bh * TITLE_LINE1_Y_F, titlePx, 'rgba(28,20,10,0.5)', 1.4);
+    drawTracked(ctx, 'CONTENT & VISUAL DIRECTION', pad, bh * TITLE_LINE2_Y_F, titlePx, 'rgba(28,20,10,0.5)', 1.4);
+    drawTracked(ctx, '2026', pad, bh * YEAR_Y_F, Math.round(bh * 0.036), 'rgba(28,20,10,0.32)', 1.4);
 
     drawToggleRow(ctx, w, bh, pad, 'RÉSUMÉ');
 
