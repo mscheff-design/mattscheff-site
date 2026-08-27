@@ -249,6 +249,13 @@ const CARD_HEIGHT = BASE_CARD_HEIGHT * TOGGLE_BAND_BOTTOM_F;
 // (contact lines, social row, the note form) has to fit inside the same
 // single CARD_HEIGHT the front's closed face uses.
 const BACK_HEADER_F = 0.075;
+// Mobile-only: the plain text header doubles as a tap target there, but a
+// few tracked characters' worth of hit region turned out too small and
+// too easy to miss (see drawBack's own comment on the filled bar this
+// drives) — this is that bar's own top/bottom instead, sized as a real
+// button rather than wrapped tight around the label.
+const BACK_HEADER_BAR_TOP_F = 0.035;
+const BACK_HEADER_BAR_BOTTOM_F = 0.135;
 // Four stacked rows now: email, url, then the Instagram and LinkedIn
 // icon+handle rows (folded into this same list instead of a separate
 // "social row" below it — see the SOCIAL_LINKS loop in drawBack). Same
@@ -424,6 +431,16 @@ function drawTracked(ctx, text, x, y, size, color, spacing, font) {
     cx += ctx.measureText(ch).width + spacing;
   }
   return cx;
+}
+
+// Same layout math as drawTracked, minus the actual fillText calls — for
+// centering a tracked string (e.g. inside a filled button bar) where the
+// draw position depends on knowing the total width *before* drawing.
+function trackedTextWidth(ctx, text, size, spacing, font) {
+  ctx.font = `${font || '400'} ${size}px "DM Mono", monospace`;
+  let width = 0;
+  for (const ch of text) width += ctx.measureText(ch).width + spacing;
+  return width - spacing;
 }
 
 // fitTextSize's own logic (see its comment below), but for drawTracked's
@@ -825,23 +842,44 @@ export function initCard(container) {
 
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
-    // On mobile the header doubles as the save-contact tap target. The
-    // arrow is drawn as its own drawTracked call, in the same accent
-    // (LINK_COLOR) the "contact saved" confirmation toast uses, so the
-    // header reads as actionable at a glance rather than leaning on the
-    // arrow glyph alone — and so there's a visible thread from "this is
-    // the thing you tap" to "this is the color that then confirms it
-    // worked". drawTracked's own return value (the x position just past
-    // the last character, trailing spacing included) is exactly where the
-    // next segment should continue from, and — for the arrow call — the
-    // hit region's right edge, so no separate measureText pass is needed
-    // for it the way the Space Grotesk lines below still require.
+    // Desktop keeps the plain dim label it's always had — this only
+    // branches on mobile. On mobile the header doubles as the
+    // save-contact tap target, and started out as just that same label
+    // plus a colored arrow appended (see git history) — small enough,
+    // and with a hit region tight enough around the tracked text, that it
+    // was easy to miss and land a plain flip instead. This is that fixed:
+    // a real filled bar (LINK_COLOR, the same accent the "contact saved"
+    // toast itself uses) spanning the same left/right margin every other
+    // row on this face uses, tall enough to be an actual button rather
+    // than text with some padding, with the label centered on it in the
+    // card stock's own color so it reads on top of the fill. The hit
+    // region below (in socialLinkBounds) matches this bar's bounds
+    // exactly, not just the label's own tracked width.
     const headerSize = Math.round(bh * 0.038);
-    const headerY = bh * BACK_HEADER_F;
-    const headerLabelEndPx = drawTracked(ctx, 'CONTACT', pad, headerY, headerSize, 'rgba(28,20,10,0.4)', 3);
-    const headerEndPx = isTouchDevice
-      ? drawTracked(ctx, ' →', headerLabelEndPx, headerY, headerSize, LINK_COLOR, 3)
-      : headerLabelEndPx;
+    if (isTouchDevice) {
+      const barLeft = pad;
+      const barTop = bh * BACK_HEADER_BAR_TOP_F;
+      const barWidth = w - pad * 2;
+      const barHeight = bh * (BACK_HEADER_BAR_BOTTOM_F - BACK_HEADER_BAR_TOP_F);
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(barLeft, barTop, barWidth, barHeight, barHeight * 0.28);
+      ctx.fillStyle = LINK_COLOR;
+      ctx.fill();
+      ctx.restore();
+
+      const headerLabel = 'CONTACT →';
+      const labelWidth = trackedTextWidth(ctx, headerLabel, headerSize, 3);
+      const labelX = barLeft + (barWidth - labelWidth) / 2;
+      // Baseline, not top: the bar's own vertical center plus ~0.35× the
+      // font size is the usual rough correction for a baseline sitting
+      // below a font's true visual middle — good enough for a short,
+      // all-caps, no-descender label like this one.
+      const labelY = barTop + barHeight / 2 + headerSize * 0.35;
+      drawTracked(ctx, headerLabel, labelX, labelY, headerSize, CARD_STOCK_COLOR, 3);
+    } else {
+      drawTracked(ctx, 'CONTACT', pad, bh * BACK_HEADER_F, headerSize, 'rgba(28,20,10,0.4)', 3);
+    }
 
     // Space Grotesk, plain fillText, normal case — matching the front
     // face's own job-title treatment (see JOBS.forEach in drawFront)
@@ -879,8 +917,8 @@ export function initCard(container) {
     socialLinkBounds.length = 0;
     if (isTouchDevice) {
       socialLinkBounds.push({
-        uMin: pad / w, uMax: headerEndPx / w,
-        vMin: BACK_HEADER_F - 0.03, vMax: BACK_HEADER_F + 0.03,
+        uMin: pad / w, uMax: (w - pad) / w,
+        vMin: BACK_HEADER_BAR_TOP_F, vMax: BACK_HEADER_BAR_BOTTOM_F,
         action: () => { downloadVCard(); showConfirmation('contact saved'); }
       });
       const emailWidthPx = ctx.measureText(CONTACT.email).width;
