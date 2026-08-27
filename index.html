@@ -559,6 +559,8 @@ const sheetPanel = document.getElementById('sheetPanel');
 
 let activeProject = null;
 let activeJob = null;
+let activeJobSummary = '';
+const caseStudySummaryCache = new Map();
 let viewStack = [];
 let cfIndex = 0;
 let activeLoupe = null;
@@ -584,10 +586,31 @@ function openProjectSheet(id) {
   renderPanel();
 }
 
-function openJobSheet(id) {
+// The homepage preview shows an abridged version of the case study — its
+// hero summary, pulled live from the case study's own data.js — rather
+// than a separately hand-written blurb, so the preview can't drift out of
+// sync with the real page. jobs.js's `description` is only a fallback,
+// used when a job has no caseStudyUrl yet or its data.js fails to load.
+async function getAbridgedSummary(job) {
+  if (!job.caseStudyUrl) return job.description;
+  if (caseStudySummaryCache.has(job.id)) return caseStudySummaryCache.get(job.id);
+  try {
+    const mod = await import(job.caseStudyUrl + 'data.js');
+    const hero = mod.CASE_STUDY.blocks.find(b => b.type === 'hero');
+    const summary = (hero && hero.props && hero.props.summary) || job.description;
+    caseStudySummaryCache.set(job.id, summary);
+    return summary;
+  } catch (err) {
+    console.warn(`Could not load abridged summary for "${job.id}":`, err);
+    return job.description;
+  }
+}
+
+async function openJobSheet(id) {
   const job = JOBS.find(j => j.id === id);
   if (!job) return;
   activeJob = job;
+  activeJobSummary = await getAbridgedSummary(job);
   viewStack = ['caseStudy'];
   sheetBackdrop.classList.add('open');
   sheetBackdrop.setAttribute('aria-hidden', 'false');
@@ -642,7 +665,7 @@ function renderCaseStudy() {
     <div class="cs-tags">${job.tags.join(' · ')}</div>
     <h2 class="cs-title">${job.name}</h2>
     <div class="cs-dates">${job.dates}</div>
-    <p class="cs-desc">${job.description}</p>
+    <p class="cs-desc">${activeJobSummary}</p>
     ${job.caseStudyUrl ? `<a class="cs-readmore" href="${job.caseStudyUrl}">Read full case study →</a>` : ''}
   `;
 }
