@@ -110,6 +110,12 @@ const CARD_PAD_FRACTION = 0.09;
 // single source of truth for the stock color — used for the card's own
 // front/back faces AND both dropdown tabs, so nothing can drift apart.
 const CARD_STOCK_COLOR = '#f7f0e1';
+// Mobile-only accent for the back face's tappable text (the header's
+// save-contact arrow, the email line) — the exact color the
+// "contact saved" confirmation toast already uses (.card3d-confirm's own
+// CSS, below), so the thread from "this is tappable" to "this is what
+// just happened" reads as the same color rather than two unrelated ones.
+const LINK_COLOR = '#F4811F';
 
 function roundedRectShape(w, h, r) {
   const shape = new THREE.Shape();
@@ -819,14 +825,23 @@ export function initCard(container) {
 
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
-    // On mobile the header doubles as the save-contact tap target (the
-    // trailing arrow is the only visual cue, matching the arrow the old
-    // standalone "SAVE CONTACT →" line used) — drawTracked's own return
-    // value (the x position just past the last character) is exactly the
+    // On mobile the header doubles as the save-contact tap target. The
+    // arrow is drawn as its own drawTracked call, in the same accent
+    // (LINK_COLOR) the "contact saved" confirmation toast uses, so the
+    // header reads as actionable at a glance rather than leaning on the
+    // arrow glyph alone — and so there's a visible thread from "this is
+    // the thing you tap" to "this is the color that then confirms it
+    // worked". drawTracked's own return value (the x position just past
+    // the last character, trailing spacing included) is exactly where the
+    // next segment should continue from, and — for the arrow call — the
     // hit region's right edge, so no separate measureText pass is needed
     // for it the way the Space Grotesk lines below still require.
-    const headerText = isTouchDevice ? 'CONTACT →' : 'CONTACT';
-    const headerEndPx = drawTracked(ctx, headerText, pad, bh * BACK_HEADER_F, Math.round(bh * 0.038), 'rgba(28,20,10,0.4)', 3);
+    const headerSize = Math.round(bh * 0.038);
+    const headerY = bh * BACK_HEADER_F;
+    const headerLabelEndPx = drawTracked(ctx, 'CONTACT', pad, headerY, headerSize, 'rgba(28,20,10,0.4)', 3);
+    const headerEndPx = isTouchDevice
+      ? drawTracked(ctx, ' →', headerLabelEndPx, headerY, headerSize, LINK_COLOR, 3)
+      : headerLabelEndPx;
 
     // Space Grotesk, plain fillText, normal case — matching the front
     // face's own job-title treatment (see JOBS.forEach in drawFront)
@@ -850,10 +865,16 @@ export function initCard(container) {
       w - pad * 2 - iconAllowancePx, baseInfoSize,
       (px) => `400 ${px}px "Space Grotesk", sans-serif`
     );
+    // Email gets its own fillStyle pass (mobile only) rather than joining
+    // the shared one below — it's the only line here backed by a real
+    // link-like action of its own (openMailto) rather than just being
+    // read, so LINK_COLOR marks it as tappable the same way an underlined
+    // blue link would, without needing an icon or an underline that'd
+    // fight the card's own typographic style.
+    ctx.fillStyle = isTouchDevice ? LINK_COLOR : 'rgba(28,20,10,0.85)';
+    ctx.fillText(CONTACT.email, pad, bh * BACK_LINES_TOP_F);
     ctx.fillStyle = 'rgba(28,20,10,0.85)';
-    [CONTACT.email, CONTACT.url].forEach((line, i) => {
-      ctx.fillText(line, pad, bh * (BACK_LINES_TOP_F + i * BACK_LINE_GAP_F));
-    });
+    ctx.fillText(CONTACT.url, pad, bh * (BACK_LINES_TOP_F + BACK_LINE_GAP_F));
 
     socialLinkBounds.length = 0;
     if (isTouchDevice) {
@@ -1234,6 +1255,7 @@ export function initCard(container) {
     dropdownOpen = true;
     redrawToggleChevron();
     updateGuideContent();
+    updateMobileFlipGuide();
     animateDropdown(1);
   }
 
@@ -1242,6 +1264,7 @@ export function initCard(container) {
     dropdownOpen = false;
     redrawToggleChevron();
     updateGuideContent();
+    updateMobileFlipGuide();
     animateDropdown(0);
   }
 
@@ -1604,6 +1627,7 @@ export function initCard(container) {
     // the back never extends and so never has this conflict.
     if (flipping || dragging || mode !== 'idle' || (dropdownOpen && !flipped)) return;
     flipping = true;
+    updateMobileFlipGuide();
     const from = flipYaw;
     const to = flipYaw + Math.PI;
     flipped = !flipped;
@@ -1612,6 +1636,7 @@ export function initCard(container) {
     }, () => {
       flipYaw = to;
       flipping = false;
+      updateMobileFlipGuide();
     });
   }
 
@@ -1856,22 +1881,51 @@ export function initCard(container) {
   guideIcon.left.innerHTML = ICON_CURVE;
   guideIcon.right.innerHTML = ICON_CURVE;
   guideIcon.flip.innerHTML = ICON_FLIP;
-  guideText.flip.textContent = 'click to flip';
+  guideText.flip.textContent = isTouchDevice ? 'tap to flip' : 'click to flip';
 
-  // None of these gestures exist on mobile any more (see the pointermove
-  // listener's own comment) — display:none, not just left unpositioned,
-  // since these render OUTSIDE the card's own edges with long unwrapped
-  // hint sentences ("DRAG RIGHT TO SAVE CONTACT INFO"); on a narrow phone
-  // that's wider than the card itself has room for, an opacity-0-but-
-  // still-positioned element still contributes to the page's own
-  // scrollable width, which is what was actually causing the horizontal
-  // scrollbar/dead-scroll-zone this exists to fix — not the touch-action
-  // handling, which was already correct.
+  // The drag-based guides (top/left/right) have no gesture left to hint
+  // at on mobile (see the pointermove listener's own comment) —
+  // display:none, not just left unpositioned, since these render OUTSIDE
+  // the card's own edges with long unwrapped hint sentences ("DRAG RIGHT
+  // TO SAVE CONTACT INFO"); on a narrow phone that's wider than the card
+  // itself has room for, an opacity-0-but-still-positioned element still
+  // contributes to the page's own scrollable width, which is what was
+  // actually causing the horizontal scrollbar/dead-scroll-zone this
+  // exists to fix — not the touch-action handling, which was already
+  // correct. guideFlip is different: tap-to-flip is still very much a
+  // live gesture on mobile, just with no hover to reveal it the way
+  // updateGuideHints below does for desktop — see updateMobileFlipGuide,
+  // which drives it there instead.
   if (isTouchDevice) {
     guideTop.style.display = 'none';
     guideLeft.style.display = 'none';
     guideRight.style.display = 'none';
-    guideFlip.style.display = 'none';
+  }
+
+  // Mobile has no hover to fade guideFlip in near the cursor the way
+  // updateGuideHints does for desktop (that whole function is skipped for
+  // touch — see the pointermove listener), so this drives the same guide
+  // a different way: a fixed, ambient opacity whenever the card is at
+  // rest showing its front (the only state tap-to-flip actually applies),
+  // hidden the instant that stops being true. Position only needs
+  // recomputing on resize and once at startup, not every frame — it's
+  // only ever shown at cardLift's resting value (0: the dropdown, the
+  // only thing that ever moves it, is one of the states this hides for),
+  // so there's no drift to chase the way a truly per-frame position would
+  // need to account for.
+  const MOBILE_GUIDE_FLIP_OPACITY = 0.6;
+  function positionMobileFlipGuide() {
+    if (!isTouchDevice) return;
+    const hostRect = interactionRoot.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const originX = hostRect.left + hostRect.width / 2 - containerRect.left;
+    const originY = hostRect.top + hostRect.height / 2 - containerRect.top;
+    guideFlip.style.left = originX + 'px';
+    guideFlip.style.top = (originY + GUIDE_HALF_H_PX + GUIDE_MARGIN_PX) + 'px';
+  }
+  function updateMobileFlipGuide() {
+    if (!isTouchDevice) return;
+    guideFlip.style.opacity = (!flipped && !flipping && !dropdownOpen) ? MOBILE_GUIDE_FLIP_OPACITY : 0;
   }
 
   // Only the top/left/right guides' TEXT (and the top guide's icon
@@ -1893,6 +1947,8 @@ export function initCard(container) {
     guideText.right.textContent = resumeDragActive ? 'drag to save résumé' : 'drag right to save contact info';
   }
   updateGuideContent();
+  positionMobileFlipGuide();
+  updateMobileFlipGuide();
 
   function hideGuides() {
     guideTop.style.opacity = 0;
@@ -2032,6 +2088,7 @@ export function initCard(container) {
     const scale = Math.min(1, availableWidthPx / NATURAL_CARD_WIDTH_PX);
     PIXELS_PER_WORLD_UNIT = (REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT) * scale;
     updateGuideConstants();
+    positionMobileFlipGuide();
 
     camera.aspect = w / h;
     // hold on-screen scale constant so the résumé reveal growing
