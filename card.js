@@ -835,20 +835,43 @@ export function initCard(container) {
     // the base, pre-fit size for that allowance rather than solving it
     // circularly) — close enough in practice since the email address is
     // almost always the longest of the four anyway.
+    // Mobile has no drag gesture left to reach email/vCard-save through
+    // (see the pointer-handling section's own comment on why dragging is
+    // gone there entirely) — so on mobile, this same second line becomes
+    // a tap target for saving the contact instead of just displaying the
+    // URL, and the email line above it becomes tappable too. Both keep
+    // their exact position/size budget; only what's drawn (and, for
+    // email, whether it's in socialLinkBounds at all) changes.
+    const line2Text = isTouchDevice ? 'SAVE CONTACT →' : CONTACT.url;
     const baseInfoSize = Math.round(bh * 0.052);
     const iconAllowancePx = baseInfoSize * 1.05 + baseInfoSize * 0.35;
     const infoSize = fitTextSize(
       ctx,
-      [CONTACT.email, CONTACT.url, ...SOCIAL_LINKS.map((l) => l.handle)],
+      [CONTACT.email, line2Text, ...SOCIAL_LINKS.map((l) => l.handle)],
       w - pad * 2 - iconAllowancePx, baseInfoSize,
       (px) => `400 ${px}px "Space Grotesk", sans-serif`
     );
     ctx.fillStyle = 'rgba(28,20,10,0.85)';
-    [CONTACT.email, CONTACT.url].forEach((line, i) => {
+    [CONTACT.email, line2Text].forEach((line, i) => {
       ctx.fillText(line, pad, bh * (BACK_LINES_TOP_F + i * BACK_LINE_GAP_F));
     });
 
     socialLinkBounds.length = 0;
+    if (isTouchDevice) {
+      const emailWidthPx = ctx.measureText(CONTACT.email).width;
+      socialLinkBounds.push({
+        uMin: pad / w, uMax: (pad + emailWidthPx) / w,
+        vMin: BACK_LINES_TOP_F - 0.05, vMax: BACK_LINES_TOP_F + 0.02,
+        action: openMailto
+      });
+      const line2WidthPx = ctx.measureText(line2Text).width;
+      const line2Frac = BACK_LINES_TOP_F + BACK_LINE_GAP_F;
+      socialLinkBounds.push({
+        uMin: pad / w, uMax: (pad + line2WidthPx) / w,
+        vMin: line2Frac - 0.05, vMax: line2Frac + 0.02,
+        action: () => { downloadVCard(); showConfirmation('contact saved'); }
+      });
+    }
     const iconSize = Math.round(infoSize * 1.05);
     SOCIAL_LINKS.forEach((link, i) => {
       const rowFrac = BACK_LINES_TOP_F + (i + 2) * BACK_LINE_GAP_F;
@@ -864,7 +887,7 @@ export function initCard(container) {
         uMax: handleEnd / w,
         vMin: rowFrac - 0.05,
         vMax: rowFrac + 0.02,
-        href: link.href
+        action: () => window.open(link.href, '_blank', 'noopener')
       });
     });
 
@@ -1284,6 +1307,12 @@ export function initCard(container) {
   let pointerDownTime = 0;
   let pointerDownOnCard = false;
   const DRAG_THRESHOLD = 6;
+  // Mobile has no visual drag feedback to speak of any more (see the
+  // pointermove listener below) — a tap is judged as "still a tap" by
+  // this instead, a good deal more forgiving than a mouse's own precise
+  // DRAG_THRESHOLD, since a fingertip drifts more than a mouse cursor
+  // does even when the person holding it means to just tap once.
+  const TOUCH_TAP_TOLERANCE_PX = 16;
 
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -1383,10 +1412,11 @@ export function initCard(container) {
       }
     }
 
-    // back-only: the Instagram/LinkedIn icon+handle rows (drawn by
-    // drawBack, bounds recorded in socialLinkBounds each time it redraws —
-    // each is its own row now, so bounds carry their own v-range rather
-    // than sharing one row's band)
+    // back-only: the Instagram/LinkedIn icon+handle rows, plus (mobile
+    // only) the email and "SAVE CONTACT" lines above them (all drawn by
+    // drawBack, bounds recorded in socialLinkBounds each time it
+    // redraws — each is its own row now, so bounds carry their own
+    // v-range rather than sharing one row's band)
     if (flipped) {
       const hit = hitUVOnCard(clientX, clientY);
       if (hit !== null) {
@@ -1394,7 +1424,7 @@ export function initCard(container) {
           hit.u >= b.uMin && hit.u <= b.uMax && hit.vFrac >= b.vMin && hit.vFrac <= b.vMax
         );
         if (link) {
-          window.open(link.href, '_blank', 'noopener');
+          link.action();
           return;
         }
       }
@@ -1469,17 +1499,14 @@ export function initCard(container) {
   });
 
   window.addEventListener('pointermove', (e) => {
-    // Mouse: continuous hover-tilt regardless of button state, same as
-    // always. Touch: reuses this same function (touch position standing
-    // in for cursor position) rather than a separate mechanism, but only
-    // while the touch currently down actually started on the card
-    // (pointerDownOnCard) — "the card tilts while you're touching it"
-    // specifically, not from touches anywhere else in the hero. (An
-    // earlier version sourced touch tilt from the gyroscope instead —
-    // removed: no permission prompt, no sensor noise to smooth, no
-    // direction to guess at without a real device to test on, and this
-    // reuses code that already existed rather than adding more.)
-    if (!dragging && (e.pointerType !== 'touch' || pointerDownOnCard)) updateHoverTilt(e.clientX, e.clientY);
+    // Mobile drops hover/touch-tilt, free-drag, and the hover guides
+    // entirely, by request — tap-to-flip (via handleCardClick, in
+    // pointerup below) is the only gesture left there. An earlier version
+    // tilted the card toward wherever it was being touched (reusing this
+    // same updateHoverTilt) — removed for being one more moving part on
+    // top of everything else being cut, not because it didn't work.
+    if (isTouchDevice) return;
+    if (!dragging) updateHoverTilt(e.clientX, e.clientY);
     if (!dragging) updateGuideHints(e.clientX, e.clientY);
 
     if (isPointerDown && potentialDrag && !dragging) {
@@ -1499,17 +1526,17 @@ export function initCard(container) {
       const dt = performance.now() - pointerDownTime;
       const dx = e.clientX - pointerDownClient.x;
       const dy = e.clientY - pointerDownClient.y;
-      if (Math.hypot(dx, dy) < DRAG_THRESHOLD && dt < 600) {
+      // Mobile never started a drag to begin with (see pointermove above),
+      // so a real fingertip's natural wobble during a plain tap has
+      // nothing to have been absorbed by the way a few px of mouse
+      // movement before beginDrag's own threshold does — a more forgiving
+      // tolerance here is what keeps that same tap reliably still reading
+      // as a tap instead of silently doing nothing.
+      const tapTolerance = isTouchDevice ? TOUCH_TAP_TOLERANCE_PX : DRAG_THRESHOLD;
+      if (Math.hypot(dx, dy) < tapTolerance && dt < 600) {
         handleCardClick(e.clientX, e.clientY);
       }
     }
-    // Touch has no "moving the cursor away" event the way a mouse's own
-    // out-of-bounds check in updateHoverTilt gets for free — without this,
-    // whatever tilt the last touchmove left on screen would just stay
-    // frozen there once the finger lifts, instead of springing back flat
-    // the instant contact ends (which is what "tilts while you're
-    // touching it" implies on release too).
-    if (e.pointerType === 'touch') { tiltTargetX = 0; tiltTargetY = 0; }
     isPointerDown = false;
     potentialDrag = false;
     document.body.style.userSelect = '';
@@ -1529,7 +1556,6 @@ export function initCard(container) {
     // needs the card physics settled back to its resting state, not just
     // left mid-air wherever the gesture happened to be interrupted.
     if (dragging) endDrag();
-    if (e.pointerType === 'touch') { tiltTargetX = 0; tiltTargetY = 0; }
     isPointerDown = false;
     potentialDrag = false;
     document.body.style.userSelect = '';
@@ -1834,6 +1860,22 @@ export function initCard(container) {
   guideIcon.right.innerHTML = ICON_CURVE;
   guideIcon.flip.innerHTML = ICON_FLIP;
   guideText.flip.textContent = 'click to flip';
+
+  // None of these gestures exist on mobile any more (see the pointermove
+  // listener's own comment) — display:none, not just left unpositioned,
+  // since these render OUTSIDE the card's own edges with long unwrapped
+  // hint sentences ("DRAG RIGHT TO SAVE CONTACT INFO"); on a narrow phone
+  // that's wider than the card itself has room for, an opacity-0-but-
+  // still-positioned element still contributes to the page's own
+  // scrollable width, which is what was actually causing the horizontal
+  // scrollbar/dead-scroll-zone this exists to fix — not the touch-action
+  // handling, which was already correct.
+  if (isTouchDevice) {
+    guideTop.style.display = 'none';
+    guideLeft.style.display = 'none';
+    guideRight.style.display = 'none';
+    guideFlip.style.display = 'none';
+  }
 
   // Only the top/left/right guides' TEXT (and the top guide's icon
   // direction) change with state — updated once per actual state

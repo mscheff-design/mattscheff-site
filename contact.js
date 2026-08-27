@@ -635,7 +635,17 @@ function injectStyles() {
        growing share of it at small scales until there wasn't enough left
        for the form's own (correctly-scaled) content and it had to scroll
        again anyway. */
-    .contact3d-clip{box-sizing:border-box;padding:calc(12px * var(--fs, 1)) calc(20px * var(--fs, 1)) 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center}
+    /* position:relative here isn't decorative — it makes this box the
+       containing block for .cf-honeypot's position:absolute below.
+       Without it, the honeypot skips past this element (which has no
+       positioning context of its own) straight to .contact3d-panel — the
+       3D-transformed ancestor above it — and its left:-9999px gets
+       amplified by that transform's own scale, landing tens of thousands
+       of px offscreen and blowing out the whole document's scrollWidth
+       (a real horizontal-scrollbar bug on the page, not just something
+       clipped from view). Being the containing block also makes this
+       element's own overflow:hidden actually apply to it. */
+    .contact3d-clip{position:relative;box-sizing:border-box;padding:calc(12px * var(--fs, 1)) calc(20px * var(--fs, 1)) 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center}
 
     /* --fs (set in updateGeometry(), see its own comment) is card.js's
        current width-cap scale factor — every size below is a calc() off
