@@ -20,7 +20,8 @@ export const JOBS = [
     name: 'Bernard Figueroa Studio',
     dates: '2025 – Present',
     tags: ['PHOTOGRAPHY', 'SOCIAL', 'EMAIL'],
-    description: 'A closer look at the photography, social, and email work built here since 2025 — full case study coming soon.'
+    description: 'A closer look at the photography, social, and email work built here since 2025.',
+    caseStudyUrl: '/case-studies/bernard-figueroa-studio/'
   },
   {
     id: 'statmask',
