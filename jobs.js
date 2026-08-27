@@ -12,7 +12,7 @@ export const JOBS = [
     name: 'Urban Architecture Inc.',
     dates: '2022 – Present',
     tags: ['DIGITAL STRATEGY', 'E-COMMERCE', 'CONTENT'],
-    description: 'A closer look at the digital strategy, e-commerce, and content work built here since 2022.',
+    description: `Urban Architecture Inc. has been dealing collectible Memphis and postmodern design since 1981, on the strength of one man’s relationships. I built everything digital around him: brand strategy, a custom Shopify design system, a data pipeline, an editorial program, and a private dispatch — all engineered so the principal never has to perform.`,
     caseStudyUrl: '/case-studies/urban-architecture/'
   },
   {

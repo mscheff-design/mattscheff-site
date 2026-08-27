@@ -11,9 +11,10 @@
 // doesn't have to follow the same template shape.
 
 function placeholder(label, w = 1200, h = 800, bg = 'd8cfc0', fg = '1c140a') {
+  const escapedLabel = String(label).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'>
     <rect width='100%' height='100%' fill='#${bg}'/>
-    <text x='50%' y='50%' font-family='monospace' font-size='20' fill='#${fg}' fill-opacity='0.5' text-anchor='middle' dominant-baseline='middle'>${label}</text>
+    <text x='50%' y='50%' font-family='monospace' font-size='20' fill='#${fg}' fill-opacity='0.5' text-anchor='middle' dominant-baseline='middle'>${escapedLabel}</text>
   </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
