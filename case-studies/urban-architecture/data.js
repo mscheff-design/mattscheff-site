@@ -1,9 +1,11 @@
 // Case-study block config for Urban Architecture Inc.
 //
-// PLACEHOLDER CONTENT — swap the placeholder() image calls below for real
-// assets under /assets/case-studies/urban-architecture/, and rewrite the
-// copy. This file exists to exercise every block type once as the template
-// instance; the block sequence itself (hero -> textMedia -> statRow ->
+// DRAFT PLACEHOLDER COPY — this narrative/stats/quote is plausible-sounding
+// filler, not the real project story. It exists so the template can be
+// evaluated fully fleshed out. Swap it for real content, and swap the
+// placeholder() image calls for real assets under
+// /assets/case-studies/urban-architecture/, whenever the real material is
+// ready. The block sequence itself (hero -> textMedia -> statRow ->
 // fullBleedMedia(dark) -> quote -> textMedia -> gallery -> nextProject) is
 // a reasonable default order to start from, not a fixed requirement.
 
@@ -21,16 +23,16 @@ export const CASE_STUDY = {
     {
       type: 'hero',
       props: {
-        summary: 'A closer look at the digital strategy, e-commerce, and content work built for Urban Architecture Inc. since 2022 — replace this summary with real project context.',
-        media: { type: 'image', src: placeholder('HERO IMAGE — 1600x900', 1600, 900), alt: 'Urban Architecture Inc. hero placeholder' }
+        summary: 'Urban Architecture Inc. came to us running a five-year-old site that no longer matched how the studio actually worked — a static portfolio bolted onto a checkout flow, with content updates that took a developer to ship. Since 2022 we’ve rebuilt the digital experience end to end: strategy, storefront, and the editorial system behind it.',
+        media: { type: 'image', src: placeholder('HERO IMAGE — 1600x900', 1600, 900), alt: 'Urban Architecture Inc. site, hero placeholder' }
       }
     },
     {
       type: 'textMedia',
       props: {
         heading: 'The challenge',
-        body: 'Placeholder body copy describing the problem this project set out to solve. Replace with real narrative.',
-        media: { type: 'image', src: placeholder('IMAGE — RIGHT') },
+        body: 'The old site treated the studio’s project archive and its e-commerce arm as two unrelated products, each with its own template language and content workflow. Editors were routing text changes through engineering, checkout abandoned above industry average, and there was no single source of truth for which projects, materials, or products were current. The brief wasn’t “redesign the homepage” — it was “make the site something the team can actually run day to day.”',
+        media: { type: 'image', src: placeholder('SITE AUDIT / BEFORE') },
         orientation: 'right'
       }
     },
@@ -48,23 +50,23 @@ export const CASE_STUDY = {
       type: 'fullBleedMedia',
       props: {
         theme: 'dark',
-        media: { type: 'image', src: placeholder('FULL-BLEED IMAGE — 1920x1080', 1920, 1080, '141008', 'd2c8b4') },
-        caption: 'Placeholder caption for this full-bleed image.'
+        media: { type: 'image', src: placeholder('STOREFRONT REDESIGN — 1920x1080', 1920, 1080, '141008', 'd2c8b4') },
+        caption: 'The rebuilt storefront, shipped in phase two alongside the new content system.'
       }
     },
     {
       type: 'quote',
       props: {
-        text: 'Placeholder pull-quote from a stakeholder or teammate about the impact of this work.',
-        attribution: 'NAME, TITLE'
+        text: 'We used to dread touching the site. Now our own team ships a new project page in an afternoon, no developer required.',
+        attribution: 'PRINCIPAL, URBAN ARCHITECTURE INC.'
       }
     },
     {
       type: 'textMedia',
       props: {
         heading: 'The approach',
-        body: 'Placeholder body copy describing the approach taken. Replace with real narrative.',
-        media: { type: 'image', src: placeholder('IMAGE — LEFT') },
+        body: 'We started with a content model, not a mockup: one system for "project," "product," and "material" that both the portfolio and the store could pull from, so an update in one place propagates everywhere it’s referenced. From there, the storefront and content workflows were rebuilt in parallel — a leaner checkout, and an editor interface simple enough that the studio’s own team owns it without our involvement.',
+        media: { type: 'image', src: placeholder('CONTENT MODEL / WORKFLOW') },
         orientation: 'left'
       }
     },
@@ -72,9 +74,9 @@ export const CASE_STUDY = {
       type: 'gallery',
       props: {
         images: [
-          { src: placeholder('GALLERY 1', 600, 600), alt: '' },
-          { src: placeholder('GALLERY 2', 600, 600), alt: '' },
-          { src: placeholder('GALLERY 3', 600, 600), alt: '' }
+          { src: placeholder('PROJECT PAGE TEMPLATE', 600, 600), alt: 'Project page template' },
+          { src: placeholder('PRODUCT DETAIL VIEW', 600, 600), alt: 'Product detail view' },
+          { src: placeholder('EDITOR INTERFACE', 600, 600), alt: 'Editor interface' }
         ]
       }
     },
