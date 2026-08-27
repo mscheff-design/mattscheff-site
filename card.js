@@ -819,7 +819,14 @@ export function initCard(container) {
 
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
-    drawTracked(ctx, 'CONTACT', pad, bh * BACK_HEADER_F, Math.round(bh * 0.038), 'rgba(28,20,10,0.4)', 3);
+    // On mobile the header doubles as the save-contact tap target (the
+    // trailing arrow is the only visual cue, matching the arrow the old
+    // standalone "SAVE CONTACT →" line used) — drawTracked's own return
+    // value (the x position just past the last character) is exactly the
+    // hit region's right edge, so no separate measureText pass is needed
+    // for it the way the Space Grotesk lines below still require.
+    const headerText = isTouchDevice ? 'CONTACT →' : 'CONTACT';
+    const headerEndPx = drawTracked(ctx, headerText, pad, bh * BACK_HEADER_F, Math.round(bh * 0.038), 'rgba(28,20,10,0.4)', 3);
 
     // Space Grotesk, plain fillText, normal case — matching the front
     // face's own job-title treatment (see JOBS.forEach in drawFront)
@@ -835,41 +842,31 @@ export function initCard(container) {
     // the base, pre-fit size for that allowance rather than solving it
     // circularly) — close enough in practice since the email address is
     // almost always the longest of the four anyway.
-    // Mobile has no drag gesture left to reach email/vCard-save through
-    // (see the pointer-handling section's own comment on why dragging is
-    // gone there entirely) — so on mobile, this same second line becomes
-    // a tap target for saving the contact instead of just displaying the
-    // URL, and the email line above it becomes tappable too. Both keep
-    // their exact position/size budget; only what's drawn (and, for
-    // email, whether it's in socialLinkBounds at all) changes.
-    const line2Text = isTouchDevice ? 'SAVE CONTACT →' : CONTACT.url;
     const baseInfoSize = Math.round(bh * 0.052);
     const iconAllowancePx = baseInfoSize * 1.05 + baseInfoSize * 0.35;
     const infoSize = fitTextSize(
       ctx,
-      [CONTACT.email, line2Text, ...SOCIAL_LINKS.map((l) => l.handle)],
+      [CONTACT.email, CONTACT.url, ...SOCIAL_LINKS.map((l) => l.handle)],
       w - pad * 2 - iconAllowancePx, baseInfoSize,
       (px) => `400 ${px}px "Space Grotesk", sans-serif`
     );
     ctx.fillStyle = 'rgba(28,20,10,0.85)';
-    [CONTACT.email, line2Text].forEach((line, i) => {
+    [CONTACT.email, CONTACT.url].forEach((line, i) => {
       ctx.fillText(line, pad, bh * (BACK_LINES_TOP_F + i * BACK_LINE_GAP_F));
     });
 
     socialLinkBounds.length = 0;
     if (isTouchDevice) {
+      socialLinkBounds.push({
+        uMin: pad / w, uMax: headerEndPx / w,
+        vMin: BACK_HEADER_F - 0.03, vMax: BACK_HEADER_F + 0.03,
+        action: () => { downloadVCard(); showConfirmation('contact saved'); }
+      });
       const emailWidthPx = ctx.measureText(CONTACT.email).width;
       socialLinkBounds.push({
         uMin: pad / w, uMax: (pad + emailWidthPx) / w,
         vMin: BACK_LINES_TOP_F - 0.05, vMax: BACK_LINES_TOP_F + 0.02,
         action: openMailto
-      });
-      const line2WidthPx = ctx.measureText(line2Text).width;
-      const line2Frac = BACK_LINES_TOP_F + BACK_LINE_GAP_F;
-      socialLinkBounds.push({
-        uMin: pad / w, uMax: (pad + line2WidthPx) / w,
-        vMin: line2Frac - 0.05, vMax: line2Frac + 0.02,
-        action: () => { downloadVCard(); showConfirmation('contact saved'); }
       });
     }
     const iconSize = Math.round(infoSize * 1.05);
@@ -1413,10 +1410,10 @@ export function initCard(container) {
     }
 
     // back-only: the Instagram/LinkedIn icon+handle rows, plus (mobile
-    // only) the email and "SAVE CONTACT" lines above them (all drawn by
-    // drawBack, bounds recorded in socialLinkBounds each time it
-    // redraws — each is its own row now, so bounds carry their own
-    // v-range rather than sharing one row's band)
+    // only) the "CONTACT" header itself (save-contact) and the email line
+    // below it (all drawn by drawBack, bounds recorded in socialLinkBounds
+    // each time it redraws — each is its own row now, so bounds carry
+    // their own v-range rather than sharing one row's band)
     if (flipped) {
       const hit = hitUVOnCard(clientX, clientY);
       if (hit !== null) {
