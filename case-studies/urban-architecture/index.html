@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Urban Architecture Inc. — Matthew Scheffler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}body{background:#e8e3d9;font-family:'DM Mono',monospace}</style>
+</head>
+<body>
+<div id="siteNav"></div>
+<main id="csMount"></main>
+<div id="siteFooter"></div>
+<script type="module">
+  import { renderSiteNav, renderSiteFooter } from '../../chrome.js';
+  import { renderCaseStudyPage } from '../../blocks.js';
+  import { JOBS } from '../../jobs.js';
+  import { CASE_STUDY } from './data.js';
+
+  renderSiteNav(document.getElementById('siteNav'));
+  renderSiteFooter(document.getElementById('siteFooter'));
+
+  const job = JOBS.find(j => j.id === CASE_STUDY.id);
+  renderCaseStudyPage(job, CASE_STUDY, document.getElementById('csMount'));
+</script>
+</body>
+</html>

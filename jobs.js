@@ -12,7 +12,8 @@ export const JOBS = [
     name: 'Urban Architecture Inc.',
     dates: '2022 – Present',
     tags: ['DIGITAL STRATEGY', 'E-COMMERCE', 'CONTENT'],
-    description: 'A closer look at the digital strategy, e-commerce, and content work built here since 2022 — full case study coming soon.'
+    description: 'A closer look at the digital strategy, e-commerce, and content work built here since 2022.',
+    caseStudyUrl: '/case-studies/urban-architecture/'
   },
   {
     id: 'bernard-figueroa-studio',
