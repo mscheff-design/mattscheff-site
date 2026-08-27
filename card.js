@@ -78,8 +78,9 @@ import { JOBS } from './jobs.js';
 // is decided once, before any of the geometry/texture math below (all of
 // which is itself only ever computed once, at module load — see the
 // Geometry strategy note above) rather than threaded through as a
-// parameter. Same detection contact.js's own touch/gyro gating uses
-// (coarse pointer = no fine hover), so both stay in sync by construction.
+// parameter. Also gates the mobile-specific interaction changes further
+// down this file (touch-and-tilt instead of gyroscope, no drag-to-extend-
+// résumé, no drag-throw-to-download-résumé — see each one's own comment).
 const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
 // Portrait on touch devices. NOT the landscape numbers swapped — an
@@ -340,9 +341,7 @@ let PIXELS_PER_WORLD_UNIT = REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT;
 // updateGuideConstants().
 let GUIDE_HALF_W_PX = (CARD_WIDTH / 2) * PIXELS_PER_WORLD_UNIT;
 let GUIDE_HALF_H_PX = (CARD_HEIGHT / 2) * PIXELS_PER_WORLD_UNIT;
-// Fixed regardless of scale — shared with the tilt-prompt's own
-// positioning (see positionTiltPrompt) so both sit the same distance off
-// the card's edge.
+// Fixed regardless of scale.
 const GUIDE_MARGIN_PX = 22;
 let GUIDE_TAB_H_PX = TAB_HEIGHT * PIXELS_PER_WORLD_UNIT;
 function updateGuideConstants() {
@@ -1256,48 +1255,6 @@ export function initCard(container) {
   const TILT_DAMPING = 0.8;
   let hovering = false;
 
-  // ---- gyroscope tilt (touch devices only) ----
-  // isTouchDevice itself is module-scope now (see its own comment, up by
-  // CARD_WIDTH/BASE_CARD_HEIGHT) — the same portrait-or-landscape decision
-  // and this tilt-source decision both need to be made from the exact same
-  // check, so there's one place it's computed rather than two that could
-  // theoretically drift apart.
-  const gyroSupported = typeof DeviceOrientationEvent !== 'undefined';
-  let gyroActive = false;
-  // The angles a phone rests at "flat/neutral" in someone's hand vary a
-  // lot person to person — captured from the first real reading after
-  // permission is granted (see handleDeviceOrientation), not assumed to
-  // be some fixed "device lying flat" or "held bolt upright" value, so
-  // the card starts centered from wherever they're actually holding it
-  // rather than snapping to whatever tilt that assumption was off by.
-  let gyroBaseline = null;
-  // how many degrees of phone tilt (off that baseline) reach the same
-  // TILT_MAX the mouse-hover version reaches at the card's own edge —
-  // small enough to be reachable by wrist movement without needing to
-  // wave the whole phone around, generous enough that it doesn't feel
-  // twitchy at rest (ordinary hand tremor is a fraction of a degree).
-  const GYRO_MAX_DEG = 16;
-  // Raw beta/gamma readings carry real sensor noise — a phone held
-  // perfectly still still reports small (sub-degree, but not zero) frame-
-  // to-frame fluctuations. tiltTargetX/Y's own spring-damper (TILT_
-  // STIFFNESS/DAMPING) smooths whatever it's fed, but feeding it already-
-  // noisy raw degrees still reads as a faint, restless "buzz" at rest
-  // rather than a genuinely still card. gyroSmoothed is a light low-pass
-  // filter on the readings themselves, applied before anything else
-  // (including baseline capture, so the baseline isn't itself one noisy
-  // sample) — GYRO_SMOOTHING is how much of each new reading gets blended
-  // in per event (lower = smoother but more lag; DeviceOrientationEvent
-  // fires often enough, ~60Hz on most devices, that even a fairly small
-  // value here still tracks real movement responsively).
-  let gyroSmoothed = null;
-  const GYRO_SMOOTHING = 0.35;
-  // Below this many degrees of (smoothed) deviation from baseline, treat
-  // it as noise/hand tremor rather than an intentional tilt — without
-  // this, the smoothing above still lets sub-threshold jitter through as
-  // a barely-perceptible drift, which reads as "not quite settled" even
-  // once smoothed.
-  const GYRO_DEADZONE_DEG = 0.6;
-
   let physicsSuspended = false;
   function setPhysicsSuspended(v) {
     physicsSuspended = v;
@@ -1503,20 +1460,26 @@ export function initCard(container) {
     // past DRAG_THRESHOLD in beginDrag) so the few px before that
     // threshold — still real mouse-down movement — can't start one
     // either; cleared in pointerup below regardless of whether this
-    // turned into a drag, a click, or neither.
+    // turned into a drag, a click, or neither. webkitUserSelect
+    // alongside the standard property for the same reason
+    // .card3d-container's own CSS sets both — iOS Safari doesn't
+    // reliably honor the unprefixed one alone.
     document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
   });
 
   window.addEventListener('pointermove', (e) => {
-    // A touch drag fires pointermove too, and this device's actual tilt
-    // is being driven by handleDeviceOrientation() once gyro is active —
-    // letting a touch's own position also feed tiltTargetX/Y through
-    // updateHoverTilt would just have the two constantly overwriting each
-    // other. gyroSupported alone (not gyroActive) is enough to gate this:
-    // once a device has a gyroscope to ask about, its touch position was
-    // never a meaningful stand-in for "where is this being looked at from"
-    // the way a mouse's is, permission granted or not.
-    if (!dragging && !(e.pointerType === 'touch' && gyroSupported)) updateHoverTilt(e.clientX, e.clientY);
+    // Mouse: continuous hover-tilt regardless of button state, same as
+    // always. Touch: reuses this same function (touch position standing
+    // in for cursor position) rather than a separate mechanism, but only
+    // while the touch currently down actually started on the card
+    // (pointerDownOnCard) — "the card tilts while you're touching it"
+    // specifically, not from touches anywhere else in the hero. (An
+    // earlier version sourced touch tilt from the gyroscope instead —
+    // removed: no permission prompt, no sensor noise to smooth, no
+    // direction to guess at without a real device to test on, and this
+    // reuses code that already existed rather than adding more.)
+    if (!dragging && (e.pointerType !== 'touch' || pointerDownOnCard)) updateHoverTilt(e.clientX, e.clientY);
     if (!dragging) updateGuideHints(e.clientX, e.clientY);
 
     if (isPointerDown && potentialDrag && !dragging) {
@@ -1540,9 +1503,17 @@ export function initCard(container) {
         handleCardClick(e.clientX, e.clientY);
       }
     }
+    // Touch has no "moving the cursor away" event the way a mouse's own
+    // out-of-bounds check in updateHoverTilt gets for free — without this,
+    // whatever tilt the last touchmove left on screen would just stay
+    // frozen there once the finger lifts, instead of springing back flat
+    // the instant contact ends (which is what "tilts while you're
+    // touching it" implies on release too).
+    if (e.pointerType === 'touch') { tiltTargetX = 0; tiltTargetY = 0; }
     isPointerDown = false;
     potentialDrag = false;
     document.body.style.userSelect = '';
+    document.body.style.webkitUserSelect = '';
     interactionRoot.style.touchAction = 'auto';
   });
 
@@ -1553,14 +1524,16 @@ export function initCard(container) {
   // it to, silently killing scroll in the hero until another full
   // pointerdown/pointerup cycle happens to reset it — worse than the
   // original bug this all exists to fix, since it'd look intermittent.
-  window.addEventListener('pointercancel', () => {
+  window.addEventListener('pointercancel', (e) => {
     // Same as pointerup's own dragging branch — a cancel mid-drag still
     // needs the card physics settled back to its resting state, not just
     // left mid-air wherever the gesture happened to be interrupted.
     if (dragging) endDrag();
+    if (e.pointerType === 'touch') { tiltTargetX = 0; tiltTargetY = 0; }
     isPointerDown = false;
     potentialDrag = false;
     document.body.style.userSelect = '';
+    document.body.style.webkitUserSelect = '';
     interactionRoot.style.touchAction = 'auto';
   });
 
@@ -1595,80 +1568,6 @@ export function initCard(container) {
     const ny = ((clientY - rect.top) / rect.height) * 2 - 1;
     tiltTargetX = THREE.MathUtils.clamp(-ny * TILT_MAX, -TILT_MAX, TILT_MAX);
     tiltTargetY = THREE.MathUtils.clamp(nx * TILT_MAX, -TILT_MAX, TILT_MAX);
-  }
-
-  /* ---------- gyroscope tilt (touch devices only, opt-in — see the
-     tilt-prompt in the DOM overlays section for the permission gesture) ---------- */
-
-  // beta/gamma's sign conventions are notoriously inconsistent across iOS
-  // vs Android and even across browser versions on the same OS, and there
-  // is no way to test an actual accelerometer through this session's
-  // tooling — this mapping (tilting the phone's top edge back → card tilts
-  // the same way beta moved; tilting it left/right → card tilts that way
-  // with gamma) is a best-guess best matching the mouse-hover version's own
-  // "vertical → X tilt, horizontal → Y tilt" convention just above. If it
-  // reads as backwards on a real device, flip the sign on the two
-  // assignments below — everything else (baseline capture, clamping,
-  // feeding the existing tiltTargetX/Y spring-damper) stays correct either
-  // way.
-  // Soft deadzone: subtracts GYRO_DEADZONE_DEG from the magnitude rather
-  // than hard-clamping everything below it to exactly zero, so crossing
-  // the threshold doesn't read as a sudden jump from "nothing" to
-  // "something" — then rescales the remaining span so a tilt of exactly
-  // GYRO_MAX_DEG still reaches TILT_MAX rather than falling just short of
-  // it by the deadzone amount.
-  function gyroDeltaToTilt(deltaDeg) {
-    const sign = Math.sign(deltaDeg);
-    const mag = Math.max(0, Math.abs(deltaDeg) - GYRO_DEADZONE_DEG);
-    const t = Math.min(1, mag / (GYRO_MAX_DEG - GYRO_DEADZONE_DEG));
-    return sign * t * TILT_MAX;
-  }
-
-  function handleDeviceOrientation(e) {
-    if (e.beta === null || e.gamma === null) return;
-    // Smoothed before anything else touches it, including baseline
-    // capture below — see gyroSmoothed's own comment. First reading has
-    // nothing to blend with yet.
-    if (!gyroSmoothed) {
-      gyroSmoothed = { beta: e.beta, gamma: e.gamma };
-    } else {
-      gyroSmoothed.beta += (e.beta - gyroSmoothed.beta) * GYRO_SMOOTHING;
-      gyroSmoothed.gamma += (e.gamma - gyroSmoothed.gamma) * GYRO_SMOOTHING;
-    }
-    // First (already-smoothed) reading becomes "centered" — see
-    // gyroBaseline's own comment for why this isn't a fixed assumed angle.
-    if (!gyroBaseline) { gyroBaseline = { beta: gyroSmoothed.beta, gamma: gyroSmoothed.gamma }; return; }
-    // A drag or an open form field should visually dominate over ambient
-    // tilt during that gesture, same as hover already yields to dragging
-    // (see the pointermove listener) and to physicsSuspended (see
-    // setPhysicsSuspended) — this is the gyro's equivalent of both gates.
-    if (physicsSuspended || dragging) return;
-    tiltTargetX = gyroDeltaToTilt(gyroSmoothed.beta - gyroBaseline.beta);
-    tiltTargetY = gyroDeltaToTilt(gyroSmoothed.gamma - gyroBaseline.gamma);
-  }
-
-  // The actual permission gesture, called from the tilt-prompt's own
-  // click handler (DOM overlays section) — iOS requires this to run
-  // synchronously inside a real user gesture (a tap), every page load,
-  // even for a device that granted it last time; Android and desktop
-  // browsers with the interface at all just skip straight to attaching
-  // the listener since they never gate it behind a permission prompt.
-  async function enableGyro() {
-    if (gyroActive || !gyroSupported) return;
-    try {
-      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        const result = await DeviceOrientationEvent.requestPermission();
-        if (result !== 'granted') { hideTiltPrompt(); return; }
-      }
-      window.addEventListener('deviceorientation', handleDeviceOrientation);
-      gyroActive = true;
-      hideTiltPrompt();
-    } catch (_) {
-      // Permission API present but the call itself failed (not run from a
-      // trusted gesture, or the browser's own quirks) — leave the card on
-      // its existing touch-drag/flip behavior rather than retrying.
-      hideTiltPrompt();
-    }
   }
 
   /* ---------- flip ---------- */
@@ -1746,16 +1645,23 @@ export function initCard(container) {
     // Open/close is judged on how far THIS drag travelled, so a card
     // already parked near the top doesn't re-trigger on every nudge.
     mode = 'idle';
-    const worldH = worldHeightAtZ(0);
-    const travelY = posY - dragStartY;
 
-    if (travelY > worldH * DRAG_UP_THRESHOLD_FRACTION) {
-      // no effect while already extended (that's what left/right-drag are
-      // for now — see throwCard) or while viewing the back (which never
-      // extends at all)
-      if (!dropdownOpen && !flipped) openDropdown();
-    } else if (travelY < -worldH * DRAG_DOWN_THRESHOLD_FRACTION) {
-      closeDropdown();
+    // Mobile drops drag-to-extend entirely, by request — the toggle
+    // row's own tap target (see handleCardClick) is the only way to
+    // open/close the résumé there now. A vertical drag on mobile still
+    // moves the card and springs it back via returnToHome() below like
+    // any other drag, it just doesn't have this side effect anymore.
+    if (!isTouchDevice) {
+      const worldH = worldHeightAtZ(0);
+      const travelY = posY - dragStartY;
+      if (travelY > worldH * DRAG_UP_THRESHOLD_FRACTION) {
+        // no effect while already extended (that's what left/right-drag are
+        // for now — see throwCard) or while viewing the back (which never
+        // extends at all)
+        if (!dropdownOpen && !flipped) openDropdown();
+      } else if (travelY < -worldH * DRAG_DOWN_THRESHOLD_FRACTION) {
+        closeDropdown();
+      }
     }
 
     // Dragging is always a temporary displacement, never a new permanent
@@ -1797,8 +1703,13 @@ export function initCard(container) {
     // Extended, both edges grab the résumé instead — throwing either way
     // reads as "here, take this" regardless of side once the résumé is
     // what's actually showing; the vCard/mailto split only makes sense
-    // for the closed, contact-card-first state.
-    if (dropdownOpen) {
+    // for the closed, contact-card-first state. Mobile drops this
+    // override entirely, by request: the résumé can still be open there
+    // (via the toggle row's tap target — drag-to-extend itself is gone,
+    // see endDrag, but tapping still works), but a left/right throw
+    // always does the plain vCard/mailto split regardless, and the PDF
+    // is only ever reachable by tapping "DOWNLOAD RÉSUMÉ (PDF)" directly.
+    if (dropdownOpen && !isTouchDevice) {
       downloadResumePdf();
       showConfirmation('downloading résumé…');
     } else if (direction === 'right') {
@@ -1904,10 +1815,6 @@ export function initCard(container) {
   const ICON_ARROW = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 7l4-4 4 4"/></svg>';
   const ICON_CURVE = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.2c-2.6 3-6.3 4.4-9.8 3.9"/><path d="M6.4 6.3L2.9 9.2l2.7 2.6"/></svg>';
   const ICON_FLIP = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.3 8.4a4.7 4.7 0 0 1 8-3.3M12.7 7.6a4.7 4.7 0 0 1-8 3.3"/><path d="M11 2.6v2.8H8.2M5 13.4v-2.8h2.8"/></svg>';
-  // A tilted phone outline, rocking between two angles — the little
-  // curved arrows either side read as "the same motion this label is
-  // asking permission for," not just a static phone glyph.
-  const ICON_TILT = '<svg width="14" height="13" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="6.7" y="1.3" width="6.6" height="12" rx="1.5" transform="rotate(-13 10 7.3)"/><path d="M2.3 4.2a7 7 0 0 0 0 6.2"/><path d="M17.7 4.2a7 7 0 0 1 0 6.2"/></svg>';
 
   function makeGuide(extraClass) {
     const el = document.createElement('div');
@@ -1936,47 +1843,17 @@ export function initCard(container) {
     guideIcon.top.innerHTML = ICON_ARROW;
     guideIcon.top.classList.toggle('is-down', dropdownOpen);
     guideText.top.textContent = dropdownOpen ? 'drag down to close' : 'drag up to view résumé';
-    guideText.left.textContent = dropdownOpen ? 'drag to save résumé' : 'drag left to send an email';
-    guideText.right.textContent = dropdownOpen ? 'drag to save résumé' : 'drag right to save contact info';
+    // Mobile keeps the left/right throw as plain email/vCard always (see
+    // throwCard) — never repurposed for résumé download the way desktop's
+    // still is — so the guide text has to stay accurate to that rather
+    // than switching to "drag to save résumé" just because dropdownOpen
+    // happens to be true (reachable there via the toggle row's tap
+    // target even with drag-to-extend itself gone).
+    const resumeDragActive = dropdownOpen && !isTouchDevice;
+    guideText.left.textContent = resumeDragActive ? 'drag to save résumé' : 'drag left to send an email';
+    guideText.right.textContent = resumeDragActive ? 'drag to save résumé' : 'drag right to save contact info';
   }
   updateGuideContent();
-
-  // Touch-only, opt-in "tap to enable tilt" affordance for the gyroscope
-  // (see handleDeviceOrientation/enableGyro above) — shown until tapped
-  // (granted, denied, or the request itself failing all hide it the same
-  // way — see enableGyro) or until this device turns out to have no
-  // DeviceOrientationEvent interface at all. Positioned once per resize
-  // (see positionTiltPrompt, called from handleResize()) rather than
-  // driven by pointermove like the hover guides above: touch has nothing
-  // resembling continuous hover to reposition it with.
-  const tiltPrompt = document.createElement('div');
-  tiltPrompt.className = 'card3d-tilt-prompt';
-  tiltPrompt.innerHTML = '<span class="card3d-guide-icon">' + ICON_TILT + '</span><span>tap to enable tilt</span>';
-  container.appendChild(tiltPrompt);
-  if (isTouchDevice && gyroSupported) {
-    tiltPrompt.addEventListener('click', enableGyro);
-  } else {
-    tiltPrompt.style.display = 'none';
-  }
-  function hideTiltPrompt() {
-    tiltPrompt.style.opacity = 0;
-    tiltPrompt.style.pointerEvents = 'none';
-  }
-  function positionTiltPrompt() {
-    if (!isTouchDevice || !gyroSupported || gyroActive) return;
-    // Same origin math as updateGuideHints() above (see its own comment
-    // for why interactionRoot's center, re-expressed in container-space,
-    // is the shared reference point every DOM overlay here positions off).
-    const hostRect = interactionRoot.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    const centerX = hostRect.width / 2;
-    const centerY = hostRect.height / 2 - cardLift * PIXELS_PER_WORLD_UNIT;
-    const originX = (hostRect.left + centerX) - containerRect.left;
-    const originY = (hostRect.top + centerY) - containerRect.top;
-    tiltPrompt.style.left = originX + 'px';
-    tiltPrompt.style.top = (originY + GUIDE_HALF_H_PX + GUIDE_MARGIN_PX) + 'px';
-    tiltPrompt.style.opacity = 1;
-  }
 
   function hideGuides() {
     guideTop.style.opacity = 0;
@@ -2009,7 +1886,10 @@ export function initCard(container) {
     const inside = Math.abs(px) <= GUIDE_HALF_W_PX * 1.08
       && py >= -GUIDE_HALF_H_PX * 1.08 && py <= bottomLimit * 1.05;
 
-    const topStrength = inside && !flipped ? THREE.MathUtils.clamp(-py / GUIDE_HALF_H_PX, 0, 1) : 0;
+    // Mobile has no drag-up-to-extend to hint at any more (see endDrag) —
+    // the toggle row's own tap target is the only way there, and that
+    // needs no hover-proximity hint the way a drag gesture does.
+    const topStrength = inside && !flipped && !isTouchDevice ? THREE.MathUtils.clamp(-py / GUIDE_HALF_H_PX, 0, 1) : 0;
     const leftStrength = inside ? THREE.MathUtils.clamp(-px / GUIDE_HALF_W_PX, 0, 1) : 0;
     const rightStrength = inside ? THREE.MathUtils.clamp(px / GUIDE_HALF_W_PX, 0, 1) : 0;
     const flipStrength = inside && !dropdownOpen
@@ -2133,7 +2013,6 @@ export function initCard(container) {
       tabHeightPx: BACK_FORM_HEIGHT * PIXELS_PER_WORLD_UNIT,
       formScale: scale
     });
-    positionTiltPrompt();
   }
   const resizeObserver = new ResizeObserver(handleResize);
   resizeObserver.observe(interactionRoot);
@@ -2244,7 +2123,20 @@ function injectStyles() {
   const style = document.createElement('style');
   style.id = 'card3d-styles';
   style.textContent = `
-    .card3d-container{position:relative}
+    /* -webkit-touch-callout specifically (not just user-select) is what
+       actually suppresses iOS's long-press "select/copy" callout on a
+       touch-and-hold — the two are separate properties, and this one has
+       no standard/unprefixed equivalent. Permanent, not toggled per-
+       gesture like touchAction/userSelect below (see pointerdown/up): it
+       only affects selection/callout UI, never touch/scroll routing, so
+       there's no equivalent to the "whole hero became a scroll dead zone"
+       bug leaving this on unconditionally caused with touch-action. This
+       used to be masked as a side effect of that same blanket touch-
+       action:none — narrowing that down to be per-touch (see
+       interactionRoot.style.touchAction's own comment) lost that side
+       effect, which is what a touch-and-hold starting text selection
+       during a drag actually was. */
+    .card3d-container{position:relative;-webkit-touch-callout:none;-webkit-user-select:none}
     .card3d-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;overflow:visible}
 
     .card3d-zone{position:fixed;top:0;bottom:0;width:36vw;max-width:520px;pointer-events:none;opacity:0;transition:opacity 0.3s ease;z-index:2}
@@ -2263,13 +2155,6 @@ function injectStyles() {
     .card3d-guide--left{transform:translate(calc(-100% - 4px),-50%)}
     .card3d-guide--right{transform:translate(calc(4px),-50%);flex-direction:row-reverse}
     .card3d-guide--right .card3d-guide-icon{transform:scaleX(-1)}
-
-    /* same font/size/color/icon layout as the hover guides above, but
-       always-on (opacity written directly in positionTiltPrompt/
-       hideTiltPrompt, not proximity-faded like theirs — touch has no
-       hover to fade in from) and actually clickable, since tapping it is
-       the whole point. */
-    .card3d-tilt-prompt{position:absolute;display:flex;align-items:center;gap:6px;transform:translate(-50%,0);font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.32);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:auto;cursor:pointer;transition:opacity 0.25s ease;z-index:4}
   `;
   document.head.appendChild(style);
 }
