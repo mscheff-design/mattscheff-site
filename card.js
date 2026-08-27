@@ -868,7 +868,7 @@ export function initCard(container) {
       ctx.fill();
       ctx.restore();
 
-      const headerLabel = 'CONTACT →';
+      const headerLabel = 'SAVE CONTACT →';
       const labelWidth = trackedTextWidth(ctx, headerLabel, headerSize, 3);
       const labelX = barLeft + (barWidth - labelWidth) / 2;
       // Baseline, not top: the bar's own vertical center plus ~0.35× the
