@@ -28,7 +28,8 @@ export const JOBS = [
     name: 'STATMASK',
     dates: '2020 – 2022',
     tags: ['PRODUCT PHOTOGRAPHY', 'PAID SOCIAL', 'E-COMMERCE'],
-    description: 'A closer look at the product photography, paid social, and e-commerce work done here from 2020 to 2022 — full case study coming soon.'
+    description: 'A closer look at the product photography, paid social, and e-commerce work done here from 2020 to 2022.',
+    caseStudyUrl: '/case-studies/statmask/'
   },
   {
     id: 'contributor-development-partnership',
