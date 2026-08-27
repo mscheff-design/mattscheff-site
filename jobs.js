@@ -36,6 +36,7 @@ export const JOBS = [
     name: 'Contributor Development Partnership',
     dates: '2023',
     tags: ['TRAINING', 'CRM', 'DOCUMENTATION'],
-    description: 'A closer look at the training, CRM, and documentation work done here in 2023 — full case study coming soon.'
+    description: 'A closer look at the training, CRM, and documentation work done here in 2023.',
+    caseStudyUrl: '/case-studies/contributor-development-partnership/'
   }
 ];

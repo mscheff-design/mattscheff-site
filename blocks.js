@@ -74,6 +74,14 @@ export function textMediaBlock(props) {
   return wrap;
 }
 
+export function textBlock(props) {
+  const wrap = el('div', 'cs-block cs-text');
+  if (props.heading) wrap.appendChild(el('h2', 'cs-text-heading', props.heading));
+  const paragraphs = Array.isArray(props.body) ? props.body : [props.body];
+  paragraphs.filter(Boolean).forEach((p) => wrap.appendChild(el('p', 'cs-text-body', p)));
+  return wrap;
+}
+
 export function fullBleedMediaBlock(props) {
   const wrap = el('div', 'cs-block cs-full-bleed' + (props.theme === 'dark' ? ' cs-full-bleed--dark' : ''));
   const inner = el('div', 'cs-full-bleed-inner');
@@ -130,6 +138,7 @@ export function nextProjectBlock(props) {
 
 const BLOCK_FACTORIES = {
   hero: heroBlock,
+  text: textBlock,
   textMedia: textMediaBlock,
   fullBleedMedia: fullBleedMediaBlock,
   statRow: statRowBlock,
@@ -174,6 +183,11 @@ function injectStyles() {
     .cs-hero-summary{font-family:'EB Garamond',serif;font-size:19px;line-height:1.6;color:rgba(28,20,10,0.75);max-width:52ch}
     .cs-hero-media{margin-top:48px;width:100vw;margin-left:calc(50% - 50vw)}
     .cs-hero-media .cs-media-el{width:100%;display:block;object-fit:cover}
+
+    /* plain text (no media slot — for text-forward case studies) */
+    .cs-text-heading{font-family:'EB Garamond',serif;font-weight:400;font-size:clamp(24px,3vw,32px);color:#1c140a;margin-bottom:16px}
+    .cs-text-body{font-family:'EB Garamond',serif;font-size:17px;line-height:1.65;color:rgba(28,20,10,0.75);max-width:62ch;margin-bottom:20px}
+    .cs-text-body:last-child{margin-bottom:0}
 
     /* text + media split */
     .cs-text-media{display:flex;gap:64px;align-items:center}
