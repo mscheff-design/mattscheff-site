@@ -611,8 +611,26 @@ function injectStyles() {
        form flashing at the corner of the hero region on load. update()
        always overrides this with an explicit visibility on every frame
        it runs (see both branches below), so this default only ever
-       matters for that one pre-first-frame window. */
-    .contact3d-panel{position:absolute;top:0;left:0;visibility:hidden;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;will-change:transform}
+       matters for that one pre-first-frame window.
+       transform:translate(-50%,-50%) here isn't just that same one-frame
+       guard, though — update() only ever sets panel.style.transform at
+       all once backActive() is true (see its own early-return), so this
+       default is actually live the *entire* time the card rests on its
+       front, not just before the first frame. Without it, panel.style.left/
+       top (set unconditionally, before that gate) place the panel's
+       top-left corner — not its center — at the stage's own center point,
+       so its full width extends further right and its full height further
+       down from there instead of straddling it evenly. Invisible
+       (visibility:hidden) doesn't mean harmless: a hidden box still
+       occupies layout space, so on a narrow viewport that off-center
+       placement was enough to push past the right edge and force a real
+       horizontal scrollbar on the whole page — reproduced on a phone-width
+       viewport, not on a wider desktop one where the same offset still
+       lands within bounds. Matching the exact prefix update()'s own
+       matrix3d transform string already uses means this is never a
+       competing value, just what's visibly already true the instant that
+       real transform lands. */
+    .contact3d-panel{position:absolute;top:0;left:0;visibility:hidden;transform:translate(-50%,-50%);transform-style:preserve-3d;-webkit-transform-style:preserve-3d;will-change:transform}
 
     /* the actual clip: fixed to the form's real reserved region, overflow
        hidden, no 3D styling of its own (see the comment where this is
