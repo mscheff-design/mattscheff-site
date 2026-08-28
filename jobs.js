@@ -12,7 +12,6 @@ export const JOBS = [
     name: 'Urban Architecture Inc.',
     dates: '2022 – Present',
     tags: ['DIGITAL STRATEGY', 'E-COMMERCE', 'CONTENT'],
-    description: `Urban Architecture Inc. has been dealing collectible Memphis and postmodern design since 1981, on the strength of one man’s relationships. I built everything digital around him: brand strategy, a custom Shopify design system, a data pipeline, an editorial program, and a private dispatch — all engineered so the principal never has to perform.`,
     caseStudyUrl: '/case-studies/urban-architecture/'
   },
   {
@@ -20,7 +19,6 @@ export const JOBS = [
     name: 'Bernard Figueroa Studio',
     dates: '2025 – Present',
     tags: ['PHOTOGRAPHY', 'SOCIAL', 'EMAIL'],
-    description: 'A closer look at the photography, social, and email work built here since 2025.',
     caseStudyUrl: '/case-studies/bernard-figueroa-studio/'
   },
   {
@@ -28,7 +26,6 @@ export const JOBS = [
     name: 'STATMASK',
     dates: '2020 – 2022',
     tags: ['PRODUCT PHOTOGRAPHY', 'PAID SOCIAL', 'E-COMMERCE'],
-    description: 'A closer look at the product photography, paid social, and e-commerce work done here from 2020 to 2022.',
     caseStudyUrl: '/case-studies/statmask/'
   },
   {
@@ -36,7 +33,6 @@ export const JOBS = [
     name: 'Contributor Development Partnership',
     dates: '2023',
     tags: ['TRAINING', 'CRM', 'DOCUMENTATION'],
-    description: 'A closer look at the training, CRM, and documentation work done here in 2023.',
     caseStudyUrl: '/case-studies/contributor-development-partnership/'
   }
 ];
