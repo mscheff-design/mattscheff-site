@@ -20,6 +20,25 @@ nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-cont
 .nav-links a{font-family:'DM Mono',monospace;font-size:10px;color:rgba(28,20,10,0.4);letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:color 0.2s}
 .nav-links a:hover{color:rgba(28,20,10,0.85)}
 
+/* NTS radio widget (radio.js) — its mount point lives in the nav on every
+   page; CSS is hand-kept-in-sync with chrome.js's copy, same as the rest
+   of the nav (no templating/build step to share it directly). */
+.nav-radio{display:flex;align-items:center;gap:10px}
+.radio-toggle{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;width:14px;color:rgba(28,20,10,0.45);transition:color 0.2s}
+.radio-toggle:hover{color:rgba(28,20,10,0.85)}
+.radio-toggle svg{fill:currentColor}
+.radio-toggle .icon-pause{display:none}
+.nav-radio.is-playing .icon-play{display:none}
+.nav-radio.is-playing .icon-pause{display:block}
+.nav-radio.is-playing .radio-toggle{color:#F4811F}
+.radio-station{all:unset;cursor:pointer;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(28,20,10,0.4);transition:color 0.2s;white-space:nowrap}
+.radio-station:hover{color:rgba(28,20,10,0.85)}
+.radio-now{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.04em;color:rgba(28,20,10,0.3);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.radio-volume{-webkit-appearance:none;appearance:none;width:44px;height:2px;background:rgba(28,20,10,0.15);border-radius:2px;cursor:pointer}
+.radio-volume::-webkit-slider-thumb{-webkit-appearance:none;width:7px;height:7px;border-radius:50%;background:rgba(28,20,10,0.5);cursor:pointer}
+.radio-volume::-moz-range-thumb{width:7px;height:7px;border:none;border-radius:50%;background:rgba(28,20,10,0.5);cursor:pointer}
+@media (max-width:640px){.radio-now,.radio-volume{display:none}}
+
 .hero{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 80px}
 
 /* the 3D business card lives entirely in card.js — see initCard(). This is
@@ -190,6 +209,7 @@ footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-t
 
 <nav>
   <span class="nav-name">MS</span>
+  <div class="nav-radio" id="navRadio"></div>
   <div class="nav-links">
     <a href="#work">Work</a>
     <a href="#photography">Photography</a>
@@ -263,11 +283,14 @@ window.cancelAnimationFrame = (id) => clearTimeout(id);
 import { Loupe } from './loupe.js';
 import { initCard } from './card.js';
 import { JOBS } from './jobs.js';
+import { initRadioWidget } from './radio.js';
+
+initRadioWidget(document.getElementById('navRadio'));
 
 initCard(document.getElementById('card3d'));
 document.getElementById('card3d').addEventListener('resume-job-click', (e) => {
   const job = JOBS.find(j => j.id === e.detail.jobId);
-  if (job && job.caseStudyUrl) window.location.href = job.caseStudyUrl;
+  if (job && job.caseStudyUrl) window.open(job.caseStudyUrl, '_blank', 'noopener');
 });
 
 /* ---------- project config ----------
@@ -534,7 +557,13 @@ JOBS.forEach((job, i) => {
   // caseStudyUrl yet renders as an inert, non-interactive row instead.
   const row = document.createElement(job.caseStudyUrl ? 'a' : 'div');
   row.className = 'project-row' + (job.caseStudyUrl ? '' : ' is-inert');
-  if (job.caseStudyUrl) row.href = job.caseStudyUrl;
+  if (job.caseStudyUrl) {
+    row.href = job.caseStudyUrl;
+    // Opens in a new tab so the radio widget playing in this tab is never
+    // interrupted by browsing into a case study — see radio.js.
+    row.target = '_blank';
+    row.rel = 'noopener';
+  }
   row.innerHTML = `
     <span class="row-num">${String(i + 1).padStart(2, '0')}</span>
     <div class="row-body">
