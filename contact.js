@@ -702,7 +702,6 @@ function injectStyles() {
 
     .cf-submit{all:unset;display:inline-block;margin-top:0;font-family:'DM Mono',monospace;font-size:calc(8.5px * var(--fs, 1));letter-spacing:0.1em;text-transform:uppercase;color:#1c140a;cursor:pointer;border-bottom:0.5px solid rgba(28,20,10,0.4);padding-bottom:calc(1px * var(--fs, 1));transition:opacity 0.2s ease}
     .cf-submit:hover{border-color:#1c140a}
-    .cf-submit:focus-visible{outline:1.5px solid #F4811F;outline-offset:2px;border-radius:2px}
     .cf-submit:disabled{cursor:default;opacity:0.5}
 
     .cf-status{margin-top:calc(5px * var(--fs, 1));font-family:'DM Mono',monospace;font-size:calc(7.5px * var(--fs, 1));letter-spacing:0.03em;line-height:1.4;color:rgba(28,20,10,0.55)}

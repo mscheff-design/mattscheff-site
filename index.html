@@ -4,18 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Matthew Scheffler</title>
-<meta name="description" content="Digital Strategy · E-Commerce · Content & Visual Direction. Selected work and photography by Matthew Scheffler.">
-<link rel="canonical" href="https://mattscheff-site.matthew-scheffler14.workers.dev/">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Matthew Scheffler">
-<meta property="og:description" content="Digital Strategy · E-Commerce · Content & Visual Direction. Selected work and photography by Matthew Scheffler.">
-<meta property="og:url" content="https://mattscheff-site.matthew-scheffler14.workers.dev/">
-<meta property="og:image" content="https://mattscheff-site.matthew-scheffler14.workers.dev/assets/og-image.jpg">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Matthew Scheffler">
-<meta name="twitter:description" content="Digital Strategy · E-Commerce · Content & Visual Direction. Selected work and photography by Matthew Scheffler.">
-<meta name="twitter:image" content="https://mattscheff-site.matthew-scheffler14.workers.dev/assets/og-image.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@300;400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
@@ -31,27 +19,6 @@ nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-cont
 .nav-links{display:flex;gap:32px}
 .nav-links a{font-family:'DM Mono',monospace;font-size:10px;color:rgba(28,20,10,0.4);letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:color 0.2s}
 .nav-links a:hover{color:rgba(28,20,10,0.85)}
-
-/* NTS radio widget (radio.js) — its mount point lives in the nav on every
-   page; CSS is hand-kept-in-sync with chrome.js's copy, same as the rest
-   of the nav (no templating/build step to share it directly). */
-.nav-radio{display:flex;align-items:center;gap:10px}
-.radio-toggle{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;width:14px;color:rgba(28,20,10,0.45);transition:color 0.2s}
-.radio-toggle:hover{color:rgba(28,20,10,0.85)}
-.radio-toggle:focus-visible{outline:1.5px solid #F4811F;outline-offset:2px;border-radius:2px}
-.radio-toggle svg{fill:currentColor}
-.radio-toggle .icon-pause{display:none}
-.nav-radio.is-playing .icon-play{display:none}
-.nav-radio.is-playing .icon-pause{display:block}
-.nav-radio.is-playing .radio-toggle{color:#F4811F}
-.radio-station{all:unset;cursor:pointer;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(28,20,10,0.4);transition:color 0.2s;white-space:nowrap}
-.radio-station:hover{color:rgba(28,20,10,0.85)}
-.radio-station:focus-visible{outline:1.5px solid #F4811F;outline-offset:2px;border-radius:2px}
-.radio-now{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.04em;color:rgba(28,20,10,0.3);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.radio-volume{-webkit-appearance:none;appearance:none;width:44px;height:2px;background:rgba(28,20,10,0.15);border-radius:2px;cursor:pointer}
-.radio-volume::-webkit-slider-thumb{-webkit-appearance:none;width:7px;height:7px;border-radius:50%;background:rgba(28,20,10,0.5);cursor:pointer}
-.radio-volume::-moz-range-thumb{width:7px;height:7px;border:none;border-radius:50%;background:rgba(28,20,10,0.5);cursor:pointer}
-@media (max-width:640px){.radio-now,.radio-volume{display:none}}
 
 .hero{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 80px}
 
@@ -170,7 +137,6 @@ footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-t
 
 .sheet-close{all:unset;position:absolute;top:28px;right:40px;font-family:'DM Mono',monospace;font-size:20px;color:rgba(210,200,180,0.4);cursor:pointer;transition:color 0.2s;z-index:4}
 .sheet-close:hover{color:rgba(210,200,180,0.9)}
-.sheet-close:focus-visible{outline:1.5px solid #F4811F;outline-offset:3px;border-radius:2px}
 
 .lv3-grain{position:absolute;inset:-20%;pointer-events:none;z-index:1;opacity:0.05;background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:180px 180px;animation:lv3GrainShift 1s steps(4) infinite}
 @keyframes lv3GrainShift{0%{transform:translate(0,0)}25%{transform:translate(-2%,2%)}50%{transform:translate(2%,-1%)}75%{transform:translate(-1%,-2%)}100%{transform:translate(0,0)}}
@@ -195,7 +161,6 @@ footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-t
 .lv3-loupe-toggle{all:unset;position:absolute;right:30px;bottom:26px;z-index:4;width:30px;height:30px;border-radius:50%;cursor:pointer;background:transparent;border:1px solid rgba(210,200,180,0.4);transition:border-color 0.25s ease,transform 0.2s ease,box-shadow 0.25s ease}
 .lv3-loupe-toggle:hover{border-color:rgba(210,200,180,0.75);transform:scale(1.08)}
 .lv3-loupe-toggle.is-active{border-color:#F4811F;box-shadow:0 0 7px rgba(244,129,31,0.5)}
-.lv3-loupe-toggle:focus-visible{border-color:#F4811F;box-shadow:0 0 7px rgba(244,129,31,0.5)}
 </style>
 </head>
 <body>
@@ -225,7 +190,6 @@ footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-t
 
 <nav>
   <span class="nav-name">MS</span>
-  <div class="nav-radio" id="navRadio"></div>
   <div class="nav-links">
     <a href="#work">Work</a>
     <a href="#photography">Photography</a>
@@ -290,18 +254,20 @@ footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-t
   <div class="sheet-panel" id="sheetPanel"></div>
 </div>
 
+<script>
+/* TEMP TEST PATCH — remove before shipping */
+window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
+window.cancelAnimationFrame = (id) => clearTimeout(id);
+</script>
 <script type="module">
 import { Loupe } from './loupe.js';
 import { initCard } from './card.js';
 import { JOBS } from './jobs.js';
-import { initRadioWidget } from './radio.js';
-
-initRadioWidget(document.getElementById('navRadio'));
 
 initCard(document.getElementById('card3d'));
 document.getElementById('card3d').addEventListener('resume-job-click', (e) => {
   const job = JOBS.find(j => j.id === e.detail.jobId);
-  if (job && job.caseStudyUrl) window.open(job.caseStudyUrl, '_blank', 'noopener');
+  if (job && job.caseStudyUrl) window.location.href = job.caseStudyUrl;
 });
 
 /* ---------- project config ----------
@@ -568,13 +534,7 @@ JOBS.forEach((job, i) => {
   // caseStudyUrl yet renders as an inert, non-interactive row instead.
   const row = document.createElement(job.caseStudyUrl ? 'a' : 'div');
   row.className = 'project-row' + (job.caseStudyUrl ? '' : ' is-inert');
-  if (job.caseStudyUrl) {
-    row.href = job.caseStudyUrl;
-    // Opens in a new tab so the radio widget playing in this tab is never
-    // interrupted by browsing into a case study — see radio.js.
-    row.target = '_blank';
-    row.rel = 'noopener';
-  }
+  if (job.caseStudyUrl) row.href = job.caseStudyUrl;
   row.innerHTML = `
     <span class="row-num">${String(i + 1).padStart(2, '0')}</span>
     <div class="row-body">

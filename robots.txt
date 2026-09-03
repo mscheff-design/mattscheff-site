@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://mattscheff-site.matthew-scheffler14.workers.dev/sitemap.xml
