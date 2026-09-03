@@ -13,7 +13,7 @@ import { revealOnScroll } from './reveal.js';
 import { JOBS } from './jobs.js';
 
 const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-const LINK_COLOR = '#F4811F';
+const LINK_COLOR = 'var(--accent)';
 
 function el(tag, className, html) {
   const node = document.createElement(tag);
@@ -184,16 +184,16 @@ function injectStyles() {
 
     /* hero */
     .cs-hero{padding-top:140px}
-    .cs-eyebrow{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(28,20,10,0.4);margin-bottom:18px}
-    .cs-hero-title{font-family:'EB Garamond',serif;font-weight:400;font-size:clamp(40px,5.5vw,64px);color:#1c140a;margin-bottom:10px;line-height:1.08}
-    .cs-hero-dates{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.08em;color:rgba(28,20,10,0.35);margin-bottom:28px}
-    .cs-hero-summary{font-family:'EB Garamond',serif;font-size:19px;line-height:1.6;color:rgba(28,20,10,0.75);max-width:52ch}
+    .cs-eyebrow{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4);margin-bottom:18px}
+    .cs-hero-title{font-family:'EB Garamond',serif;font-weight:400;font-size:clamp(40px,5.5vw,64px);color:var(--ink);margin-bottom:10px;line-height:1.08}
+    .cs-hero-dates{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.35);margin-bottom:28px}
+    .cs-hero-summary{font-family:'EB Garamond',serif;font-size:19px;line-height:1.6;color:rgba(var(--ink-rgb),0.75);max-width:52ch}
     .cs-hero-media{margin-top:48px;width:100vw;margin-left:calc(50% - 50vw)}
     .cs-hero-media .cs-media-el{width:100%;display:block;object-fit:cover}
 
     /* plain text (no media slot — for text-forward case studies) */
-    .cs-text-heading{font-family:'EB Garamond',serif;font-weight:400;font-size:clamp(24px,3vw,32px);color:#1c140a;margin-bottom:16px}
-    .cs-text-body{font-family:'EB Garamond',serif;font-size:17px;line-height:1.65;color:rgba(28,20,10,0.75);max-width:62ch;margin-bottom:20px}
+    .cs-text-heading{font-family:'EB Garamond',serif;font-weight:400;font-size:clamp(24px,3vw,32px);color:var(--ink);margin-bottom:16px}
+    .cs-text-body{font-family:'EB Garamond',serif;font-size:17px;line-height:1.65;color:rgba(var(--ink-rgb),0.75);max-width:62ch;margin-bottom:20px}
     .cs-text-body:last-child{margin-bottom:0}
 
     /* text + media split */
@@ -201,30 +201,30 @@ function injectStyles() {
     .cs-text-media--right{flex-direction:row}
     .cs-text-media--left{flex-direction:row-reverse}
     .cs-text-media-text,.cs-text-media-media{flex:1 1 0;min-width:0}
-    .cs-text-media-heading{font-family:'EB Garamond',serif;font-weight:400;font-size:clamp(24px,3vw,32px);color:#1c140a;margin-bottom:16px}
-    .cs-text-media-body{font-family:'EB Garamond',serif;font-size:17px;line-height:1.65;color:rgba(28,20,10,0.75)}
+    .cs-text-media-heading{font-family:'EB Garamond',serif;font-weight:400;font-size:clamp(24px,3vw,32px);color:var(--ink);margin-bottom:16px}
+    .cs-text-media-body{font-family:'EB Garamond',serif;font-size:17px;line-height:1.65;color:rgba(var(--ink-rgb),0.75)}
     .cs-text-media-media .cs-media-el{width:100%;display:block;border-radius:2px}
 
     /* full-bleed media */
     .cs-full-bleed{padding:64px 0;max-width:none}
     .cs-full-bleed-inner{width:100vw;margin-left:calc(50% - 50vw)}
     .cs-full-bleed .cs-media-el{width:100%;display:block;object-fit:cover}
-    .cs-full-bleed--dark{background:#141008;padding:80px 0}
+    .cs-full-bleed--dark{background:var(--bg-dark);padding:80px 0}
     .cs-full-bleed--dark .cs-full-bleed-inner{max-width:min(1200px,92vw);margin:0 auto}
-    .cs-full-bleed-caption{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;color:rgba(28,20,10,0.4);margin-top:16px;text-align:center}
-    .cs-full-bleed--dark .cs-full-bleed-caption{color:rgba(210,200,180,0.4)}
+    .cs-full-bleed-caption{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.4);margin-top:16px;text-align:center}
+    .cs-full-bleed--dark .cs-full-bleed-caption{color:rgba(var(--ink-light-rgb),0.4)}
 
     /* stat row */
     .cs-stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0}
-    .cs-stat{padding:0 24px;border-left:0.5px solid rgba(28,20,10,0.12)}
+    .cs-stat{padding:0 24px;border-left:0.5px solid rgba(var(--ink-rgb),0.12)}
     .cs-stat:first-child{border-left:none;padding-left:0}
-    .cs-stat-value{font-family:'EB Garamond',serif;font-size:40px;color:#1c140a;line-height:1}
-    .cs-stat-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(28,20,10,0.4);margin-top:10px}
+    .cs-stat-value{font-family:'EB Garamond',serif;font-size:40px;color:var(--ink);line-height:1}
+    .cs-stat-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4);margin-top:10px}
 
     /* quote */
     .cs-quote{border-left:2px solid ${LINK_COLOR};padding-left:32px}
-    .cs-quote-text{font-family:'EB Garamond',serif;font-style:italic;font-size:clamp(24px,3vw,34px);line-height:1.4;color:#1c140a}
-    .cs-quote-attribution{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;color:rgba(28,20,10,0.4);margin-top:16px}
+    .cs-quote-text{font-family:'EB Garamond',serif;font-style:italic;font-size:clamp(24px,3vw,34px);line-height:1.4;color:var(--ink)}
+    .cs-quote-attribution{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.4);margin-top:16px}
 
     /* gallery */
     .cs-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
@@ -235,8 +235,8 @@ function injectStyles() {
     ` : ''}
 
     /* next project */
-    .cs-next-project{text-align:center;border-top:0.5px solid rgba(28,20,10,0.12);padding-top:56px;padding-bottom:96px}
-    .cs-next-project-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(28,20,10,0.35);margin-bottom:12px}
+    .cs-next-project{text-align:center;border-top:0.5px solid rgba(var(--ink-rgb),0.12);padding-top:56px;padding-bottom:96px}
+    .cs-next-project-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.35);margin-bottom:12px}
     .cs-next-project-link{font-family:'DM Mono',monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:${LINK_COLOR};text-decoration:none;transition:opacity 0.2s ease}
     .cs-next-project-link:hover{opacity:0.65}
 
