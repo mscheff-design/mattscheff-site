@@ -136,6 +136,13 @@ export function nextProjectBlock(props) {
   return wrap;
 }
 
+// Every block used the identical fade-up-16px reveal before this — full-bleed
+// images (already the most dramatic/full-width moment on the page) get a
+// slower scale-in instead, and quotes get a slower plain fade with no
+// vertical motion, since a pull-quote reads better materializing quietly
+// than sliding in like a data row. Everything else keeps the default.
+const REVEAL_VARIANTS = { fullBleedMedia: 'scale', quote: 'soft' };
+
 const BLOCK_FACTORIES = {
   hero: heroBlock,
   text: textBlock,
@@ -162,7 +169,7 @@ export function renderCaseStudyPage(job, config, mountEl) {
     const mergedProps = type === 'hero' ? { ...defaultsFromJob(job), ...props } : props;
     const node = factory(mergedProps || {});
     mountEl.appendChild(node);
-    revealOnScroll(node);
+    revealOnScroll(node, { variant: REVEAL_VARIANTS[type] });
   });
 }
 
