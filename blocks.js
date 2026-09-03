@@ -237,8 +237,8 @@ function injectStyles() {
     /* next project */
     .cs-next-project{text-align:center;border-top:0.5px solid rgba(28,20,10,0.12);padding-top:56px;padding-bottom:96px}
     .cs-next-project-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(28,20,10,0.35);margin-bottom:12px}
-    .cs-next-project-link{font-family:'EB Garamond',serif;font-size:28px;color:${LINK_COLOR};text-shadow:0 0 4px rgba(244,129,31,0.5);text-decoration:none;transition:text-shadow 0.2s ease}
-    .cs-next-project-link:hover{text-shadow:0 0 7px rgba(244,129,31,0.65)}
+    .cs-next-project-link{font-family:'DM Mono',monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:${LINK_COLOR};text-decoration:none;transition:opacity 0.2s ease}
+    .cs-next-project-link:hover{opacity:0.65}
 
     ${isTouchDevice ? `
     .cs-text-media{flex-direction:column !important;gap:24px}
