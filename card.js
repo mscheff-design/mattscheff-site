@@ -1,7 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { initContactForm } from './contact.js';
 import { JOBS } from './jobs.js';
-import { getPalette, onThemeChange } from './theme.js';
 
 /**
  * initCard(container) builds and runs the entire 3D business-card hero.
@@ -108,30 +107,15 @@ const BASE_CARD_HEIGHT = isTouchDevice ? 3.4 : 2.14;
 const CARD_THICKNESS = 0.026;
 const CARD_RADIUS = 0.12;
 const CARD_PAD_FRACTION = 0.09;
-// Canvas fillStyle/strokeStyle calls can't reach CSS custom properties, so
-// the card's palette is mirrored here from theme.js and kept live via
-// onThemeChange() below (registered once initCard() runs) — everything in
-// this file reads these `let` bindings (or the ink()/accent() helpers, for
-// the many opacity variants) rather than literal color strings, so a theme
-// switch just means reassigning these and redrawing.
-let PALETTE = getPalette();
 // single source of truth for the stock color — used for the card's own
 // front/back faces AND both dropdown tabs, so nothing can drift apart.
-let CARD_STOCK_COLOR = PALETTE.cardStock;
-let INK_COLOR = PALETTE.ink;
+const CARD_STOCK_COLOR = '#f7f0e1';
 // Mobile-only accent for the back face's tappable text (the header's
 // save-contact arrow, the email line) — the exact color the
 // "contact saved" confirmation toast already uses (.card3d-confirm's own
 // CSS, below), so the thread from "this is tappable" to "this is what
 // just happened" reads as the same color rather than two unrelated ones.
-let LINK_COLOR = PALETTE.accent;
-
-function ink(alpha) {
-  return `rgba(${PALETTE.inkRgb},${alpha})`;
-}
-function accent(alpha) {
-  return `rgba(${PALETTE.accentRgb},${alpha})`;
-}
+const LINK_COLOR = '#F4811F';
 
 function roundedRectShape(w, h, r) {
   const shape = new THREE.Shape();
@@ -619,7 +603,7 @@ export function initCard(container) {
   function drawToggleRow(ctx, w, bh, pad, label) {
     ctx.save();
     ctx.setLineDash([bh * 0.012, bh * 0.012]);
-    ctx.strokeStyle = ink(0.25);
+    ctx.strokeStyle = 'rgba(28,20,10,0.25)';
     ctx.lineWidth = Math.max(1, bh * 0.003);
     ctx.beginPath();
     ctx.moveTo(pad, bh * TOGGLE_BAND_TOP_F);
@@ -627,10 +611,10 @@ export function initCard(container) {
     ctx.stroke();
     ctx.restore();
 
-    drawTracked(ctx, label, pad, bh * TOGGLE_LABEL_F, Math.round(bh * 0.034), ink(0.55), 1.3);
+    drawTracked(ctx, label, pad, bh * TOGGLE_LABEL_F, Math.round(bh * 0.034), 'rgba(28,20,10,0.55)', 1.3);
     ctx.save();
     ctx.font = `400 ${Math.round(bh * 0.04)}px "DM Mono", monospace`;
-    ctx.fillStyle = ink(0.55);
+    ctx.fillStyle = 'rgba(28,20,10,0.55)';
     ctx.textAlign = 'center';
     ctx.translate(w - pad - bh * 0.02, bh * (TOGGLE_LABEL_F - 0.01));
     ctx.rotate(dropdownOpen ? Math.PI : 0);
@@ -678,15 +662,15 @@ export function initCard(container) {
     // same vignette formula as drawFront() — fillRect is clip-bounded to the
     // small box above regardless of the gradient's own (canvas-spanning) extent
     const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
-    vg.addColorStop(0, ink(0));
-    vg.addColorStop(1, ink(0.06));
+    vg.addColorStop(0, 'rgba(28,20,10,0)');
+    vg.addColorStop(1, 'rgba(28,20,10,0.06)');
     ctx.fillStyle = vg;
     ctx.fillRect(cx - half, cy - half, half * 2, half * 2);
 
     applyGrain(ctx, w, h, 0.055); // also clip-bounded to the small box
 
     ctx.font = `400 ${Math.round(bh * 0.04)}px "DM Mono", monospace`;
-    ctx.fillStyle = ink(0.55);
+    ctx.fillStyle = 'rgba(28,20,10,0.55)';
     ctx.textAlign = 'center';
     ctx.translate(cx, cy);
     ctx.rotate(dropdownOpen ? Math.PI : 0);
@@ -719,8 +703,8 @@ export function initCard(container) {
     // last color stop holds constant beyond its own radius, so painting
     // the whole canvas lets it fade smoothly into that constant tone.
     const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
-    vg.addColorStop(0, ink(0));
-    vg.addColorStop(1, ink(0.06));
+    vg.addColorStop(0, 'rgba(28,20,10,0)');
+    vg.addColorStop(1, 'rgba(28,20,10,0.06)');
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, w, h);
 
@@ -735,10 +719,10 @@ export function initCard(container) {
       ctx, [CONTACT.first, CONTACT.last], nameMaxWidthPx, Math.round(bh * 0.155),
       (px) => `700 ${px}px "Space Grotesk", sans-serif`
     );
-    ctx.fillStyle = INK_COLOR;
+    ctx.fillStyle = '#1c140a';
     ctx.font = `700 ${namePx}px "Space Grotesk", sans-serif`;
     ctx.fillText(CONTACT.first, pad, bh * NAME_FIRST_Y_F);
-    ctx.fillStyle = ink(0.55);
+    ctx.fillStyle = 'rgba(28,20,10,0.55)';
     ctx.font = `italic 700 ${namePx}px "Space Grotesk", sans-serif`;
     ctx.fillText(CONTACT.last, pad, bh * NAME_LAST_Y_F);
 
@@ -747,9 +731,9 @@ export function initCard(container) {
       ctx, ['DIGITAL STRATEGY · E-COMMERCE', 'CONTENT & VISUAL DIRECTION'],
       titleMaxWidthPx, Math.round(bh * 0.04), 1.4
     );
-    drawTracked(ctx, 'DIGITAL STRATEGY · E-COMMERCE', pad, bh * TITLE_LINE1_Y_F, titlePx, ink(0.5), 1.4);
-    drawTracked(ctx, 'CONTENT & VISUAL DIRECTION', pad, bh * TITLE_LINE2_Y_F, titlePx, ink(0.5), 1.4);
-    drawTracked(ctx, '2026', pad, bh * YEAR_Y_F, Math.round(bh * 0.036), ink(0.32), 1.4);
+    drawTracked(ctx, 'DIGITAL STRATEGY · E-COMMERCE', pad, bh * TITLE_LINE1_Y_F, titlePx, 'rgba(28,20,10,0.5)', 1.4);
+    drawTracked(ctx, 'CONTENT & VISUAL DIRECTION', pad, bh * TITLE_LINE2_Y_F, titlePx, 'rgba(28,20,10,0.5)', 1.4);
+    drawTracked(ctx, '2026', pad, bh * YEAR_Y_F, Math.round(bh * 0.036), 'rgba(28,20,10,0.32)', 1.4);
 
     drawToggleRow(ctx, w, bh, pad, 'RÉSUMÉ');
 
@@ -766,23 +750,23 @@ export function initCard(container) {
         ctx, [job.name], nameMaxWidthPx, Math.round(bh * 0.052),
         (px) => `500 ${px}px "Space Grotesk", sans-serif`
       );
-      ctx.fillStyle = ink(0.88);
+      ctx.fillStyle = 'rgba(28,20,10,0.88)';
       ctx.textAlign = 'left';
       ctx.fillText(job.name, pad, bh * (rowTopF + 0.075));
 
       ctx.save();
       ctx.font = `400 ${Math.round(bh * 0.027)}px "DM Mono", monospace`;
-      ctx.fillStyle = ink(0.35);
+      ctx.fillStyle = 'rgba(28,20,10,0.35)';
       ctx.textAlign = 'right';
       ctx.fillText(job.dates, w - pad, bh * (rowTopF + 0.07));
       ctx.restore();
 
       const tagsText = job.tags.join(' · ');
       const tagsPx = fitTrackedSize(ctx, [tagsText], w - pad * 2, Math.round(bh * 0.023), 1.1);
-      drawTracked(ctx, tagsText, pad, bh * (rowTopF + 0.11), tagsPx, ink(0.35), 1.1);
+      drawTracked(ctx, tagsText, pad, bh * (rowTopF + 0.11), tagsPx, 'rgba(28,20,10,0.35)', 1.1);
 
       ctx.save();
-      ctx.strokeStyle = ink(0.1);
+      ctx.strokeStyle = 'rgba(28,20,10,0.1)';
       ctx.lineWidth = Math.max(1, bh * 0.0015);
       ctx.beginPath();
       ctx.moveTo(pad, bh * (rowTopF + ROW_HEIGHT_F - 0.02));
@@ -803,8 +787,8 @@ export function initCard(container) {
     // lower-risk fix; a real reflow is exactly the kind of thing worth
     // doing once this is visible and can be tuned by eye.
     const tagCloudPx = fitTrackedSize(ctx, [line1, line2], w - pad * 2, Math.round(bh * 0.021), 1);
-    drawTracked(ctx, line1, pad, bh * TAGCLOUD_TOP_F, tagCloudPx, ink(0.3), 1);
-    drawTracked(ctx, line2, pad, bh * TAGCLOUD_BOTTOM_F, tagCloudPx, ink(0.3), 1);
+    drawTracked(ctx, line1, pad, bh * TAGCLOUD_TOP_F, tagCloudPx, 'rgba(28,20,10,0.3)', 1);
+    drawTracked(ctx, line2, pad, bh * TAGCLOUD_BOTTOM_F, tagCloudPx, 'rgba(28,20,10,0.3)', 1);
 
     const downloadText = 'DOWNLOAD RÉSUMÉ (PDF) →';
     const downloadSize = fitTextSize(
@@ -812,12 +796,12 @@ export function initCard(container) {
       (px) => `400 ${px}px "DM Mono", monospace`
     );
     ctx.font = `400 ${downloadSize}px "DM Mono", monospace`;
-    ctx.fillStyle = INK_COLOR;
+    ctx.fillStyle = '#1c140a';
     ctx.textAlign = 'left';
     ctx.fillText(downloadText, pad, bh * DOWNLOAD_LABEL_F);
     const underlineY = bh * DOWNLOAD_LABEL_F + downloadSize * 0.22;
     ctx.save();
-    ctx.strokeStyle = ink(0.3);
+    ctx.strokeStyle = 'rgba(28,20,10,0.3)';
     ctx.lineWidth = Math.max(1, bh * 0.0015);
     ctx.beginPath();
     ctx.moveTo(pad, underlineY);
@@ -851,8 +835,8 @@ export function initCard(container) {
     ctx.fillStyle = CARD_STOCK_COLOR;
     ctx.fillRect(0, 0, w, h);
     const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
-    vg.addColorStop(0, ink(0));
-    vg.addColorStop(1, ink(0.08));
+    vg.addColorStop(0, 'rgba(28,20,10,0)');
+    vg.addColorStop(1, 'rgba(28,20,10,0.08)');
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, w, h);
 
@@ -894,7 +878,7 @@ export function initCard(container) {
       const labelY = barTop + barHeight / 2 + headerSize * 0.35;
       drawTracked(ctx, headerLabel, labelX, labelY, headerSize, CARD_STOCK_COLOR, 3);
     } else {
-      drawTracked(ctx, 'CONTACT', pad, bh * BACK_HEADER_F, headerSize, ink(0.4), 3);
+      drawTracked(ctx, 'CONTACT', pad, bh * BACK_HEADER_F, headerSize, 'rgba(28,20,10,0.4)', 3);
     }
 
     // Space Grotesk, plain fillText, normal case — matching the front
@@ -925,9 +909,9 @@ export function initCard(container) {
     // read, so LINK_COLOR marks it as tappable the same way an underlined
     // blue link would, without needing an icon or an underline that'd
     // fight the card's own typographic style.
-    ctx.fillStyle = isTouchDevice ? LINK_COLOR : ink(0.85);
+    ctx.fillStyle = isTouchDevice ? LINK_COLOR : 'rgba(28,20,10,0.85)';
     ctx.fillText(CONTACT.email, pad, bh * BACK_LINES_TOP_F);
-    ctx.fillStyle = ink(0.85);
+    ctx.fillStyle = 'rgba(28,20,10,0.85)';
     ctx.fillText(CONTACT.url, pad, bh * (BACK_LINES_TOP_F + BACK_LINE_GAP_F));
 
     socialLinkBounds.length = 0;
@@ -948,10 +932,10 @@ export function initCard(container) {
     SOCIAL_LINKS.forEach((link, i) => {
       const rowFrac = BACK_LINES_TOP_F + (i + 2) * BACK_LINE_GAP_F;
       const rowY = bh * rowFrac;
-      let cx = SOCIAL_GLYPHS[link.icon](ctx, pad, rowY, iconSize, ink(0.55));
+      let cx = SOCIAL_GLYPHS[link.icon](ctx, pad, rowY, iconSize, 'rgba(28,20,10,0.55)');
       cx += infoSize * 0.35;
       ctx.font = `400 ${infoSize}px "Space Grotesk", sans-serif`;
-      ctx.fillStyle = ink(0.85);
+      ctx.fillStyle = 'rgba(28,20,10,0.85)';
       ctx.fillText(link.handle, cx, rowY);
       const handleEnd = cx + ctx.measureText(link.handle).width;
       socialLinkBounds.push({
@@ -968,7 +952,7 @@ export function initCard(container) {
     // tight to fit one anyway
     ctx.save();
     ctx.setLineDash([bh * 0.012, bh * 0.012]);
-    ctx.strokeStyle = ink(0.25);
+    ctx.strokeStyle = 'rgba(28,20,10,0.25)';
     ctx.lineWidth = Math.max(1, bh * 0.003);
     ctx.beginPath();
     ctx.moveTo(pad, bh * BACK_DIVIDER_F);
@@ -1265,18 +1249,6 @@ export function initCard(container) {
       drawBack();
     });
   }
-
-  // CSS custom properties re-theme the DOM on their own, but nothing
-  // repaints a canvas for free — re-read the palette and redraw both faces
-  // whenever the dev-only theme switcher (themeSwitcher.js) changes theme.
-  onThemeChange(() => {
-    PALETTE = getPalette();
-    CARD_STOCK_COLOR = PALETTE.cardStock;
-    INK_COLOR = PALETTE.ink;
-    LINK_COLOR = PALETTE.accent;
-    drawFront();
-    drawBack();
-  });
 
   /* ---------- extend/un-extend: front-only now. Animates the résumé
      tab's position and the card's own lift; the page grows to match. No
@@ -2302,14 +2274,14 @@ function injectStyles() {
     .card3d-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;overflow:visible}
 
     .card3d-zone{position:fixed;top:0;bottom:0;width:36vw;max-width:520px;pointer-events:none;opacity:0;transition:opacity 0.3s ease;z-index:2}
-    .card3d-zone--right{right:0;background:linear-gradient(to right,rgba(var(--accent-rgb),0),rgba(var(--accent-rgb),0.16))}
-    .card3d-zone--left{left:0;background:linear-gradient(to left,rgba(var(--accent-rgb),0),rgba(var(--accent-rgb),0.16))}
+    .card3d-zone--right{right:0;background:linear-gradient(to right,rgba(244,129,31,0),rgba(244,129,31,0.16))}
+    .card3d-zone--left{left:0;background:linear-gradient(to left,rgba(244,129,31,0),rgba(244,129,31,0.16))}
     .card3d-zone.is-active{opacity:1}
 
-    .card3d-confirm{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);text-shadow:0 0 6px rgba(var(--accent-rgb),0.5);opacity:0;pointer-events:none;transition:opacity 0.35s ease;white-space:nowrap;z-index:5}
+    .card3d-confirm{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#F4811F;text-shadow:0 0 6px rgba(244,129,31,0.5);opacity:0;pointer-events:none;transition:opacity 0.35s ease;white-space:nowrap;z-index:5}
     .card3d-confirm.is-visible{opacity:1}
 
-    .card3d-guide{position:absolute;display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:9px;color:rgba(var(--ink-rgb),0.32);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.25s ease;z-index:4}
+    .card3d-guide{position:absolute;display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:9px;color:rgba(28,20,10,0.32);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.25s ease;z-index:4}
     .card3d-guide-icon{display:flex;line-height:0}
     .card3d-guide--top{transform:translate(-50%,-100%);flex-direction:column-reverse;gap:4px}
     .card3d-guide--top .card3d-guide-icon.is-down{transform:rotate(180deg)}
