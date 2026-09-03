@@ -53,6 +53,7 @@ function injectStyles() {
     .nav-radio{display:flex;align-items:center;gap:10px}
     .radio-toggle{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;width:14px;color:rgba(28,20,10,0.45);transition:color 0.2s}
     .radio-toggle:hover{color:rgba(28,20,10,0.85)}
+    .radio-toggle:focus-visible{outline:1.5px solid #F4811F;outline-offset:2px;border-radius:2px}
     .radio-toggle svg{fill:currentColor}
     .radio-toggle .icon-pause{display:none}
     .nav-radio.is-playing .icon-play{display:none}
@@ -60,6 +61,7 @@ function injectStyles() {
     .nav-radio.is-playing .radio-toggle{color:#F4811F}
     .radio-station{all:unset;cursor:pointer;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(28,20,10,0.4);transition:color 0.2s;white-space:nowrap}
     .radio-station:hover{color:rgba(28,20,10,0.85)}
+    .radio-station:focus-visible{outline:1.5px solid #F4811F;outline-offset:2px;border-radius:2px}
     .radio-now{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.04em;color:rgba(28,20,10,0.3);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .radio-volume{-webkit-appearance:none;appearance:none;width:44px;height:2px;background:rgba(28,20,10,0.15);border-radius:2px;cursor:pointer}
     .radio-volume::-webkit-slider-thumb{-webkit-appearance:none;width:7px;height:7px;border-radius:50%;background:rgba(28,20,10,0.5);cursor:pointer}

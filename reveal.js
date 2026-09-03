@@ -35,7 +35,11 @@ function promoteDeferredMedia(root) {
   });
 }
 
-export function revealOnScroll(el) {
+// variant is an optional treatment name ('scale' | 'soft') for blocks that
+// shouldn't get the default fade-up — see blocks.js's REVEAL_VARIANTS. Every
+// block got the identical fade-up-16px treatment before this; unnamed/unknown
+// variants just fall through to that default.
+export function revealOnScroll(el, { variant } = {}) {
   injectStyles();
   if (prefersReducedMotion || typeof IntersectionObserver === 'undefined') {
     el.classList.add('is-revealed');
@@ -43,6 +47,7 @@ export function revealOnScroll(el) {
     return;
   }
   el.classList.add('reveal-init');
+  if (variant) el.classList.add(`reveal-${variant}`);
   getObserver().observe(el);
 }
 
@@ -52,6 +57,8 @@ function injectStyles() {
   style.id = 'scroll-reveal-styles';
   style.textContent = `
     .reveal-init{opacity:0;transform:translateY(16px);transition:opacity 0.5s ease,transform 0.5s ease}
+    .reveal-init.reveal-scale{transform:scale(1.035);transition:opacity 0.7s ease,transform 0.7s ease}
+    .reveal-init.reveal-soft{transform:none;transition:opacity 0.9s ease}
     .reveal-init.is-revealed{opacity:1;transform:none}
   `;
   document.head.appendChild(style);
