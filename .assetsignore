@@ -1,0 +1,15 @@
+# Tells Wrangler which files under the assets directory ("." — the whole
+# repo root, per wrangler.jsonc) NOT to upload/serve as public static
+# assets. Without this, Wrangler happily uploads and serves EVERYTHING
+# under ".", including .git itself — confirmed live and publicly
+# reachable (e.g. /.git/HEAD, /.git/config, the full packed object store)
+# on 2026-09-04 before this file existed. .git exposure is a real
+# vulnerability: packed objects make the entire commit history
+# reconstructable by anyone who finds the URL, regardless of what's in
+# the current working tree.
+.git
+.wrangler
+.claude
+.DS_Store
+.gitignore
+.assetsignore
