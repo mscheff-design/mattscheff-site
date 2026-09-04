@@ -50,9 +50,9 @@ function injectStyles() {
   style.id = 'site-chrome-styles';
   style.textContent = `
     nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:20px 48px;mix-blend-mode:multiply}
-    .nav-name{font-family:'DM Mono',monospace;font-size:10px;color:rgba(var(--ink-rgb),0.5);letter-spacing:0.1em;text-decoration:none}
+    .nav-name{font-family:var(--font-mono);font-size:10px;color:rgba(var(--ink-rgb),0.5);letter-spacing:0.1em;text-decoration:none}
     .nav-links{display:flex;gap:32px}
-    .nav-links a{font-family:'DM Mono',monospace;font-size:10px;color:rgba(var(--ink-rgb),0.4);letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:color 0.2s}
+    .nav-links a{font-family:var(--font-mono);font-size:10px;color:rgba(var(--ink-rgb),0.4);letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:color 0.2s}
     .nav-links a:hover{color:rgba(var(--ink-rgb),0.85)}
 
     .nav-radio{display:flex;align-items:center;gap:10px}
@@ -64,18 +64,18 @@ function injectStyles() {
     .nav-radio.is-playing .icon-play{display:none}
     .nav-radio.is-playing .icon-pause{display:block}
     .nav-radio.is-playing .radio-toggle{color:var(--accent)}
-    .radio-station{all:unset;cursor:pointer;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4);transition:color 0.2s;white-space:nowrap}
+    .radio-station{all:unset;cursor:pointer;font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4);transition:color 0.2s;white-space:nowrap}
     .radio-station:hover{color:rgba(var(--ink-rgb),0.85)}
     .radio-station:focus-visible{outline:1.5px solid var(--accent);outline-offset:2px;border-radius:2px}
-    .radio-now{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.3);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .radio-now{font-family:var(--font-mono);font-size:8.5px;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.3);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .radio-volume{-webkit-appearance:none;appearance:none;width:44px;height:2px;background:rgba(var(--ink-rgb),0.15);border-radius:2px;cursor:pointer}
     .radio-volume::-webkit-slider-thumb{-webkit-appearance:none;width:7px;height:7px;border-radius:50%;background:rgba(var(--ink-rgb),0.5);cursor:pointer}
     .radio-volume::-moz-range-thumb{width:7px;height:7px;border:none;border-radius:50%;background:rgba(var(--ink-rgb),0.5);cursor:pointer}
     @media (max-width:640px){.radio-now,.radio-volume{display:none}}
     footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;border-top:0.5px solid rgba(var(--ink-light-rgb),0.08);display:flex;justify-content:space-between;align-items:center}
-    .footer-left{font-family:'DM Mono',monospace;font-size:9px;color:rgba(var(--ink-light-rgb),0.2);letter-spacing:0.08em}
+    .footer-left{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-light-rgb),0.2);letter-spacing:0.08em}
     .footer-links{display:flex;gap:24px}
-    .footer-links a{font-family:'DM Mono',monospace;font-size:9px;color:rgba(var(--ink-light-rgb),0.25);letter-spacing:0.08em;text-decoration:none;transition:color 0.2s}
+    .footer-links a{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-light-rgb),0.25);letter-spacing:0.08em;text-decoration:none;transition:color 0.2s}
     .footer-links a:hover{color:rgba(var(--ink-light-rgb),0.6)}
   `;
   document.head.appendChild(style);

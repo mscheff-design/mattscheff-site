@@ -687,12 +687,12 @@ function injectStyles() {
        that actually fits. 4px absorbs that noise without meaningfully
        weakening the real guard: genuine overflow (an error message,
        autofilled content) still exceeds it by far more than that. */
-    .contact-form{width:calc(230px * var(--fs, 1));max-height:calc(100% + 4px);overflow-y:auto;font-family:'DM Mono',monospace}
+    .contact-form{width:calc(230px * var(--fs, 1));max-height:calc(100% + 4px);overflow-y:auto;font-family:var(--font-mono)}
     .cf-field{margin-bottom:calc(7px * var(--fs, 1))}
-    .cf-field label{display:block;font-family:'DM Mono',monospace;font-size:calc(7.5px * var(--fs, 1));letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.45);margin-bottom:calc(2px * var(--fs, 1))}
+    .cf-field label{display:block;font-family:var(--font-mono);font-size:calc(7.5px * var(--fs, 1));letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.45);margin-bottom:calc(2px * var(--fs, 1))}
     .cf-field input,.cf-field textarea{
       display:block;width:100%;border:none;border-bottom:0.5px solid rgba(var(--ink-rgb),0.28);
-      background:transparent;font-family:'EB Garamond',serif;font-size:calc(12.5px * var(--fs, 1));color:var(--ink);
+      background:transparent;font-family:var(--font-serif);font-size:calc(12.5px * var(--fs, 1));color:var(--ink);
       padding:calc(1px * var(--fs, 1)) 0 calc(2px * var(--fs, 1));outline:none;resize:none;line-height:1.25
     }
     .cf-field input:focus,.cf-field textarea:focus{border-bottom-color:var(--ink)}
@@ -700,16 +700,16 @@ function injectStyles() {
 
     .cf-honeypot{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
 
-    .cf-submit{all:unset;display:inline-block;margin-top:0;font-family:'DM Mono',monospace;font-size:calc(8.5px * var(--fs, 1));letter-spacing:0.1em;text-transform:uppercase;color:var(--ink);cursor:pointer;border-bottom:0.5px solid rgba(var(--ink-rgb),0.4);padding-bottom:calc(1px * var(--fs, 1));transition:opacity 0.2s ease}
+    .cf-submit{all:unset;display:inline-block;margin-top:0;font-family:var(--font-mono);font-size:calc(8.5px * var(--fs, 1));letter-spacing:0.1em;text-transform:uppercase;color:var(--ink);cursor:pointer;border-bottom:0.5px solid rgba(var(--ink-rgb),0.4);padding-bottom:calc(1px * var(--fs, 1));transition:opacity 0.2s ease}
     .cf-submit:hover{border-color:var(--ink)}
     .cf-submit:focus-visible{outline:1.5px solid var(--accent);outline-offset:2px;border-radius:2px}
     .cf-submit:disabled{cursor:default;opacity:0.5}
 
-    .cf-status{margin-top:calc(5px * var(--fs, 1));font-family:'DM Mono',monospace;font-size:calc(7.5px * var(--fs, 1));letter-spacing:0.03em;line-height:1.4;color:rgba(var(--ink-rgb),0.55)}
+    .cf-status{margin-top:calc(5px * var(--fs, 1));font-family:var(--font-mono);font-size:calc(7.5px * var(--fs, 1));letter-spacing:0.03em;line-height:1.4;color:rgba(var(--ink-rgb),0.55)}
     .cf-status.is-error{color:var(--error)}
     .cf-status.is-error a,.cf-status a{color:inherit}
 
-    .cf-result{font-family:'EB Garamond',serif;font-size:calc(13px * var(--fs, 1));color:var(--ink);line-height:1.4;max-width:calc(210px * var(--fs, 1))}
+    .cf-result{font-family:var(--font-serif);font-size:calc(13px * var(--fs, 1));color:var(--ink);line-height:1.4;max-width:calc(210px * var(--fs, 1))}
 
   `;
   document.head.appendChild(style);

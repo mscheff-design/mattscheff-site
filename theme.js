@@ -28,11 +28,21 @@ const THEMES = {
     accentRgb: '244,129,31',
     cardStock: '#f7f0e1',
     error: '#a3402a',
-    black: '#000'
+    black: '#000',
+    // Font *names* only — the actual @font-face/Google Fonts <link> that
+    // makes a given name renderable is still hand-authored per page (see
+    // each page's own <head>), same hand-sync convention as everything
+    // else here. Swapping a theme to a typeface that isn't loaded yet on
+    // every page will render as a fallback until that's added.
+    fontMono: `'DM Mono',monospace`,
+    fontSerif: `'EB Garamond',serif`,
+    fontDisplay: `'Space Grotesk',sans-serif`
   },
   // Mechanism-check placeholder only — not a real design. Proves the
   // switcher actually re-themes both the DOM and the card's canvas.
-  // Real themes get described and added later.
+  // Real themes get described and added later. Fonts deliberately left
+  // identical to default here — this theme is about proving the color
+  // mechanism works, not about typography.
   'placeholder-cool': {
     bg: '#dde3ea',
     ink: '#0d1420',
@@ -46,7 +56,10 @@ const THEMES = {
     accentRgb: '62,142,240',
     cardStock: '#e3e9f0',
     error: '#a3402a',
-    black: '#000'
+    black: '#000',
+    fontMono: `'DM Mono',monospace`,
+    fontSerif: `'EB Garamond',serif`,
+    fontDisplay: `'Space Grotesk',sans-serif`
   }
 };
 
@@ -56,7 +69,8 @@ const DEFAULT_THEME = 'default';
 function tokenDeclarations(p) {
   return `--bg:${p.bg};--ink:${p.ink};--ink-rgb:${p.inkRgb};--ink-light-rgb:${p.inkLightRgb};`
     + `--bg-dark:${p.bgDark};--bg-darker:${p.bgDarker};--bg-frame:${p.bgFrame};--border-dark:${p.borderDark};`
-    + `--accent:${p.accent};--accent-rgb:${p.accentRgb};--card-stock:${p.cardStock};--error:${p.error};--black:${p.black}`;
+    + `--accent:${p.accent};--accent-rgb:${p.accentRgb};--card-stock:${p.cardStock};--error:${p.error};--black:${p.black};`
+    + `--font-mono:${p.fontMono};--font-serif:${p.fontSerif};--font-display:${p.fontDisplay}`;
 }
 
 // Non-default themes only — the default theme's values are the literal

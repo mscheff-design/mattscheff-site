@@ -125,6 +125,11 @@ let INK_COLOR = PALETTE.ink;
 // CSS, below), so the thread from "this is tappable" to "this is what
 // just happened" reads as the same color rather than two unrelated ones.
 let LINK_COLOR = PALETTE.accent;
+// Card canvas text only ever uses the mono (labels) and display (name)
+// roles — never serif, that's DOM-only (EB Garamond in the homepage
+// row list, case-study body text, etc.), so no FONT_SERIF binding here.
+let FONT_MONO = PALETTE.fontMono;
+let FONT_DISPLAY = PALETTE.fontDisplay;
 
 function ink(alpha) {
   return `rgba(${PALETTE.inkRgb},${alpha})`;
@@ -439,7 +444,7 @@ function applyGrain(ctx, w, h, alpha) {
 }
 
 function drawTracked(ctx, text, x, y, size, color, spacing, font) {
-  ctx.font = `${font || '400'} ${size}px "DM Mono", monospace`;
+  ctx.font = `${font || '400'} ${size}px ${FONT_MONO}`;
   ctx.fillStyle = color;
   let cx = x;
   for (const ch of text) {
@@ -453,7 +458,7 @@ function drawTracked(ctx, text, x, y, size, color, spacing, font) {
 // centering a tracked string (e.g. inside a filled button bar) where the
 // draw position depends on knowing the total width *before* drawing.
 function trackedTextWidth(ctx, text, size, spacing, font) {
-  ctx.font = `${font || '400'} ${size}px "DM Mono", monospace`;
+  ctx.font = `${font || '400'} ${size}px ${FONT_MONO}`;
   let width = 0;
   for (const ch of text) width += ctx.measureText(ch).width + spacing;
   return width - spacing;
@@ -468,7 +473,7 @@ function trackedTextWidth(ctx, text, size, spacing, font) {
 function fitTrackedSize(ctx, texts, maxWidthPx, basePx, spacing, font) {
   let px = basePx;
   for (const t of texts) {
-    ctx.font = `${font || '400'} ${px}px "DM Mono", monospace`;
+    ctx.font = `${font || '400'} ${px}px ${FONT_MONO}`;
     let width = -spacing;
     for (const ch of t) width += ctx.measureText(ch).width + spacing;
     if (width > maxWidthPx) px = Math.min(px, Math.floor(px * (maxWidthPx / width)));
@@ -533,7 +538,7 @@ function drawLinkedinGlyph(ctx, x, y, size, color) {
   ctx.roundRect(x, top, size, size, size * 0.18);
   ctx.stroke();
   ctx.fillStyle = color;
-  ctx.font = `700 ${Math.round(size * 0.6)}px "DM Mono", monospace`;
+  ctx.font = `700 ${Math.round(size * 0.6)}px ${FONT_MONO}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('in', x + size / 2, top + size / 2 + size * 0.03);
@@ -629,7 +634,7 @@ export function initCard(container) {
 
     drawTracked(ctx, label, pad, bh * TOGGLE_LABEL_F, Math.round(bh * 0.034), ink(0.55), 1.3);
     ctx.save();
-    ctx.font = `400 ${Math.round(bh * 0.04)}px "DM Mono", monospace`;
+    ctx.font = `400 ${Math.round(bh * 0.04)}px ${FONT_MONO}`;
     ctx.fillStyle = ink(0.55);
     ctx.textAlign = 'center';
     ctx.translate(w - pad - bh * 0.02, bh * (TOGGLE_LABEL_F - 0.01));
@@ -685,7 +690,7 @@ export function initCard(container) {
 
     applyGrain(ctx, w, h, 0.055); // also clip-bounded to the small box
 
-    ctx.font = `400 ${Math.round(bh * 0.04)}px "DM Mono", monospace`;
+    ctx.font = `400 ${Math.round(bh * 0.04)}px ${FONT_MONO}`;
     ctx.fillStyle = ink(0.55);
     ctx.textAlign = 'center';
     ctx.translate(cx, cy);
@@ -733,13 +738,13 @@ export function initCard(container) {
     const nameMaxWidthPx = w - pad * 2;
     const namePx = fitTextSize(
       ctx, [CONTACT.first, CONTACT.last], nameMaxWidthPx, Math.round(bh * 0.155),
-      (px) => `700 ${px}px "Space Grotesk", sans-serif`
+      (px) => `700 ${px}px ${FONT_DISPLAY}`
     );
     ctx.fillStyle = INK_COLOR;
-    ctx.font = `700 ${namePx}px "Space Grotesk", sans-serif`;
+    ctx.font = `700 ${namePx}px ${FONT_DISPLAY}`;
     ctx.fillText(CONTACT.first, pad, bh * NAME_FIRST_Y_F);
     ctx.fillStyle = ink(0.55);
-    ctx.font = `italic 700 ${namePx}px "Space Grotesk", sans-serif`;
+    ctx.font = `italic 700 ${namePx}px ${FONT_DISPLAY}`;
     ctx.fillText(CONTACT.last, pad, bh * NAME_LAST_Y_F);
 
     const titleMaxWidthPx = w - pad * 2;
@@ -759,19 +764,19 @@ export function initCard(container) {
       // Dates measured first (fixed size, right-aligned) so the name's own
       // fit below reserves the actual room they take instead of the two
       // just overlapping on a narrow portrait row.
-      ctx.font = `400 ${Math.round(bh * 0.027)}px "DM Mono", monospace`;
+      ctx.font = `400 ${Math.round(bh * 0.027)}px ${FONT_MONO}`;
       const datesWidthPx = ctx.measureText(job.dates).width;
       const nameMaxWidthPx = w - pad * 2 - datesWidthPx - bh * 0.02;
       const namePx = fitTextSize(
         ctx, [job.name], nameMaxWidthPx, Math.round(bh * 0.052),
-        (px) => `500 ${px}px "Space Grotesk", sans-serif`
+        (px) => `500 ${px}px ${FONT_DISPLAY}`
       );
       ctx.fillStyle = ink(0.88);
       ctx.textAlign = 'left';
       ctx.fillText(job.name, pad, bh * (rowTopF + 0.075));
 
       ctx.save();
-      ctx.font = `400 ${Math.round(bh * 0.027)}px "DM Mono", monospace`;
+      ctx.font = `400 ${Math.round(bh * 0.027)}px ${FONT_MONO}`;
       ctx.fillStyle = ink(0.35);
       ctx.textAlign = 'right';
       ctx.fillText(job.dates, w - pad, bh * (rowTopF + 0.07));
@@ -809,9 +814,9 @@ export function initCard(container) {
     const downloadText = 'DOWNLOAD RÉSUMÉ (PDF) →';
     const downloadSize = fitTextSize(
       ctx, [downloadText], w - pad * 2, Math.round(bh * 0.027),
-      (px) => `400 ${px}px "DM Mono", monospace`
+      (px) => `400 ${px}px ${FONT_MONO}`
     );
-    ctx.font = `400 ${downloadSize}px "DM Mono", monospace`;
+    ctx.font = `400 ${downloadSize}px ${FONT_MONO}`;
     ctx.fillStyle = INK_COLOR;
     ctx.textAlign = 'left';
     ctx.fillText(downloadText, pad, bh * DOWNLOAD_LABEL_F);
@@ -917,7 +922,7 @@ export function initCard(container) {
       ctx,
       [CONTACT.email, CONTACT.url, ...SOCIAL_LINKS.map((l) => l.handle)],
       w - pad * 2 - iconAllowancePx, baseInfoSize,
-      (px) => `400 ${px}px "Space Grotesk", sans-serif`
+      (px) => `400 ${px}px ${FONT_DISPLAY}`
     );
     // Email gets its own fillStyle pass (mobile only) rather than joining
     // the shared one below — it's the only line here backed by a real
@@ -950,7 +955,7 @@ export function initCard(container) {
       const rowY = bh * rowFrac;
       let cx = SOCIAL_GLYPHS[link.icon](ctx, pad, rowY, iconSize, ink(0.55));
       cx += infoSize * 0.35;
-      ctx.font = `400 ${infoSize}px "Space Grotesk", sans-serif`;
+      ctx.font = `400 ${infoSize}px ${FONT_DISPLAY}`;
       ctx.fillStyle = ink(0.85);
       ctx.fillText(link.handle, cx, rowY);
       const handleEnd = cx + ctx.measureText(link.handle).width;
@@ -1274,6 +1279,8 @@ export function initCard(container) {
     CARD_STOCK_COLOR = PALETTE.cardStock;
     INK_COLOR = PALETTE.ink;
     LINK_COLOR = PALETTE.accent;
+    FONT_MONO = PALETTE.fontMono;
+    FONT_DISPLAY = PALETTE.fontDisplay;
     drawFront();
     drawBack();
   });
@@ -2306,10 +2313,10 @@ function injectStyles() {
     .card3d-zone--left{left:0;background:linear-gradient(to left,rgba(var(--accent-rgb),0),rgba(var(--accent-rgb),0.16))}
     .card3d-zone.is-active{opacity:1}
 
-    .card3d-confirm{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);text-shadow:0 0 6px rgba(var(--accent-rgb),0.5);opacity:0;pointer-events:none;transition:opacity 0.35s ease;white-space:nowrap;z-index:5}
+    .card3d-confirm{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);text-shadow:0 0 6px rgba(var(--accent-rgb),0.5);opacity:0;pointer-events:none;transition:opacity 0.35s ease;white-space:nowrap;z-index:5}
     .card3d-confirm.is-visible{opacity:1}
 
-    .card3d-guide{position:absolute;display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:9px;color:rgba(var(--ink-rgb),0.32);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.25s ease;z-index:4}
+    .card3d-guide{position:absolute;display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-rgb),0.32);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.25s ease;z-index:4}
     .card3d-guide-icon{display:flex;line-height:0}
     .card3d-guide--top{transform:translate(-50%,-100%);flex-direction:column-reverse;gap:4px}
     .card3d-guide--top .card3d-guide-icon.is-down{transform:rotate(180deg)}
