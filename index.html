@@ -290,6 +290,23 @@ footer{position:relative;z-index:1;background:#141008;padding:28px 48px;border-t
   <div class="sheet-panel" id="sheetPanel"></div>
 </div>
 
+<script>
+// Some browser/OS combinations (confirmed on at least one real machine
+// this site was tested on) deliver requestAnimationFrame callbacks only
+// once every several seconds instead of ~60/sec, which makes every
+// animation on the page (the 3D card's tilt, its résumé fold-out, its
+// return-to-home spring) look frozen and then snap straight to the end.
+// A per-frame "race real rAF against a backstop timer" version of this
+// was tried and, even though it should only ever be as slow as the
+// backstop in the worst case, it didn't resolve the issue in testing —
+// rather than leave an unproven, more complex mechanism in place, this
+// is the plain, unconditional substitute: always drive animation timing
+// off a regular interval instead of the browser's native scheduler. This
+// is a known-working fix, verified directly, at the cost of not getting
+// the browser's own frame-perfect timing on machines where it's healthy.
+window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
+window.cancelAnimationFrame = (id) => clearTimeout(id);
+</script>
 <script type="module">
 import { Loupe } from './loupe.js';
 import { initCard } from './card.js';
