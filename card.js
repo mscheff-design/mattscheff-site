@@ -119,6 +119,11 @@ let PALETTE = getPalette();
 // front/back faces AND both dropdown tabs, so nothing can drift apart.
 let CARD_STOCK_COLOR = PALETTE.cardStock;
 let INK_COLOR = PALETTE.ink;
+// The card's extruded edge (the thin "paper thickness" strip visible along
+// its side at a tilt) — optional per theme; falls back to the original
+// fixed warm paper-edge tone so every theme that doesn't set it renders
+// exactly as before.
+let CARD_EDGE_COLOR = PALETTE.cardEdge || '#e6dcc4';
 // Mobile-only accent for the back face's tappable text (the header's
 // save-contact arrow, the email line) — the exact color the
 // "contact saved" confirmation toast already uses (.card3d-confirm's own
@@ -130,6 +135,11 @@ let LINK_COLOR = PALETTE.accent;
 // row list, case-study body text, etc.), so no FONT_SERIF binding here.
 let FONT_MONO = PALETTE.fontMono;
 let FONT_DISPLAY = PALETTE.fontDisplay;
+// Optional per-theme paper-grain intensity — every theme gets a bit of
+// grain regardless (see applyGrain's call sites), this just lets a theme
+// that wants to read as visibly textured stock (e.g. "neo-stijl"'s cream
+// paper) turn it up beyond the default subtle amount.
+let GRAIN_ALPHA = PALETTE.grainOpacity || 0.055;
 
 function ink(alpha) {
   return `rgba(${PALETTE.inkRgb},${alpha})`;
@@ -688,7 +698,7 @@ export function initCard(container) {
     ctx.fillStyle = vg;
     ctx.fillRect(cx - half, cy - half, half * 2, half * 2);
 
-    applyGrain(ctx, w, h, 0.055); // also clip-bounded to the small box
+    applyGrain(ctx, w, h, GRAIN_ALPHA); // also clip-bounded to the small box
 
     ctx.font = `400 ${Math.round(bh * 0.04)}px ${FONT_MONO}`;
     ctx.fillStyle = ink(0.55);
@@ -830,7 +840,7 @@ export function initCard(container) {
     ctx.stroke();
     ctx.restore();
 
-    applyGrain(ctx, w, h, 0.055);
+    applyGrain(ctx, w, h, GRAIN_ALPHA);
     frontTex.needsUpdate = true;
   }
 
@@ -981,7 +991,7 @@ export function initCard(container) {
     ctx.stroke();
     ctx.restore();
 
-    applyGrain(ctx, w, h, 0.055);
+    applyGrain(ctx, w, h, GRAIN_ALPHA);
     backTex.needsUpdate = true;
   }
 
@@ -1012,7 +1022,7 @@ export function initCard(container) {
 
   function edgeMaterial() {
     return new THREE.MeshPhysicalMaterial({
-      color: 0xe6dcc4,
+      color: CARD_EDGE_COLOR,
       roughness: 0.95,
       metalness: 0,
       clearcoat: 0,
@@ -1279,10 +1289,25 @@ export function initCard(container) {
     CARD_STOCK_COLOR = PALETTE.cardStock;
     INK_COLOR = PALETTE.ink;
     LINK_COLOR = PALETTE.accent;
+    CARD_EDGE_COLOR = PALETTE.cardEdge || '#e6dcc4';
+    edgeSideMat.color.set(CARD_EDGE_COLOR);
     FONT_MONO = PALETTE.fontMono;
     FONT_DISPLAY = PALETTE.fontDisplay;
+    GRAIN_ALPHA = PALETTE.grainOpacity || 0.055;
     drawFront();
     drawBack();
+    // A theme can introduce a font family the page has never rendered
+    // before, so the browser may still be fetching its file at the moment
+    // of this redraw (Google Fonts only downloads the actual font bytes
+    // once something first tries to paint with them) — this draw falls
+    // back to a substitute font silently. Re-draw once it's confirmed in,
+    // same as the initial-load handling above.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        drawFront();
+        drawBack();
+      });
+    }
   });
 
   /* ---------- extend/un-extend: front-only now. Animates the résumé
@@ -1329,6 +1354,7 @@ export function initCard(container) {
     redrawToggleChevron();
     updateGuideContent();
     updateMobileFlipGuide();
+    updateElevation();
     animateDropdown(1);
   }
 
@@ -1338,6 +1364,7 @@ export function initCard(container) {
     redrawToggleChevron();
     updateGuideContent();
     updateMobileFlipGuide();
+    updateElevation();
     animateDropdown(0);
   }
 
@@ -1715,6 +1742,19 @@ export function initCard(container) {
 
   /* ---------- drag to throw ---------- */
 
+  // .hero's own CSS pins it at z-index:1 (below nav's fixed z-index:100), so
+  // the card can be dragged (or extended into the résumé view) up into the
+  // nav's screen area but would render underneath it — bumping the whole
+  // hero section above nav whenever either is true lets the card win that
+  // overlap without permanently changing hero/nav stacking the rest of the
+  // time. A single derived helper (rather than setting/clearing the z-index
+  // ad hoc at each call site) avoids the two states stomping on each other —
+  // e.g. a drag that ends without closing an already-open résumé must leave
+  // the elevation in place, not reset it just because the drag itself ended.
+  function updateElevation() {
+    interactionRoot.style.zIndex = (dragging || dropdownOpen) ? '150' : '';
+  }
+
   function beginDrag(clientX, clientY) {
     if (cancelReturnTween) { cancelReturnTween(); cancelReturnTween = null; }
     dragging = true;
@@ -1728,6 +1768,7 @@ export function initCard(container) {
     lastDragProgress = 0;
     liftProgressTarget = 1;
     document.body.style.cursor = 'grabbing';
+    updateElevation();
   }
 
   function updateDrag(clientX, clientY) {
@@ -1754,6 +1795,12 @@ export function initCard(container) {
     dragging = false;
     document.body.style.cursor = 'grab';
     liftProgressTarget = 0;
+    // Provisional — if this same drag opens/closes the dropdown further
+    // down, openDropdown()/closeDropdown() will call this again with the
+    // final state. Needed here too for the plain-drag-with-no-effect case,
+    // where neither of those fires and this is the only place elevation
+    // drops back down once dragging itself ends.
+    updateElevation();
 
     const activeRight = lastDragProgress > 0.65;
     const activeLeft = lastDragProgress < -0.65;

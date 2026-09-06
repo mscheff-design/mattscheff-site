@@ -18,41 +18,81 @@
 <meta name="twitter:image" content="https://mattscheff-site.matthew-scheffler14.workers.dev/assets/og-image.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@300;400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@300;400&family=Space+Grotesk:wght@400;500;700&family=Unbounded:wght@400;500;700&family=Fraunces:ital,wght@0,400;0,500;1,400&family=Manrope:wght@400;500;700&family=Instrument+Sans:ital,wght@0,400;0,500;0,700;1,400;1,700&family=JetBrains+Mono:wght@400;500&family=Archivo:ital,wght@0,400;0,500;0,700;1,400;1,700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Space Grotesk is the 3D card's own display face (card.js) — EB Garamond
      above is unrelated, used by the page's own work/photography sections. -->
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#e8e3d9;--ink:#1c140a;--ink-rgb:28,20,10;--ink-light-rgb:210,200,180;--bg-dark:#141008;--bg-darker:#0a0805;--bg-frame:#0f0c08;--border-dark:#1c1610;--accent:#F4811F;--accent-rgb:244,129,31;--card-stock:#f7f0e1;--error:#a3402a;--black:#000;--font-mono:'DM Mono',monospace;--font-serif:'EB Garamond',serif;--font-display:'Space Grotesk',sans-serif}
 html{scroll-behavior:smooth;overflow-x:hidden}
-body{background:var(--bg);font-family:var(--font-mono);overflow-x:hidden}
+body{font-family:var(--font-mono);overflow-x:hidden}
+/* A real position:fixed element, not body{background-attachment:fixed} —
+   the pinned decorative background (theme.js's bgShapes, see title-card)
+   needs to stay put across scroll the same way a fixed-attachment CSS
+   background would, without the readability problems that caused; see
+   theme.js's own comment on title-card's bg for the full story (short
+   version: mix-blend-mode never actually applies to reactive text here
+   under any background technique tried, so reactive text is done via real
+   geometry hit-testing — theme.js's updateReactiveHitTest() — instead). */
+.bg-layer{position:fixed;inset:0;z-index:-1;background:var(--bg);pointer-events:none}
 
-nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:20px 48px;mix-blend-mode:multiply}
-.nav-name{font-family:var(--font-mono);font-size:10px;color:rgba(var(--ink-rgb),0.5);letter-spacing:0.1em}
+nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:20px 48px;mix-blend-mode:normal;box-shadow:0 6px 14px -7px rgba(var(--ink-rgb),0.24),inset 0 1px 0 rgba(255,255,255,0.4),0 1px 0 rgba(255,80,60,0.06),0 -1px 0 rgba(60,140,255,0.06)}
+nav::before{content:'';position:absolute;top:0;left:0;right:0;height:calc(100% + 32px);z-index:-1;background:linear-gradient(120deg,rgba(255,255,255,0.1) 0%,rgba(255,255,255,0) 35%,rgba(255,255,255,0) 65%,rgba(255,255,255,0.05) 100%),rgba(var(--ink-rgb),0.022);backdrop-filter:blur(8px) saturate(1.45);-webkit-backdrop-filter:blur(8px) saturate(1.45);-webkit-mask-image:linear-gradient(to bottom,black 0,black calc(100% - 32px),transparent 100%);mask-image:linear-gradient(to bottom,black 0,black calc(100% - 32px),transparent 100%)}
+nav::after{content:'';position:absolute;top:0;left:0;right:0;height:calc(100% + 32px);z-index:-1;pointer-events:none;opacity:0.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:90px 90px;-webkit-mask-image:linear-gradient(to bottom,black 0,black calc(100% - 32px),transparent 100%);mask-image:linear-gradient(to bottom,black 0,black calc(100% - 32px),transparent 100%)}
 .nav-links{display:flex;gap:32px}
-.nav-links a{font-family:var(--font-mono);font-size:10px;color:rgba(var(--ink-rgb),0.4);letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:color 0.2s}
+.nav-links a{font-family:var(--font-mono);font-size:10px;color:rgba(var(--ink-rgb),0.4);letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:color 0.2s;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.12)}
+.nav-links a.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.4)}
 .nav-links a:hover{color:rgba(var(--ink-rgb),0.85)}
+.nav-links a.on-shape:hover{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.85)}
 
 /* NTS radio widget (radio.js) — its mount point lives in the nav on every
    page; CSS is hand-kept-in-sync with chrome.js's copy, same as the rest
    of the nav (no templating/build step to share it directly). */
 .nav-radio{display:flex;align-items:center;gap:10px}
-.radio-toggle{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;width:14px;color:rgba(var(--ink-rgb),0.45);transition:color 0.2s}
+.radio-toggle{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;width:14px;color:rgba(var(--ink-rgb),0.45);transition:color 0.2s;filter:drop-shadow(0 1px 1.5px rgba(var(--ink-rgb),0.14))}
+.radio-toggle.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.45)}
 .radio-toggle:hover{color:rgba(var(--ink-rgb),0.85)}
+.radio-toggle.on-shape:hover{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.85)}
 .radio-toggle:focus-visible{outline:1.5px solid var(--accent);outline-offset:2px;border-radius:2px}
 .radio-toggle svg{fill:currentColor}
 .radio-toggle .icon-pause{display:none}
 .nav-radio.is-playing .icon-play{display:none}
 .nav-radio.is-playing .icon-pause{display:block}
 .nav-radio.is-playing .radio-toggle{color:var(--accent)}
-.radio-station{all:unset;cursor:pointer;font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4);transition:color 0.2s;white-space:nowrap}
+.radio-viz{display:flex;align-items:flex-end;gap:2px;height:9px;filter:drop-shadow(0 1px 1.5px rgba(var(--ink-rgb),0.14))}
+.radio-viz span{display:block;width:2px;height:100%;border-radius:1px;background:rgba(var(--ink-rgb),0.4);transform-origin:bottom;transform:scaleY(0.18);transition:transform 0.2s ease,background-color 0.2s ease}
+.radio-viz.on-shape span{background:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.4)}
+.nav-radio.is-playing .radio-viz span{background:var(--accent)}
+.radio-station{all:unset;cursor:pointer;font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4);transition:color 0.2s;white-space:nowrap;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.12)}
+.radio-station.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.4)}
 .radio-station:hover{color:rgba(var(--ink-rgb),0.85)}
+.radio-station.on-shape:hover{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.85)}
 .radio-station:focus-visible{outline:1.5px solid var(--accent);outline-offset:2px;border-radius:2px}
-.radio-now{font-family:var(--font-mono);font-size:8.5px;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.3);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.radio-now{display:inline-block;font-family:var(--font-mono);font-size:8.5px;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.3);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.1)}
+.radio-now.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.3)}
+.radio-now-track{display:inline-block;white-space:nowrap}
+.radio-now.is-ticking{-webkit-mask-image:linear-gradient(to right,transparent 0,black 12px,black calc(100% - 12px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,black 12px,black calc(100% - 12px),transparent 100%)}
+.radio-now.is-ticking .radio-now-track{animation-name:radio-ticker;animation-timing-function:linear;animation-iteration-count:infinite}
+@keyframes radio-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .radio-volume{-webkit-appearance:none;appearance:none;width:44px;height:2px;background:rgba(var(--ink-rgb),0.15);border-radius:2px;cursor:pointer}
 .radio-volume::-webkit-slider-thumb{-webkit-appearance:none;width:7px;height:7px;border-radius:50%;background:rgba(var(--ink-rgb),0.5);cursor:pointer}
 .radio-volume::-moz-range-thumb{width:7px;height:7px;border:none;border-radius:50%;background:rgba(var(--ink-rgb),0.5);cursor:pointer}
 @media (max-width:640px){.radio-now,.radio-volume{display:none}}
+
+/* nav.is-on-dark — toggled by JS below whenever the Photography section is
+   currently underneath the fixed nav; swaps nav text/icons from the normal
+   ink tone to --ink-light-rgb so they stay legible over solid black. Higher
+   specificity (3 classes) on .nav-radio.is-playing's own accent rules above
+   means "currently playing" still wins its accent color regardless of which
+   section is underneath — this only touches the resting/hover ink color. */
+nav.is-on-dark .nav-links a{color:rgba(var(--ink-light-rgb),0.4)}
+nav.is-on-dark .nav-links a:hover{color:rgba(var(--ink-light-rgb),0.85)}
+nav.is-on-dark .radio-toggle{color:rgba(var(--ink-light-rgb),0.45)}
+nav.is-on-dark .radio-toggle:hover{color:rgba(var(--ink-light-rgb),0.85)}
+nav.is-on-dark .radio-viz span{background:rgba(var(--ink-light-rgb),0.4)}
+nav.is-on-dark .radio-station{color:rgba(var(--ink-light-rgb),0.4)}
+nav.is-on-dark .radio-station:hover{color:rgba(var(--ink-light-rgb),0.85)}
+nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.3)}
 
 .hero{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 80px}
 
@@ -78,6 +118,7 @@ nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-cont
 .row-name{font-family:var(--font-serif);font-size:22px;font-weight:400;color:rgba(var(--ink-rgb),0.85);margin-bottom:4px;transition:color 0.2s}
 .row-sub{font-family:var(--font-mono);font-size:8.5px;color:rgba(var(--ink-rgb),0.3);letter-spacing:0.1em;text-transform:uppercase}
 .row-tag{font-family:var(--font-mono);font-size:8px;color:rgba(var(--ink-rgb),0.25);letter-spacing:0.08em;text-transform:uppercase;text-align:right;line-height:1.8;flex-shrink:0}
+.row-tag.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),var(--reactive-alpha,0.25))}
 .row-arrow{font-size:16px;color:rgba(var(--ink-rgb),0.2);transition:all 0.25s;opacity:0;margin-left:8px}
 
 .photo-section{position:relative;z-index:1;background:var(--bg-dark);padding:64px 48px 80px}
@@ -201,6 +242,8 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
 </head>
 <body>
 
+<div class="bg-layer"></div>
+
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
     <filter id="chromaticAberration" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
@@ -225,9 +268,9 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
 </svg>
 
 <nav>
-  <span class="nav-name">MS</span>
   <div class="nav-radio" id="navRadio"></div>
   <div class="nav-links">
+    <a href="/">Home</a>
     <a href="#work">Work</a>
     <a href="#photography">Photography</a>
     <a href="#contact">Contact</a>
@@ -323,10 +366,40 @@ initThemeSwitcher(document.getElementById('themeSwitcher'));
 
 initRadioWidget(document.getElementById('navRadio'));
 
+// Nav's frost/text is tuned for sitting over light content — once the dark
+// Photography section scrolls underneath it, that same low-contrast ink
+// text would read as a faint smudge against solid black. Swapping to
+// --ink-light-rgb whenever the section currently occupies the nav's own
+// height band at the top of the viewport keeps it legible without touching
+// the section itself. rAF-throttled scroll/resize — same idiom theme.js's
+// own reactive-text system already uses for the same reason.
+{
+  const navEl = document.querySelector('nav');
+  const photoSection = document.getElementById('photography');
+  if (navEl && photoSection) {
+    let navDarkTicking = false;
+    const updateNavDark = () => {
+      const navHeight = navEl.getBoundingClientRect().height;
+      const rect = photoSection.getBoundingClientRect();
+      navEl.classList.toggle('is-on-dark', rect.top < navHeight && rect.bottom > 0);
+      navDarkTicking = false;
+    };
+    const scheduleNavDarkUpdate = () => {
+      if (navDarkTicking) return;
+      navDarkTicking = true;
+      requestAnimationFrame(updateNavDark);
+    };
+    window.addEventListener('scroll', scheduleNavDarkUpdate, { passive: true });
+    window.addEventListener('resize', scheduleNavDarkUpdate);
+    updateNavDark();
+  }
+}
+
 initCard(document.getElementById('card3d'));
 document.getElementById('card3d').addEventListener('resume-job-click', (e) => {
   const job = JOBS.find(j => j.id === e.detail.jobId);
-  if (job && job.caseStudyUrl) window.open(job.caseStudyUrl, '_blank', 'noopener');
+  // Same-tab — see the matching comment on the Selected Work rows below.
+  if (job && job.caseStudyUrl) window.location.href = job.caseStudyUrl;
 });
 
 /* ---------- project config ----------
@@ -595,10 +668,11 @@ JOBS.forEach((job, i) => {
   row.className = 'project-row' + (job.caseStudyUrl ? '' : ' is-inert');
   if (job.caseStudyUrl) {
     row.href = job.caseStudyUrl;
-    // Opens in a new tab so the radio widget playing in this tab is never
-    // interrupted by browsing into a case study — see radio.js.
-    row.target = '_blank';
-    row.rel = 'noopener';
+    // Same-tab on purpose — case-study pages share the same radio widget
+    // (persisted state + an optimistic UI in radio.js's resumeIfNoOwner)
+    // specifically so the tab the visitor is looking at keeps feeling like
+    // one continuous listening session, visualizer included, rather than
+    // going quiet while a separate background tab keeps the real audio.
   }
   row.innerHTML = `
     <span class="row-num">${String(i + 1).padStart(2, '0')}</span>

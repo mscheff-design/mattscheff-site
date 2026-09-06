@@ -11,7 +11,7 @@ export const JOBS = [
     id: 'urban-architecture',
     name: 'Urban Architecture Inc.',
     dates: '2022 – Present',
-    tags: ['DIGITAL STRATEGY', 'E-COMMERCE', 'CONTENT'],
+    tags: ['BRAND STRATEGY', 'SHOPIFY DEVELOPMENT', 'EDITORIAL'],
     caseStudyUrl: '/case-studies/urban-architecture/'
   },
   {
