@@ -138,8 +138,34 @@ let FONT_DISPLAY = PALETTE.fontDisplay;
 // Optional per-theme paper-grain intensity — every theme gets a bit of
 // grain regardless (see applyGrain's call sites), this just lets a theme
 // that wants to read as visibly textured stock (e.g. "neo-stijl"'s cream
-// paper) turn it up beyond the default subtle amount.
-let GRAIN_ALPHA = PALETTE.grainOpacity || 0.055;
+// paper) turn it up beyond the default subtle amount. Lowered from this
+// file's original 0.055 default now that a real paper photo (below) also
+// contributes fiber detail of its own — unchanged, the two would stack
+// into visibly excessive noise rather than reading as one material.
+// Themes with their own explicit grainOpacity (neo-stijl's 0.11, tuned
+// before the real paper texture existed) aren't touched by this change and
+// may be worth revisiting now that they're layered on top of it too.
+let GRAIN_ALPHA = PALETTE.grainOpacity || 0.035;
+
+// ---- paper texture + letterpress ----
+//
+// A real uncoated-paper scan, used two ways: tinted into the stock color at
+// low strength (PAPER_VISIBILITY) so the printed faces read as genuine
+// fiber rather than a flat color, and — independently — its own fine
+// tonal variation feeds a per-pixel height map (PAPER_RELIEF_AMOUNT) so
+// that texture becomes actual surface relief under the existing lights as
+// the card tilts, not just a static image. Both numbers are deliberately
+// small; this is meant to be felt more than seen. LETTERPRESS_DEPTH is the
+// separate, more pronounced dip pressed into the surface under Matthew's
+// printed name specifically (see buildFrontBumpMap) — noticeably deeper
+// than the ambient paper relief on purpose, so it still reads as a
+// deliberate impression rather than more of the same grain.
+const PAPER_TEXTURE_PATH = 'assets/card-paper-texture.jpg';
+const PAPER_VISIBILITY = 0.4; // 0..1 — diffuse-layer strength of the paper fiber tint
+const PAPER_RELIEF_AMOUNT = 9; // 0..255 gray-units of bump-map variation from the paper's own fibers
+const LETTERPRESS_DEPTH = 42; // 0..255 gray-units the name's impression subtracts from the bump map
+const LETTERPRESS_BLUR_PX = 3; // softens the letterpress mask's edges only — the printed ink stays sharp
+const PAPER_TILE_PX = 460; // texture-space px per repeat of the paper detail tile
 
 function ink(alpha) {
   return `rgba(${PALETTE.inkRgb},${alpha})`;
@@ -453,6 +479,77 @@ function applyGrain(ctx, w, h, alpha) {
   ctx.restore();
 }
 
+// Loaded once, at module scope, independent of any given card instance's
+// theme/font state — a flattened, tileable slice of PAPER_TEXTURE_PATH,
+// built the first time it's actually needed. paperDetailTile stays null
+// until then (and forever, if the image fails to load or this browser
+// lacks canvas filter support) — every call site below already treats a
+// null tile as "no paper contribution yet", so nothing downstream needs
+// its own separate fallback branch: a card drawn before the image loads,
+// or one where it never does, just renders exactly as this file did
+// before paper texture existed.
+let paperDetailTile = null;
+let paperLoadStarted = false;
+
+// Turns the raw scan into something safe to tile: a small square crop
+// (its center, away from the corners a scan is most likely to vignette),
+// converted to grayscale, then flattened by subtracting a heavily-blurred
+// copy of itself. That last step is the important one — the supplied
+// photo visibly darkens toward its edges (real bounce-light falloff from
+// how it was shot), and tiling that gradient as-is would print a faint
+// fake shadow onto every repeat across the card. Subtracting the blurred
+// version cancels any such low-frequency shading and keeps only the fine
+// fiber detail, which is the part that's actually supposed to repeat.
+function buildPaperDetailTile(img) {
+  const s = PAPER_TILE_PX;
+  const cropSize = Math.min(img.naturalWidth, img.naturalHeight) * 0.55;
+  const cropX = (img.naturalWidth - cropSize) / 2;
+  const cropY = (img.naturalHeight - cropSize) / 2;
+
+  const tile = document.createElement('canvas');
+  tile.width = tile.height = s;
+  const tileCtx = tile.getContext('2d');
+  tileCtx.drawImage(img, cropX, cropY, cropSize, cropSize, 0, 0, s, s);
+
+  const blurred = document.createElement('canvas');
+  blurred.width = blurred.height = s;
+  const blurredCtx = blurred.getContext('2d');
+  blurredCtx.filter = `blur(${Math.round(s * 0.12)}px)`;
+  blurredCtx.drawImage(tile, 0, 0);
+
+  const sharpData = tileCtx.getImageData(0, 0, s, s);
+  const blurData = blurredCtx.getImageData(0, 0, s, s);
+  const out = tileCtx.createImageData(s, s);
+  for (let i = 0; i < sharpData.data.length; i += 4) {
+    const sharpLum = sharpData.data[i] * 0.299 + sharpData.data[i + 1] * 0.587 + sharpData.data[i + 2] * 0.114;
+    const blurLum = blurData.data[i] * 0.299 + blurData.data[i + 1] * 0.587 + blurData.data[i + 2] * 0.114;
+    // Recentered at neutral gray with a mild contrast lift — the raw
+    // difference is naturally very low-contrast (it's just fiber noise),
+    // and boosting it here means PAPER_VISIBILITY/PAPER_RELIEF_AMOUNT can
+    // stay small, restrained numbers instead of having to compensate.
+    const v = Math.max(0, Math.min(255, 128 + (sharpLum - blurLum) * 1.6));
+    out.data[i] = out.data[i + 1] = out.data[i + 2] = v;
+    out.data[i + 3] = 255;
+  }
+  tileCtx.putImageData(out, 0, 0);
+  return tile;
+}
+
+// Blends the tiled paper detail into whatever's already on ctx at low
+// strength — same shape as applyGrain just above (globalAlpha + 'overlay'
+// + a repeating pattern), deliberately, since it's doing the same kind of
+// job: modulating an existing color with fine texture without shifting
+// its actual hue/lightness. A no-op until paperDetailTile exists.
+function applyPaperTexture(ctx, w, h, alpha) {
+  if (!paperDetailTile) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.fillStyle = ctx.createPattern(paperDetailTile, 'repeat');
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
 function drawTracked(ctx, text, x, y, size, color, spacing, font) {
   ctx.font = `${font || '400'} ${size}px ${FONT_MONO}`;
   ctx.fillStyle = color;
@@ -560,24 +657,6 @@ function drawLinkedinGlyph(ctx, x, y, size, color) {
 
 const SOCIAL_GLYPHS = { instagram: drawInstagramGlyph, linkedin: drawLinkedinGlyph };
 
-function makeBumpTexture() {
-  const s = 256;
-  const c = document.createElement('canvas');
-  c.width = s; c.height = s;
-  const ctx = c.getContext('2d');
-  const img = ctx.createImageData(s, s);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const v = 128 + (Math.random() - 0.5) * 46;
-    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-    img.data[i + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(3, 2);
-  return tex;
-}
-
 export function initCard(container) {
   injectStyles();
 
@@ -629,6 +708,59 @@ export function initCard(container) {
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
   [frontTex, backTex].forEach(t => { t.anisotropy = maxAniso; });
 
+  // Cached, text-free "background" layers (stock color + paper tint +
+  // vignette) — filled in by buildFrontBackground()/buildBackBackground()
+  // inside drawFront()/drawBack(). redrawToggleChevron() below copies its
+  // small patch straight from frontBgCanvas rather than re-deriving the
+  // fill/vignette/paper-pattern math by hand, which is what guarantees the
+  // paper pattern's tiling phase can never drift between a full redraw and
+  // a chevron-only one — it's literally the same pixels, not a second
+  // attempt at matching them.
+  const frontBgCanvas = document.createElement('canvas');
+  const backBgCanvas = document.createElement('canvas');
+  frontBgCanvas.width = backBgCanvas.width = TEX_W;
+  frontBgCanvas.height = UNIFIED_TEX_H;
+  backBgCanvas.height = BACK_TEX_H;
+
+  // Bump maps: one full-face canvas per side, in the SAME coordinate space
+  // and 1:1 UV mapping as frontTex/backTex themselves (no repeat/tiling at
+  // the texture level — see buildFrontBumpMap's own comment on why that
+  // matters for the letterpress specifically). Created eagerly here, filled
+  // in later by buildFrontBumpMap()/buildBackBumpMap() — cardStockMaterial()
+  // below needs the actual texture OBJECTS to exist up front; their canvas
+  // *content* gets drawn afterward, the same lazy-fill/eager-object pattern
+  // frontCanvas/frontTex already use.
+  const frontBumpCanvas = document.createElement('canvas');
+  const backBumpCanvas = document.createElement('canvas');
+  frontBumpCanvas.width = backBumpCanvas.width = TEX_W;
+  frontBumpCanvas.height = UNIFIED_TEX_H;
+  backBumpCanvas.height = BACK_TEX_H;
+  const frontBumpTex = new THREE.CanvasTexture(frontBumpCanvas);
+  const backBumpTex = new THREE.CanvasTexture(backBumpCanvas);
+
+  // Kicked off once, here, independent of theme/font state — paperDetailTile
+  // is module-scope (shared across every card instance there'll ever be,
+  // though in practice there's only one), so a second initCard() call in
+  // the same page load would skip straight to using it.
+  if (!paperLoadStarted) {
+    paperLoadStarted = true;
+    const paperImage = new Image();
+    paperImage.onload = () => {
+      paperDetailTile = buildPaperDetailTile(paperImage);
+      // The asset can finish loading well after the card's first paint —
+      // redraw both faces once it's actually usable rather than leaving
+      // them on the pre-paper look until some unrelated redraw happens by
+      // coincidence (a theme switch, a font finishing its own load).
+      drawFront();
+      drawBack();
+    };
+    // No .onerror handling beyond this — paperDetailTile simply never gets
+    // set, and every call site above already treats that as "render
+    // exactly as before paper texture existed" (see paperDetailTile's own
+    // comment). Nothing else needs to know the load failed.
+    paperImage.src = PAPER_TEXTURE_PATH;
+  }
+
   // toggle-row drawing for the card's own front face (résumé only — the
   // back has no toggle row any more, since it never extends).
   function drawToggleRow(ctx, w, bh, pad, label) {
@@ -651,6 +783,140 @@ export function initCard(container) {
     ctx.rotate(dropdownOpen ? Math.PI : 0);
     ctx.fillText('⌄', 0, 0);
     ctx.restore();
+  }
+
+  // Fills frontBgCanvas/backBgCanvas with everything BEHIND the text: stock
+  // color, the real paper tint, then the vignette — no grain (grain is
+  // cheap and stays per-draw-call, applied after this) and no letters.
+  // Both drawFront()/drawBack() and redrawToggleChevron() paint from this
+  // instead of re-deriving the same fill/vignette by hand, so the paper
+  // pattern's tiling phase is guaranteed identical everywhere on the card:
+  // it's the same source pixels, not two independent attempts at the same
+  // math landing on the same result.
+  function buildFrontBackground() {
+    const ctx = frontBgCanvas.getContext('2d');
+    const w = TEX_W, h = UNIFIED_TEX_H, bh = TEX_BASE_PX;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = CARD_STOCK_COLOR;
+    ctx.fillRect(0, 0, w, h);
+    applyPaperTexture(ctx, w, h, PAPER_VISIBILITY);
+    // filled across the *full* canvas height, not just bh — a gradient's
+    // last color stop holds constant beyond its own radius, so painting
+    // the whole canvas lets it fade smoothly into that constant tone.
+    const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
+    vg.addColorStop(0, ink(0));
+    vg.addColorStop(1, ink(0.06));
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  function buildBackBackground() {
+    const ctx = backBgCanvas.getContext('2d');
+    const w = TEX_W, h = BACK_TEX_H, bh = TEX_BASE_PX;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = CARD_STOCK_COLOR;
+    ctx.fillRect(0, 0, w, h);
+    applyPaperTexture(ctx, w, h, PAPER_VISIBILITY);
+    // 0.08, not the front's 0.06 — matches drawBack()'s own original
+    // (slightly stronger) vignette, unchanged from before this function existed.
+    const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
+    vg.addColorStop(0, ink(0));
+    vg.addColorStop(1, ink(0.08));
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // Height-map source shared by front/back: neutral mid-gray, plus the
+  // same fine noise pattern applyGrain uses for the 2D ink overlay, reused
+  // here at a low, fixed baseline alpha as an always-present bump — this
+  // is what the surface still looks like before the real paper photo has
+  // loaded, or if it never does, matching the plain procedural relief this
+  // file always had. The real paper's own detail (once available) layers
+  // on top, additively, via PAPER_RELIEF_AMOUNT.
+  function paintReliefBase(ctx, w, h) {
+    ctx.fillStyle = 'rgb(128,128,128)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = ctx.createPattern(getGrainCanvas(), 'repeat');
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+    if (paperDetailTile) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, PAPER_RELIEF_AMOUNT / 40);
+      ctx.fillStyle = ctx.createPattern(paperDetailTile, 'repeat');
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
+  }
+
+  // Mirrors drawFront()'s own name-sizing math exactly (same inputs, same
+  // fitTextSize call) — kept as its own function specifically so the
+  // letterpress mask below and the actual printed name can never drift out
+  // of sync with each other; if the printed name's layout ever changes,
+  // this changes with it for free rather than needing a second hand-edit.
+  function fitNameSize(ctx, w, bh, pad) {
+    const nameMaxWidthPx = w - pad * 2;
+    return fitTextSize(
+      ctx, [CONTACT.first, CONTACT.last], nameMaxWidthPx, Math.round(bh * 0.155),
+      (px) => `700 ${px}px ${FONT_DISPLAY}`
+    );
+  }
+
+  // The front's bump map: paper relief (see paintReliefBase) plus a
+  // separate, deliberately deeper impression under the printed name. The
+  // dip is built as its own throwaway canvas — filled with a mid-gray
+  // (not black/white) so a plain 'multiply' blend darkens the relief by a
+  // controlled amount rather than an all-or-nothing cutout, then blurred
+  // (LETTERPRESS_BLUR_PX) so the *height transition* at each letter's edge
+  // reads as compressed paper instead of a hard-edged stamp. The printed
+  // ink itself is a completely separate layer, drawn later in drawFront()
+  // with the real INK_COLOR at full sharpness — nothing here ever touches
+  // that, only the bump map. This canvas is built at frontCanvas's own
+  // full size with no repeat/tiling (see its creation, above) specifically
+  // so this dip can be positioned once, in the same coordinate space as
+  // the printed name, and never accidentally repeat elsewhere on the card.
+  function buildFrontBumpMap() {
+    const w = TEX_W, h = UNIFIED_TEX_H, bh = TEX_BASE_PX;
+    const pad = w * CARD_PAD_FRACTION;
+    const ctx = frontBumpCanvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    paintReliefBase(ctx, w, h);
+
+    const mask = document.createElement('canvas');
+    mask.width = w; mask.height = h;
+    const maskCtx = mask.getContext('2d');
+    maskCtx.fillStyle = '#fff';
+    maskCtx.fillRect(0, 0, w, h);
+    const darken = Math.max(0, 255 - LETTERPRESS_DEPTH);
+    maskCtx.fillStyle = `rgb(${darken},${darken},${darken})`;
+    maskCtx.textBaseline = 'alphabetic';
+    maskCtx.textAlign = 'left';
+    const namePx = fitNameSize(maskCtx, w, bh, pad);
+    maskCtx.font = `700 ${namePx}px ${FONT_DISPLAY}`;
+    maskCtx.fillText(CONTACT.first, pad, bh * NAME_FIRST_Y_F);
+    maskCtx.font = `italic 700 ${namePx}px ${FONT_DISPLAY}`;
+    maskCtx.fillText(CONTACT.last, pad, bh * NAME_LAST_Y_F);
+
+    ctx.save();
+    ctx.filter = `blur(${LETTERPRESS_BLUR_PX}px)`;
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.drawImage(mask, 0, 0);
+    ctx.restore();
+
+    frontBumpTex.needsUpdate = true;
+  }
+
+  // Back's bump map: paper relief only — no letterpress, the name is never
+  // printed on the back — kept as a fully separate canvas/texture from the
+  // front's for exactly that reason (see this function's own creation,
+  // above, and the front's docblock above for why the two can't share one).
+  function buildBackBumpMap() {
+    const w = TEX_W, h = BACK_TEX_H;
+    const ctx = backBumpCanvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    paintReliefBase(ctx, w, h);
+    backBumpTex.needsUpdate = true;
   }
 
   // Redraws ONLY the toggle chevron, not the whole front canvas — dropdownOpen
@@ -687,16 +953,14 @@ export function initCard(container) {
     ctx.clip();
 
     ctx.clearRect(cx - half, cy - half, half * 2, half * 2);
-    ctx.fillStyle = CARD_STOCK_COLOR;
-    ctx.fillRect(cx - half, cy - half, half * 2, half * 2);
-
-    // same vignette formula as drawFront() — fillRect is clip-bounded to the
-    // small box above regardless of the gradient's own (canvas-spanning) extent
-    const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
-    vg.addColorStop(0, ink(0));
-    vg.addColorStop(1, ink(0.06));
-    ctx.fillStyle = vg;
-    ctx.fillRect(cx - half, cy - half, half * 2, half * 2);
+    // Copied straight from the cached background (stock + paper tint +
+    // vignette, no text) rather than re-derived by hand — see
+    // buildFrontBackground's own comment for why that's what guarantees
+    // the paper pattern lines up with the rest of the canvas exactly.
+    ctx.drawImage(
+      frontBgCanvas, cx - half, cy - half, half * 2, half * 2,
+      cx - half, cy - half, half * 2, half * 2
+    );
 
     applyGrain(ctx, w, h, GRAIN_ALPHA); // also clip-bounded to the small box
 
@@ -727,17 +991,12 @@ export function initCard(container) {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = CARD_STOCK_COLOR;
-    ctx.fillRect(0, 0, w, h);
-
-    // filled across the *full* canvas height, not just bh — a gradient's
-    // last color stop holds constant beyond its own radius, so painting
-    // the whole canvas lets it fade smoothly into that constant tone.
-    const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
-    vg.addColorStop(0, ink(0));
-    vg.addColorStop(1, ink(0.06));
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, w, h);
+    // Stock color + real paper tint + vignette — see buildFrontBackground's
+    // own comment; drawn there (not here) specifically so
+    // redrawToggleChevron() can copy the identical pixels for its own small
+    // patch instead of a second, potentially-drifting attempt at this fill.
+    buildFrontBackground();
+    ctx.drawImage(frontBgCanvas, 0, 0);
 
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
@@ -745,11 +1004,11 @@ export function initCard(container) {
     // actual on-screen width — a no-op on the landscape card, which
     // always had room to spare, but load-bearing on the narrower portrait
     // one, where "Scheffler" at the un-fit size would run past the edge.
-    const nameMaxWidthPx = w - pad * 2;
-    const namePx = fitTextSize(
-      ctx, [CONTACT.first, CONTACT.last], nameMaxWidthPx, Math.round(bh * 0.155),
-      (px) => `700 ${px}px ${FONT_DISPLAY}`
-    );
+    // Routed through the shared fitNameSize() helper (not this math
+    // inline) so the letterpress mask in buildFrontBumpMap() is
+    // structurally unable to drift from whatever's actually printed here,
+    // even if this layout changes later.
+    const namePx = fitNameSize(ctx, w, bh, pad);
     ctx.fillStyle = INK_COLOR;
     ctx.font = `700 ${namePx}px ${FONT_DISPLAY}`;
     ctx.fillText(CONTACT.first, pad, bh * NAME_FIRST_Y_F);
@@ -842,6 +1101,13 @@ export function initCard(container) {
 
     applyGrain(ctx, w, h, GRAIN_ALPHA);
     frontTex.needsUpdate = true;
+    // Rebuilds the paper-relief + letterpress bump map alongside the color
+    // canvas above — cheap enough at drawFront()'s own call sites (init,
+    // theme change, fonts finishing load), which is exactly the "asset,
+    // fonts, theme, or text layout changes" list this should react to and
+    // nothing more; tilt/drag/résumé-toggle never call drawFront() at all,
+    // so this never runs on any of those.
+    buildFrontBumpMap();
   }
 
   // Populated by drawBack() below — each social link's horizontal extent
@@ -863,13 +1129,8 @@ export function initCard(container) {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = CARD_STOCK_COLOR;
-    ctx.fillRect(0, 0, w, h);
-    const vg = ctx.createRadialGradient(w / 2, bh / 2, bh * 0.15, w / 2, bh / 2, w * 0.65);
-    vg.addColorStop(0, ink(0));
-    vg.addColorStop(1, ink(0.08));
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, w, h);
+    buildBackBackground();
+    ctx.drawImage(backBgCanvas, 0, 0);
 
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
@@ -993,18 +1254,8 @@ export function initCard(container) {
 
     applyGrain(ctx, w, h, GRAIN_ALPHA);
     backTex.needsUpdate = true;
+    buildBackBumpMap();
   }
-
-  // One bump texture for the unified front cap (card region + résumé tab
-  // region together) — repeat.y scaled for TOTAL_HEIGHT instead of the
-  // default CARD_HEIGHT-tuned (3,2), so the density this was originally
-  // tuned at holds across the full combined surface. The back cap is its
-  // own plain CARD_HEIGHT-tall surface now (no tab to merge with), so it
-  // gets its own clone at the untouched, CARD_HEIGHT-tuned density.
-  const bump = makeBumpTexture();
-  bump.repeat.set(3, 2 * (TOTAL_HEIGHT / CARD_HEIGHT));
-  const backBump = bump.clone();
-  backBump.repeat.set(3, 2);
 
   function cardStockMaterial(map, bumpTexture) {
     return new THREE.MeshPhysicalMaterial({
@@ -1015,7 +1266,7 @@ export function initCard(container) {
       sheen: 0.08,
       sheenRoughness: 0.8,
       sheenColor: new THREE.Color(0xfff6e8),
-      bumpMap: bumpTexture || bump,
+      bumpMap: bumpTexture,
       bumpScale: 0.0018
     });
   }
@@ -1035,8 +1286,8 @@ export function initCard(container) {
      Built exactly once, at its one fixed size — nothing here is ever
      rebuilt or resized again. ---------- */
 
-  const frontMat = cardStockMaterial(frontTex);
-  const backMat = cardStockMaterial(backTex, backBump);
+  const frontMat = cardStockMaterial(frontTex, frontBumpTex);
+  const backMat = cardStockMaterial(backTex, backBumpTex);
   const edgeSideMat = edgeMaterial();
   const edgeCapMat = new THREE.MeshBasicMaterial({ visible: false });
   const hitMat = new THREE.MeshBasicMaterial({ visible: false });
@@ -1249,7 +1500,7 @@ export function initCard(container) {
     }
     const growthPx = PAGE_GROWTH_WORLD * progress * PIXELS_PER_WORLD_UNIT;
     interactionRoot.style.paddingBottom = (basePaddingBottomPx + growthPx) + 'px';
-    handleResize();
+    // tick() sizes the drawing buffer and redraws it in this same callback.
   }
 
   // declared ahead of the initial draw calls below since drawFront() reads
@@ -1258,6 +1509,7 @@ export function initCard(container) {
   let dropdownProgress = 0; // résumé tab's current 0..1 slide progress
   let cardLift = 0;
   let cancelDropdownTween = null;
+  let dropdownAnimation = null;
 
   // tabGroup's own resting position is already baked in at construction
   // (group.position.y = TAB_CLOSED_LOCAL_Y in makeTabRig), but the
@@ -1336,12 +1588,28 @@ export function initCard(container) {
 
   function animateDropdown(target) {
     if (cancelDropdownTween) cancelDropdownTween();
-    const start = dropdownProgress;
-    cancelDropdownTween = tween(500, EASE.outCubic, (v) => {
-      setDropdownVisual(start + (target - start) * v);
-    }, () => {
+    dropdownAnimation = {
+      from: dropdownProgress,
+      target,
+      startTime: performance.now()
+    };
+    // Preserve the existing cancellation/settled-state contract. Unlike the
+    // general tween helper, this schedules no separate frame callback.
+    cancelDropdownTween = () => { dropdownAnimation = null; };
+  }
+
+  function advanceDropdown(now) {
+    if (!dropdownAnimation) return;
+    const { from, target, startTime } = dropdownAnimation;
+    const t = Math.max(0, Math.min(1, (now - startTime) / 500));
+    setDropdownVisual(from + (target - from) * EASE.outCubic(t));
+    if (t === 1) {
+      dropdownAnimation = null;
       cancelDropdownTween = null;
-    });
+      // The closing card remains above the nav until it is actually closed.
+      updateElevation();
+      updateMobileFlipGuide();
+    }
   }
 
   function openDropdown() {
@@ -1725,7 +1993,7 @@ export function initCard(container) {
     // while flipped — see openDropdown) flipping away from it is blocked.
     // Flipping back to the front from the back is always allowed, since
     // the back never extends and so never has this conflict.
-    if (flipping || dragging || mode !== 'idle' || (dropdownOpen && !flipped)) return;
+    if (flipping || dragging || mode !== 'idle' || cancelDropdownTween || (dropdownProgress > 0 && !flipped) || (dropdownOpen && !flipped)) return;
     flipping = true;
     updateMobileFlipGuide();
     const from = flipYaw;
@@ -1752,7 +2020,7 @@ export function initCard(container) {
   // e.g. a drag that ends without closing an already-open résumé must leave
   // the elevation in place, not reset it just because the drag itself ended.
   function updateElevation() {
-    interactionRoot.style.zIndex = (dragging || dropdownOpen) ? '150' : '';
+    interactionRoot.style.zIndex = (dragging || dropdownOpen || dropdownProgress > 0 || !!cancelDropdownTween) ? '150' : '';
   }
 
   function beginDrag(clientX, clientY) {
@@ -2045,7 +2313,7 @@ export function initCard(container) {
   }
   function updateMobileFlipGuide() {
     if (!isTouchDevice) return;
-    guideFlip.style.opacity = (!flipped && !flipping && !dropdownOpen) ? MOBILE_GUIDE_FLIP_OPACITY : 0;
+    guideFlip.style.opacity = (!flipped && !flipping && !dropdownOpen && !cancelDropdownTween && dropdownProgress === 0) ? MOBILE_GUIDE_FLIP_OPACITY : 0;
   }
 
   // Only the top/left/right guides' TEXT (and the top guide's icon
@@ -2178,22 +2446,15 @@ export function initCard(container) {
   /* ---------- resize ---------- */
 
   let lastResizeW = 0, lastResizeH = 0;
+  let resizePending = true;
   function handleResize() {
     const w = interactionRoot.clientWidth;
     const h = interactionRoot.clientHeight;
     if (!w || !h) return;
-    // Idempotency guard: during the résumé open/close drag, updateHeroPadding()
-    // writes paddingBottom every tween frame and calls this synchronously
-    // (needed — see its own comment, skipping straight to the read below
-    // would show a stale camera for a frame) — but that same write also
-    // changes interactionRoot's own box, so the ResizeObserver below fires
-    // *again* for the exact same size, once per frame, arriving right after
-    // this frame's own rAF callbacks. Without this guard both calls run the
-    // full body — including renderer.setSize(), a real GPU-side framebuffer
-    // resize — twice as often as needed for the whole ~30-frame tween,
-    // which is exactly the drag-to-extend/collapse gesture flicker traces
-    // back to. clientWidth/clientHeight are always integers, so this
-    // comparison is exact, not an approximation.
+    // Skip unchanged dimensions. During motion this runs only from tick(),
+    // followed by renderer.render() before the callback returns. Resizing
+    // the drawing buffer from a tween/observer callback can clear a frame
+    // that the browser is about to composite before the next render.
     if (w === lastResizeW && h === lastResizeH) return;
     lastResizeW = w;
     lastResizeH = h;
@@ -2230,7 +2491,11 @@ export function initCard(container) {
       formScale: scale
     });
   }
-  const resizeObserver = new ResizeObserver(handleResize);
+  const resizeObserver = new ResizeObserver(() => {
+    // Notification only: never clear/reallocate a displayed WebGL buffer
+    // here without also drawing its replacement in the same callback.
+    resizePending = true;
+  });
   resizeObserver.observe(interactionRoot);
   handleResize();
 
@@ -2239,19 +2504,13 @@ export function initCard(container) {
   let lastTime = performance.now();
   let lastFilterStr = '';
   function tick(now) {
-    // ResizeObserver notifications are delivered *after* this frame's own
-    // requestAnimationFrame callbacks (per spec) — so mid-resize, the
-    // canvas's on-screen CSS box can already reflect the new size while
-    // camera.aspect/position.z (only touched inside handleResize()) are
-    // still one or more frames stale. That's invisible on the card itself
-    // (its box just follows CSS either way), but contact.js's panel used
-    // to project its position off this same camera every frame — so for
-    // however long the camera lagged, the panel would visibly drift from
-    // the card. Position no longer depends on the camera at all (see
-    // contact.js), but this check stays cheap insurance for the WebGL
-    // render itself never lagging a resize by more than zero frames.
-    if (interactionRoot.clientWidth !== lastResizeW || interactionRoot.clientHeight !== lastResizeH) {
+    // One transaction: advance the dropdown, apply layout, resize the
+    // drawing buffer if needed, then render below. This also works with
+    // the supplied index's timer-backed requestAnimationFrame workaround.
+    advanceDropdown(now);
+    if (resizePending || interactionRoot.clientWidth !== lastResizeW || interactionRoot.clientHeight !== lastResizeH) {
       handleResize();
+      resizePending = false;
     }
 
     const dt = Math.min(0.05, (now - lastTime) / 1000);
