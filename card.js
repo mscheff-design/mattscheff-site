@@ -104,8 +104,12 @@ const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(point
 const CARD_WIDTH = isTouchDevice ? 2.6 : 3.4;
 const BASE_CARD_HEIGHT = isTouchDevice ? 3.4 : 2.14;
 // thin, real-cardstock feel — paper texture/detailing gets layered on top
-// of this later, so the object itself has to read as thin first.
-const CARD_THICKNESS = 0.026;
+// of this later, so the object itself has to read as thin first. Lowered
+// from 0.026 (closer to a credit card's real thickness ratio) — on flip,
+// that edge read as noticeably thick; this is closer to actual uncoated
+// stationery stock relative to CARD_WIDTH. TAB_RECESS (far smaller, see its
+// own definition) stays safely under this at any reasonable value.
+const CARD_THICKNESS = 0.012;
 const CARD_RADIUS = 0.12;
 const CARD_PAD_FRACTION = 0.09;
 // Canvas fillStyle/strokeStyle calls can't reach CSS custom properties, so
@@ -161,17 +165,31 @@ let GRAIN_ALPHA = PALETTE.grainOpacity || 0.035;
 // than the ambient paper relief on purpose, so it still reads as a
 // deliberate impression rather than more of the same grain.
 const PAPER_TEXTURE_PATH = 'assets/card-paper-texture.jpg';
-const PAPER_VISIBILITY = 0.5; // 0..1 — diffuse-layer strength of the paper fiber tint
-const PAPER_RELIEF_AMOUNT = 16; // 0..255 gray-units of height-map variation from the paper's own fibers
+// Lowered from an initial pass that read too dense/napped ("suede" rather
+// than fine uncoated stock) once the relief was actually rendering — see
+// buildPaperDetailTile's own contrast lift, also dialed back for the same
+// reason.
+const PAPER_VISIBILITY = 0.4; // 0..1 — diffuse-layer strength of the paper fiber tint
+const PAPER_RELIEF_AMOUNT = 9; // 0..255 gray-units of height-map variation from the paper's own fibers
 const LETTERPRESS_DEPTH = 90; // 0..255 gray-units the name's impression subtracts from the height map
-const LETTERPRESS_BLUR_PX = 3; // softens the letterpress mask's edges only — the printed ink stays sharp
+const LETTERPRESS_BLUR_PX = 3; // softens the flat recess's own edges — the printed ink stays sharp
+// The directional bevel rims drawn on top of the flat recess (see
+// buildFrontBumpMap) — SHADOW deliberately stronger than HIGHLIGHT ("a
+// restrained inner shadow... a tiny highlight on the opposite edge").
+const LETTERPRESS_BEVEL_SHADOW = 40; // extra gray-units darkened along the far-from-light inner edge
+const LETTERPRESS_BEVEL_HIGHLIGHT = 20; // gray-units lightened along the near-light inner edge
+const LETTERPRESS_BEVEL_STROKE_PX = 3; // width of each bevel rim, centered on the glyph outline
+const LETTERPRESS_BEVEL_OFFSET = 1.4; // texture px each rim is nudged off the true edge
 const PAPER_TILE_PX = 460; // texture-space px per repeat of the paper detail tile
 // heightToNormalMap()'s per-pixel slope multiplier — this is what actually
 // controls how strongly the relief reads under light, since normalScale
 // below is left at a neutral 1. Tuned up from an initial guess after the
 // bumpMap approach (see the height-canvas comment further down) turned out
-// unable to render this relief at all regardless of scale.
-const NORMAL_STRENGTH = 10;
+// unable to render this relief at all regardless of scale; nudged back down
+// slightly alongside PAPER_RELIEF_AMOUNT so grain stays quiet while the
+// bevel rims (which carry their own much larger gray-unit deltas) still
+// read clearly.
+const NORMAL_STRENGTH = 8;
 const NORMAL_MAP_SCALE = 1; // material.normalScale — secondary control, keep at 1 and tune NORMAL_STRENGTH instead
 
 function ink(alpha) {
@@ -534,7 +552,9 @@ function buildPaperDetailTile(img) {
     // difference is naturally very low-contrast (it's just fiber noise),
     // and boosting it here means PAPER_VISIBILITY/PAPER_RELIEF_AMOUNT can
     // stay small, restrained numbers instead of having to compensate.
-    const v = Math.max(0, Math.min(255, 128 + (sharpLum - blurLum) * 1.6));
+    // Lowered from an initial 1.6 — that read too dense/napped once the
+    // relief was actually rendering, closer to suede than uncoated stock.
+    const v = Math.max(0, Math.min(255, 128 + (sharpLum - blurLum) * 1.15));
     out.data[i] = out.data[i + 1] = out.data[i + 2] = v;
     out.data[i + 3] = 255;
   }
@@ -864,7 +884,10 @@ export function initCard(container) {
     ctx.fillStyle = 'rgb(128,128,128)';
     ctx.fillRect(0, 0, w, h);
     ctx.save();
-    ctx.globalAlpha = 0.12;
+    // Lowered from 0.12 alongside PAPER_RELIEF_AMOUNT — together these two
+    // were reading closer to suede than fine uncoated stock once the relief
+    // was actually rendering.
+    ctx.globalAlpha = 0.07;
     ctx.fillStyle = ctx.createPattern(getGrainCanvas(), 'repeat');
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
@@ -927,19 +950,29 @@ export function initCard(container) {
     dstCtx.putImageData(dst, 0, 0);
   }
 
+  // Shared glyph layout for every mask this file builds off of the printed
+  // name (the flat recess plateau, and the two bevel rims below) — kept as
+  // one function specifically so none of them can ever drift out of
+  // position relative to each other or to the real printed name.
+  function layoutNameGlyphs(ctx, w, bh, pad, fn) {
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    const namePx = fitNameSize(ctx, w, bh, pad);
+    ctx.font = `700 ${namePx}px ${FONT_DISPLAY}`;
+    fn(CONTACT.first, pad, bh * NAME_FIRST_Y_F);
+    ctx.font = `italic 700 ${namePx}px ${FONT_DISPLAY}`;
+    fn(CONTACT.last, pad, bh * NAME_LAST_Y_F);
+  }
+
   // The front's bump map: paper relief (see paintReliefBase) plus a
   // separate, deliberately deeper impression under the printed name. The
-  // dip is built as its own throwaway canvas — filled with a mid-gray
-  // (not black/white) so a plain 'multiply' blend darkens the relief by a
-  // controlled amount rather than an all-or-nothing cutout, then blurred
-  // (LETTERPRESS_BLUR_PX) so the *height transition* at each letter's edge
-  // reads as compressed paper instead of a hard-edged stamp. The printed
-  // ink itself is a completely separate layer, drawn later in drawFront()
-  // with the real INK_COLOR at full sharpness — nothing here ever touches
-  // that, only the bump map. This canvas is built at frontCanvas's own
-  // full size with no repeat/tiling (see its creation, above) specifically
-  // so this dip can be positioned once, in the same coordinate space as
-  // the printed name, and never accidentally repeat elsewhere on the card.
+  // printed ink itself is a completely separate layer, drawn later in
+  // drawFront() with the real INK_COLOR at full sharpness — nothing here
+  // ever touches that, only the height data. This canvas is built at
+  // frontCanvas's own full size with no repeat/tiling (see its creation,
+  // above) specifically so this dip can be positioned once, in the same
+  // coordinate space as the printed name, and never accidentally repeat
+  // elsewhere on the card.
   function buildFrontBumpMap() {
     const w = TEX_W, h = UNIFIED_TEX_H, bh = TEX_BASE_PX;
     const pad = w * CARD_PAD_FRACTION;
@@ -947,25 +980,65 @@ export function initCard(container) {
     ctx.clearRect(0, 0, w, h);
     paintReliefBase(ctx, w, h);
 
+    // The flat recess itself: a transparent mask with the glyphs filled
+    // solid at the target darken value, blurred and drawn with normal
+    // (not 'multiply') compositing — so it replaces whatever paper-grain
+    // noise paintReliefBase left underneath with a smooth, uniform value,
+    // the way real compressed paper fiber reads (matte and quiet), rather
+    // than a proportionally-darkened copy of the same grain that's still
+    // visibly textured just because it's dimmer.
+    const darken = Math.max(0, 255 - LETTERPRESS_DEPTH);
     const mask = document.createElement('canvas');
     mask.width = w; mask.height = h;
     const maskCtx = mask.getContext('2d');
-    maskCtx.fillStyle = '#fff';
-    maskCtx.fillRect(0, 0, w, h);
-    const darken = Math.max(0, 255 - LETTERPRESS_DEPTH);
-    maskCtx.fillStyle = `rgb(${darken},${darken},${darken})`;
-    maskCtx.textBaseline = 'alphabetic';
-    maskCtx.textAlign = 'left';
-    const namePx = fitNameSize(maskCtx, w, bh, pad);
-    maskCtx.font = `700 ${namePx}px ${FONT_DISPLAY}`;
-    maskCtx.fillText(CONTACT.first, pad, bh * NAME_FIRST_Y_F);
-    maskCtx.font = `italic 700 ${namePx}px ${FONT_DISPLAY}`;
-    maskCtx.fillText(CONTACT.last, pad, bh * NAME_LAST_Y_F);
-
+    layoutNameGlyphs(maskCtx, w, bh, pad, (text, x, y) => {
+      maskCtx.fillStyle = `rgb(${darken},${darken},${darken})`;
+      maskCtx.fillText(text, x, y);
+    });
     ctx.save();
     ctx.filter = `blur(${LETTERPRESS_BLUR_PX}px)`;
-    ctx.globalCompositeOperation = 'multiply';
     ctx.drawImage(mask, 0, 0);
+    ctx.restore();
+
+    // A restrained directional bevel on top of the flat recess: a thin
+    // darker crease along one inner edge and a thin, fainter lighter crease
+    // along the opposite edge — the classic two-offset-stroke emboss trick,
+    // stroking the glyph OUTLINE (not the fill) so each rim stays a narrow
+    // band right at the edge rather than washing the whole letter. Biased
+    // to match this scene's actual key light (card.js's `key` light sits at
+    // roughly upper-right/front — see its own definition above): the pit
+    // wall facing away from that light (upper-right inner edge) reads as
+    // shadow, the wall facing toward it (lower-left inner edge) catches a
+    // small highlight. 'darken'/'lighten' compositing means each stroke can
+    // only push its own direction, so the two rims can't visually cancel
+    // or exceed one clean pass each. This is what actually makes the
+    // impression read as recessed rather than ambiguous — a plain
+    // symmetric dip left it too easy to misread as raised head-on.
+    const shadowVal = Math.max(0, darken - LETTERPRESS_BEVEL_SHADOW);
+    const highlightVal = Math.min(255, 128 + LETTERPRESS_BEVEL_HIGHLIGHT);
+    const strokeMask = document.createElement('canvas');
+    strokeMask.width = w; strokeMask.height = h;
+    const strokeCtx = strokeMask.getContext('2d');
+    const strokeGlyphs = (color) => {
+      strokeCtx.clearRect(0, 0, w, h);
+      strokeCtx.lineJoin = 'round';
+      strokeCtx.strokeStyle = color;
+      strokeCtx.lineWidth = LETTERPRESS_BEVEL_STROKE_PX;
+      layoutNameGlyphs(strokeCtx, w, bh, pad, (text, x, y) => strokeCtx.strokeText(text, x, y));
+    };
+
+    strokeGlyphs(`rgb(${shadowVal},${shadowVal},${shadowVal})`);
+    ctx.save();
+    ctx.filter = 'blur(1px)';
+    ctx.globalCompositeOperation = 'darken';
+    ctx.drawImage(strokeMask, LETTERPRESS_BEVEL_OFFSET, -LETTERPRESS_BEVEL_OFFSET);
+    ctx.restore();
+
+    strokeGlyphs(`rgb(${highlightVal},${highlightVal},${highlightVal})`);
+    ctx.save();
+    ctx.filter = 'blur(1px)';
+    ctx.globalCompositeOperation = 'lighten';
+    ctx.drawImage(strokeMask, -LETTERPRESS_BEVEL_OFFSET, LETTERPRESS_BEVEL_OFFSET);
     ctx.restore();
 
     heightToNormalMap(frontBumpCanvas, frontNormalCanvas, NORMAL_STRENGTH);
