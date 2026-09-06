@@ -13,8 +13,9 @@
 // card.js reads from when drawing, so the two can never drift apart.
 
 const THEMES = {
-  // Today's exact site colors — the refactor that introduced this file
-  // must be a visual no-op for this theme.
+  // The original launch palette — was the live default until DEFAULT_THEME
+  // switched to 'letterhead' below; kept exactly as-is so it's still
+  // selectable from the ?themes=1 switcher.
   default: {
     bg: '#e8e3d9',
     ink: '#1c140a',
@@ -296,7 +297,13 @@ const THEMES = {
 };
 
 const STORAGE_KEY = 'site-theme';
-const DEFAULT_THEME = 'default';
+// "letterhead" is the live site's actual default look — the hand-authored
+// :root block in index.html's own <style> is kept in sync with its exact
+// values (see injectOverrides()'s comment on why the current DEFAULT_THEME
+// never gets its own override rule). The original launch palette lives on
+// under the 'default' key below, still selectable via the ?themes=1
+// switcher, just no longer what a fresh visitor sees.
+const DEFAULT_THEME = 'letterhead';
 
 function tokenDeclarations(p) {
   let decl = `--bg:${p.bg};--ink:${p.ink};--ink-rgb:${p.inkRgb};--ink-light-rgb:${p.inkLightRgb};`
