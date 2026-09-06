@@ -161,9 +161,21 @@ let GRAIN_ALPHA = PALETTE.grainOpacity || 0.035;
 // than the ambient paper relief on purpose, so it still reads as a
 // deliberate impression rather than more of the same grain.
 const PAPER_TEXTURE_PATH = 'assets/card-paper-texture.jpg';
-const PAPER_VISIBILITY = 0.4; // 0..1 — diffuse-layer strength of the paper fiber tint
-const PAPER_RELIEF_AMOUNT = 9; // 0..255 gray-units of bump-map variation from the paper's own fibers
-const LETTERPRESS_DEPTH = 42; // 0..255 gray-units the name's impression subtracts from the bump map
+// Pushed noticeably stronger than a first "restrained" guess (0.4/9/42) —
+// confirmed via pixel sampling that the underlying canvas data was always
+// correct, but the user reported seeing nothing at all in a real browser.
+// Two real, independent reasons the on-canvas correctness didn't translate
+// to visible relief: (1) bumpScale below was tuned for the OLD bump
+// texture, which was GPU-repeated 3x2 via UV .repeat — switching to one
+// full-face, non-repeating map (see buildFrontBumpMap) changed the
+// effective steepness per world-space unit even at identical gray-value
+// amplitude; (2) renderer.toneMapping is ACESFilmicToneMapping, which
+// compresses exactly the kind of subtle mid-tone contrast this relief
+// lives in. Deliberately overshooting first to confirm the mechanism
+// actually reads as visible at all, before dialing back together.
+const PAPER_VISIBILITY = 0.6; // 0..1 — diffuse-layer strength of the paper fiber tint
+const PAPER_RELIEF_AMOUNT = 22; // 0..255 gray-units of bump-map variation from the paper's own fibers
+const LETTERPRESS_DEPTH = 90; // 0..255 gray-units the name's impression subtracts from the bump map
 const LETTERPRESS_BLUR_PX = 3; // softens the letterpress mask's edges only — the printed ink stays sharp
 const PAPER_TILE_PX = 460; // texture-space px per repeat of the paper detail tile
 
@@ -1267,7 +1279,10 @@ export function initCard(container) {
       sheenRoughness: 0.8,
       sheenColor: new THREE.Color(0xfff6e8),
       bumpMap: bumpTexture,
-      bumpScale: 0.0018
+      // Was 0.0018, tuned for the old GPU-repeated (3x2) bump texture —
+      // see PAPER_VISIBILITY's own comment above for why that tuning
+      // didn't carry over to the new full-face map at the same value.
+      bumpScale: 0.0045
     });
   }
 
