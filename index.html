@@ -104,7 +104,12 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    text, résumé toggle, scroll cue) is injected by card.js itself. */
 .card3d-container{width:min(94vw,820px);height:min(74vh,660px)}
 
-.work{position:relative;z-index:1;padding:0 48px 120px}
+/* 120px bottom padding made sense when a big gap led into the old
+   Photography section below — now Education/Skills/Photography sit
+   directly under Work as tightly-packed accordion sections, and that much
+   trailing space just reads as dead air before the next header. Brought
+   down to match Education's own bottom padding. */
+.work{position:relative;z-index:1;padding:0 48px 48px}
 /* .section-header/.photo-header are real <button>s now — all four
    top-level homepage sections (Work, Education, Skills, Photography)
    collapse/expand the same way, just with different default open states
@@ -575,6 +580,7 @@ window.cancelAnimationFrame = (id) => clearTimeout(id);
 <script type="module">
 import { Loupe } from './loupe.js';
 import { initCard } from './card.js';
+import { initHeroSurface } from './heroSurface.js';
 import { JOBS } from './jobs.js';
 import { initRadioWidget } from './radio.js';
 import { applyStoredTheme } from './theme.js';
@@ -661,7 +667,13 @@ initCollapsibleSection('photographyHeader', 'photographyPanel');
   }
 }
 
-initCard(document.getElementById('card3d'));
+const card = initCard(document.getElementById('card3d'));
+initHeroSurface({
+  hero: document.querySelector('.hero'),
+  cardHitTest: card.hitsCard,
+  cardIsBusy: () => !card.isCardSettled(),
+  navElement: document.querySelector('nav')
+});
 document.getElementById('card3d').addEventListener('resume-job-click', (e) => {
   const job = JOBS.find(j => j.id === e.detail.jobId);
   // Same-tab — see the matching comment on the Selected Work rows below.

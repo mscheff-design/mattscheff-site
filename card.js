@@ -2116,14 +2116,14 @@ export function initCard(container) {
   /* ---------- hover: vertical -> X tilt, horizontal -> Y tilt (small angle, both axes) ---------- */
 
   function updateHoverTilt(clientX, clientY) {
-    if (physicsSuspended) { hovering = false; tiltTargetX = 0; tiltTargetY = 0; return; }
+    // Gated on an actual raycast hit against the card mesh, not just being
+    // somewhere within the hero's much wider bounding box — the cursor
+    // now has its own crayon-trail presence covering the rest of the
+    // hero, so the card should read as passively floating (its own idle
+    // sway, see idleActive below) until the cursor genuinely touches it,
+    // not tilting toward a cursor that's really just drawing nearby.
+    if (physicsSuspended || !hitsCard(clientX, clientY)) { hovering = false; tiltTargetX = 0; tiltTargetY = 0; return; }
     const rect = interactionRoot.getBoundingClientRect();
-    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
-      hovering = false;
-      tiltTargetX = 0;
-      tiltTargetY = 0;
-      return;
-    }
     hovering = true;
     const nx = ((clientX - rect.left) / rect.width) * 2 - 1;
     const ny = ((clientY - rect.top) / rect.height) * 2 - 1;
@@ -2738,6 +2738,11 @@ export function initCard(container) {
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
+
+  // Exposed for hero-level features that need to know where the card
+  // actually is (a real raycast, not a DOM rect) and whether it's mid-
+  // animation, without duplicating either check — see heroSurface.js.
+  return { hitsCard, isCardSettled };
 }
 
 function injectStyles() {
