@@ -36,12 +36,15 @@ body{font-family:var(--font-mono);overflow-x:hidden}
    geometry hit-testing — theme.js's updateReactiveHitTest() — instead). */
 .bg-layer{position:fixed;inset:0;z-index:-1;background:var(--bg);pointer-events:none}
 
-nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:20px 48px;mix-blend-mode:normal;box-shadow:0 6px 14px -7px rgba(var(--ink-rgb),0.24),inset 0 1px 0 rgba(255,255,255,0.4),0 1px 0 rgba(255,80,60,0.06),0 -1px 0 rgba(60,140,255,0.06)}
-nav::before{content:'';position:absolute;top:0;left:0;right:0;height:calc(100% + 32px);z-index:-1;background:linear-gradient(120deg,rgba(255,255,255,0.1) 0%,rgba(255,255,255,0) 35%,rgba(255,255,255,0) 65%,rgba(255,255,255,0.05) 100%),rgba(var(--ink-rgb),0.022);backdrop-filter:blur(8px) saturate(1.45);-webkit-backdrop-filter:blur(8px) saturate(1.45);-webkit-mask-image:linear-gradient(to bottom,black 0,black calc(100% - 32px),transparent 100%);mask-image:linear-gradient(to bottom,black 0,black calc(100% - 32px),transparent 100%)}
-nav::after{content:'';position:absolute;top:0;left:0;right:0;height:calc(100% + 32px);z-index:-1;pointer-events:none;opacity:0.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:90px 90px;-webkit-mask-image:linear-gradient(to bottom,black 0,black calc(100% - 32px),transparent 100%);mask-image:linear-gradient(to bottom,black 0,black calc(100% - 32px),transparent 100%)}
+/* Glass is bounded exactly to nav's own box now (bottom:0, no mask fade) —
+   see chrome.js's matching rules for the full reasoning; kept in sync by
+   hand, same as the rest of this nav/footer chrome. */
+nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:20px 48px;mix-blend-mode:normal;box-shadow:0 2px 6px -3px rgba(var(--ink-rgb),0.22),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(var(--ink-rgb),0.16)}
+nav::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1;background:linear-gradient(120deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0) 40%,rgba(255,255,255,0) 60%,rgba(255,255,255,0.025) 100%),rgba(var(--ink-rgb),0.05);backdrop-filter:blur(8px) saturate(1.45);-webkit-backdrop-filter:blur(8px) saturate(1.45)}
+nav::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1;pointer-events:none;opacity:0.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:90px 90px}
 .nav-links{display:flex;gap:32px}
-.nav-links a{font-family:var(--font-mono);font-size:10px;color:rgba(var(--ink-rgb),0.4);letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:color 0.2s;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.12)}
-.nav-links a.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.4)}
+.nav-links a{font-family:var(--font-mono);font-size:10px;color:rgba(var(--ink-rgb),0.68);letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:color 0.2s;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.12)}
+.nav-links a.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.68)}
 .nav-links a:hover{color:rgba(var(--ink-rgb),0.85)}
 .nav-links a.on-shape:hover{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.85)}
 
@@ -49,8 +52,8 @@ nav::after{content:'';position:absolute;top:0;left:0;right:0;height:calc(100% + 
    page; CSS is hand-kept-in-sync with chrome.js's copy, same as the rest
    of the nav (no templating/build step to share it directly). */
 .nav-radio{display:flex;align-items:center;gap:10px}
-.radio-toggle{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;width:14px;color:rgba(var(--ink-rgb),0.45);transition:color 0.2s;filter:drop-shadow(0 1px 1.5px rgba(var(--ink-rgb),0.14))}
-.radio-toggle.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.45)}
+.radio-toggle{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;width:14px;color:rgba(var(--ink-rgb),0.7);transition:color 0.2s;filter:drop-shadow(0 1px 1.5px rgba(var(--ink-rgb),0.14))}
+.radio-toggle.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.7)}
 .radio-toggle:hover{color:rgba(var(--ink-rgb),0.85)}
 .radio-toggle.on-shape:hover{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.85)}
 .radio-toggle:focus-visible{outline:1.5px solid var(--accent);outline-offset:2px;border-radius:2px}
@@ -60,16 +63,16 @@ nav::after{content:'';position:absolute;top:0;left:0;right:0;height:calc(100% + 
 .nav-radio.is-playing .icon-pause{display:block}
 .nav-radio.is-playing .radio-toggle{color:var(--accent)}
 .radio-viz{display:flex;align-items:flex-end;gap:2px;height:9px;filter:drop-shadow(0 1px 1.5px rgba(var(--ink-rgb),0.14))}
-.radio-viz span{display:block;width:2px;height:100%;border-radius:1px;background:rgba(var(--ink-rgb),0.4);transform-origin:bottom;transform:scaleY(0.18);transition:transform 0.2s ease,background-color 0.2s ease}
-.radio-viz.on-shape span{background:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.4)}
+.radio-viz span{display:block;width:2px;height:100%;border-radius:1px;background:rgba(var(--ink-rgb),0.6);transform-origin:bottom;transform:scaleY(0.18);transition:transform 0.2s ease,background-color 0.2s ease}
+.radio-viz.on-shape span{background:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.6)}
 .nav-radio.is-playing .radio-viz span{background:var(--accent)}
-.radio-station{all:unset;cursor:pointer;font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4);transition:color 0.2s;white-space:nowrap;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.12)}
-.radio-station.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.4)}
+.radio-station{all:unset;cursor:pointer;font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.68);transition:color 0.2s;white-space:nowrap;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.12)}
+.radio-station.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.68)}
 .radio-station:hover{color:rgba(var(--ink-rgb),0.85)}
 .radio-station.on-shape:hover{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.85)}
 .radio-station:focus-visible{outline:1.5px solid var(--accent);outline-offset:2px;border-radius:2px}
-.radio-now{display:inline-block;font-family:var(--font-mono);font-size:8.5px;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.3);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.1)}
-.radio-now.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.3)}
+.radio-now{display:inline-block;font-family:var(--font-mono);font-size:8.5px;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.45);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.1)}
+.radio-now.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.45)}
 .radio-now-track{display:inline-block;white-space:nowrap}
 .radio-now.is-ticking{-webkit-mask-image:linear-gradient(to right,transparent 0,black 12px,black calc(100% - 12px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,black 12px,black calc(100% - 12px),transparent 100%)}
 .radio-now.is-ticking .radio-now-track{animation-name:radio-ticker;animation-timing-function:linear;animation-iteration-count:infinite}
@@ -85,14 +88,14 @@ nav::after{content:'';position:absolute;top:0;left:0;right:0;height:calc(100% + 
    specificity (3 classes) on .nav-radio.is-playing's own accent rules above
    means "currently playing" still wins its accent color regardless of which
    section is underneath — this only touches the resting/hover ink color. */
-nav.is-on-dark .nav-links a{color:rgba(var(--ink-light-rgb),0.4)}
+nav.is-on-dark .nav-links a{color:rgba(var(--ink-light-rgb),0.68)}
 nav.is-on-dark .nav-links a:hover{color:rgba(var(--ink-light-rgb),0.85)}
-nav.is-on-dark .radio-toggle{color:rgba(var(--ink-light-rgb),0.45)}
+nav.is-on-dark .radio-toggle{color:rgba(var(--ink-light-rgb),0.7)}
 nav.is-on-dark .radio-toggle:hover{color:rgba(var(--ink-light-rgb),0.85)}
-nav.is-on-dark .radio-viz span{background:rgba(var(--ink-light-rgb),0.4)}
-nav.is-on-dark .radio-station{color:rgba(var(--ink-light-rgb),0.4)}
+nav.is-on-dark .radio-viz span{background:rgba(var(--ink-light-rgb),0.6)}
+nav.is-on-dark .radio-station{color:rgba(var(--ink-light-rgb),0.68)}
 nav.is-on-dark .radio-station:hover{color:rgba(var(--ink-light-rgb),0.85)}
-nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.3)}
+nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 
 .hero{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 80px}
 
