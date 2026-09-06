@@ -168,9 +168,10 @@ const PAPER_TEXTURE_PATH = 'assets/card-paper-texture.jpg';
 // Lowered from an initial pass that read too dense/napped ("suede" rather
 // than fine uncoated stock) once the relief was actually rendering — see
 // buildPaperDetailTile's own contrast lift, also dialed back for the same
-// reason.
-const PAPER_VISIBILITY = 0.4; // 0..1 — diffuse-layer strength of the paper fiber tint
-const PAPER_RELIEF_AMOUNT = 9; // 0..255 gray-units of height-map variation from the paper's own fibers
+// reason. Nudged back up slightly afterward — restrained still, just a
+// hair more present than the fully-dialed-back values.
+const PAPER_VISIBILITY = 0.46; // 0..1 — diffuse-layer strength of the paper fiber tint
+const PAPER_RELIEF_AMOUNT = 11; // 0..255 gray-units of height-map variation from the paper's own fibers
 const LETTERPRESS_DEPTH = 90; // 0..255 gray-units the name's impression subtracts from the height map
 const LETTERPRESS_BLUR_PX = 3; // softens the flat recess's own edges — the printed ink stays sharp
 // The directional bevel rims drawn on top of the flat recess (see
@@ -554,7 +555,8 @@ function buildPaperDetailTile(img) {
     // stay small, restrained numbers instead of having to compensate.
     // Lowered from an initial 1.6 — that read too dense/napped once the
     // relief was actually rendering, closer to suede than uncoated stock.
-    const v = Math.max(0, Math.min(255, 128 + (sharpLum - blurLum) * 1.15));
+    // Nudged up a hair from there afterward.
+    const v = Math.max(0, Math.min(255, 128 + (sharpLum - blurLum) * 1.25));
     out.data[i] = out.data[i + 1] = out.data[i + 2] = v;
     out.data[i + 3] = 255;
   }
@@ -886,8 +888,8 @@ export function initCard(container) {
     ctx.save();
     // Lowered from 0.12 alongside PAPER_RELIEF_AMOUNT — together these two
     // were reading closer to suede than fine uncoated stock once the relief
-    // was actually rendering.
-    ctx.globalAlpha = 0.07;
+    // was actually rendering. Nudged up a hair from there afterward.
+    ctx.globalAlpha = 0.085;
     ctx.fillStyle = ctx.createPattern(getGrainCanvas(), 'repeat');
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
@@ -2036,7 +2038,13 @@ export function initCard(container) {
     if (!dragging) updateHoverTilt(e.clientX, e.clientY);
     if (!dragging) updateGuideHints(e.clientX, e.clientY);
 
-    if (isPointerDown && potentialDrag && !dragging) {
+    // pointerDownOnCard (set at pointerdown, see below) is a real raycast
+    // hit-test against the card mesh — gating on it here, not just at
+    // pointerup for tap detection, is what keeps a mousedown anywhere in
+    // interactionRoot's much wider hover/tilt-tracking area from starting
+    // a drag. Tilt still follows the cursor everywhere on purpose; only
+    // the drag gesture itself is now scoped to actually starting on the card.
+    if (isPointerDown && potentialDrag && !dragging && pointerDownOnCard) {
       const dx = e.clientX - pointerDownClient.x;
       const dy = e.clientY - pointerDownClient.y;
       if (Math.hypot(dx, dy) > DRAG_THRESHOLD) {

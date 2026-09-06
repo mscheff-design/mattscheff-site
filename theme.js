@@ -248,7 +248,7 @@ const THEMES = {
     // right on this card's realistically-lit 3D material, regardless of
     // hue. Back to neutral paper for both; the color energy stays where
     // it was already landing well — accent green and error red in text,
-    // hover states, and the contact-sheet islands' glow labels.
+    // hover states, and the photography section's own glow labels.
     cardStock: '#F7F7F3',
     error: '#D6304C',
     black: '#000',
@@ -268,13 +268,11 @@ const THEMES = {
   // hard-edged flat color field, rather than one more flat plane within it.
   // And de-stijl's own dark-section blue (bgDark/bgDarker/bgFrame) — fine
   // as a color-block field entry, wrong for the footer and the photography
-  // section's own contact-sheet islands (its surround is the warm page
-  // background now; bgFrame/bgDarker are what still read as an actual
-  // darkroom there, not the whole section), and wrong for a Mondrian panel
-  // too — so those go true near-black here instead, restoring the
-  // black-and-red (glowing warm on true black, same effect "black and
-  // orange" describes under the original theme's actual orange accent)
-  // contact-sheet look.
+  // section (both genuinely dark backgrounds, not just a tinted panel),
+  // and wrong for a Mondrian panel too — so those go true near-black here
+  // instead, restoring the black-and-red (glowing warm on true black, same
+  // effect "black and orange" describes under the original theme's actual
+  // orange accent) contact-sheet look.
   'neo-stijl': {
     bg: `linear-gradient(115deg,transparent 0%,transparent 61%,#DA291C 61%,#DA291C 64%,transparent 64%),`
       + `linear-gradient(200deg,transparent 0%,transparent 76%,#1B3F94 76%,#1B3F94 100%),`
