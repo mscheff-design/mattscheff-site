@@ -1,5 +1,12 @@
 import { mountCrayonTrails } from './crayonTrails.js';
 
+// Off for now (wood desk-reveal parked, crayon trails stay) — flip this
+// back to true to bring the wood layer and the paper's corner cuts back;
+// everything below is still fully wired up, just skipped while this is
+// false. Paper simply covers the whole backdrop with no cuts, and
+// isPaperPoint has nothing to exclude, when this is off.
+const WOOD_ENABLED = false;
+
 const OAK_WIDTH_FRAC = 0.1, OAK_HEIGHT_FRAC = 0.12;
 const WOOD_TILE_PX = 384;
 
@@ -58,9 +65,9 @@ function injectStyles() {
        without needing any text on the page. */
     .hero-materials .trails-toggle{position:absolute;z-index:200;pointer-events:auto;bottom:16px;right:18px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:0;padding:0;background:transparent;border-radius:50%;cursor:pointer}
     .hero-materials .trails-toggle::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--crayon-color,var(--accent));transition:background 0.2s,opacity 0.2s}
-    .hero-materials .trails-toggle[aria-pressed='false']::before{background:rgba(58,42,26,0.4)}
+    .hero-materials .trails-toggle[aria-pressed='false']::before{background:rgba(var(--ink-rgb),0.3)}
     .hero-materials .trails-toggle:hover::before{opacity:0.8}
-    .hero-materials .trails-toggle:focus-visible{outline:2px solid rgba(58,42,26,0.55);outline-offset:3px}
+    .hero-materials .trails-toggle:focus-visible{outline:2px solid rgba(var(--ink-rgb),0.55);outline-offset:3px}
   `;
   document.head.appendChild(style);
 }
@@ -77,16 +84,18 @@ export function initHeroSurface({ hero, cardHitTest, cardIsBusy, navElement }) {
   materials.className = 'hero-materials';
   materials.setAttribute('aria-hidden', 'true');
 
-  const wood = document.createElement('div');
-  wood.className = 'hero-wood';
-
   const paperShadow = document.createElement('div');
   paperShadow.className = 'hero-paper-shadow';
   const paper = document.createElement('div');
   paper.className = 'hero-paper';
   paperShadow.append(paper);
 
-  materials.append(wood, paperShadow);
+  if (WOOD_ENABLED) {
+    const wood = document.createElement('div');
+    wood.className = 'hero-wood';
+    materials.append(wood);
+  }
+  materials.append(paperShadow);
   hero.before(materials);
 
   // restingHeight/ow/oh/cutTopX/cutSlope are all fixed the moment .hero
@@ -98,7 +107,7 @@ export function initHeroSurface({ hero, cardHitTest, cardIsBusy, navElement }) {
   let ow = 0, oh = 0, cutTopX = 0, cutSlope = 0;
 
   function isPaperPoint(absX, absY) {
-    if (restingHeight === null) return true;
+    if (!WOOD_ENABLED || restingHeight === null) return true;
     if (absX < ow && absY < oh && (absX / ow + absY / oh) < 1) return false;
     const xBoundary = cutTopX - cutSlope * (absY - restingHeight);
     if (absY > restingHeight - oh && absX > xBoundary) return false;
@@ -107,6 +116,8 @@ export function initHeroSurface({ hero, cardHitTest, cardIsBusy, navElement }) {
 
   function syncHeight() {
     const h = hero.getBoundingClientRect().height;
+    materials.style.height = h + 'px';
+    if (!WOOD_ENABLED) return;
     const width = materials.clientWidth || hero.clientWidth || 1;
     // .hero never goes below its own resting height on its own — the only
     // way h can be <= the last-known resting height is if we haven't
@@ -122,7 +133,6 @@ export function initHeroSurface({ hero, cardHitTest, cardIsBusy, navElement }) {
       cutTopX = width - ow;
       cutSlope = oh > 0 ? ow / oh : 0;
     }
-    materials.style.height = h + 'px';
     const cutBottomX = Math.max(0, cutTopX - cutSlope * (h - restingHeight));
     paper.style.clipPath = `polygon(${ow}px 0,${width}px 0,${width}px ${restingHeight - oh}px,${cutBottomX}px ${h}px,0 ${h}px,0 ${oh}px)`;
   }
