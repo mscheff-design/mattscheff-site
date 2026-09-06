@@ -161,23 +161,18 @@ let GRAIN_ALPHA = PALETTE.grainOpacity || 0.035;
 // than the ambient paper relief on purpose, so it still reads as a
 // deliberate impression rather than more of the same grain.
 const PAPER_TEXTURE_PATH = 'assets/card-paper-texture.jpg';
-// Pushed noticeably stronger than a first "restrained" guess (0.4/9/42) —
-// confirmed via pixel sampling that the underlying canvas data was always
-// correct, but the user reported seeing nothing at all in a real browser.
-// Two real, independent reasons the on-canvas correctness didn't translate
-// to visible relief: (1) bumpScale below was tuned for the OLD bump
-// texture, which was GPU-repeated 3x2 via UV .repeat — switching to one
-// full-face, non-repeating map (see buildFrontBumpMap) changed the
-// effective steepness per world-space unit even at identical gray-value
-// amplitude; (2) renderer.toneMapping is ACESFilmicToneMapping, which
-// compresses exactly the kind of subtle mid-tone contrast this relief
-// lives in. Deliberately overshooting first to confirm the mechanism
-// actually reads as visible at all, before dialing back together.
-const PAPER_VISIBILITY = 0.6; // 0..1 — diffuse-layer strength of the paper fiber tint
-const PAPER_RELIEF_AMOUNT = 22; // 0..255 gray-units of bump-map variation from the paper's own fibers
-const LETTERPRESS_DEPTH = 90; // 0..255 gray-units the name's impression subtracts from the bump map
+const PAPER_VISIBILITY = 0.5; // 0..1 — diffuse-layer strength of the paper fiber tint
+const PAPER_RELIEF_AMOUNT = 16; // 0..255 gray-units of height-map variation from the paper's own fibers
+const LETTERPRESS_DEPTH = 90; // 0..255 gray-units the name's impression subtracts from the height map
 const LETTERPRESS_BLUR_PX = 3; // softens the letterpress mask's edges only — the printed ink stays sharp
 const PAPER_TILE_PX = 460; // texture-space px per repeat of the paper detail tile
+// heightToNormalMap()'s per-pixel slope multiplier — this is what actually
+// controls how strongly the relief reads under light, since normalScale
+// below is left at a neutral 1. Tuned up from an initial guess after the
+// bumpMap approach (see the height-canvas comment further down) turned out
+// unable to render this relief at all regardless of scale.
+const NORMAL_STRENGTH = 10;
+const NORMAL_MAP_SCALE = 1; // material.normalScale — secondary control, keep at 1 and tune NORMAL_STRENGTH instead
 
 function ink(alpha) {
   return `rgba(${PALETTE.inkRgb},${alpha})`;
@@ -734,21 +729,41 @@ export function initCard(container) {
   frontBgCanvas.height = UNIFIED_TEX_H;
   backBgCanvas.height = BACK_TEX_H;
 
-  // Bump maps: one full-face canvas per side, in the SAME coordinate space
-  // and 1:1 UV mapping as frontTex/backTex themselves (no repeat/tiling at
-  // the texture level — see buildFrontBumpMap's own comment on why that
-  // matters for the letterpress specifically). Created eagerly here, filled
-  // in later by buildFrontBumpMap()/buildBackBumpMap() — cardStockMaterial()
-  // below needs the actual texture OBJECTS to exist up front; their canvas
-  // *content* gets drawn afterward, the same lazy-fill/eager-object pattern
-  // frontCanvas/frontTex already use.
+  // Height canvases: one full-face canvas per side, in the SAME coordinate
+  // space and 1:1 UV mapping as frontTex/backTex themselves (no repeat/
+  // tiling at the texture level — see buildFrontBumpMap's own comment on why
+  // that matters for the letterpress specifically). These are CPU-side only
+  // — never uploaded to the GPU directly — they're grayscale height data
+  // that heightToNormalMap() reads to derive an actual normal map, because
+  // THREE's bumpMap (a live screen-space dFdx/dFdy slope estimate) turned
+  // out unable to render a visible dip for a large flat-topped feature like
+  // the letterpress impression: that technique only picks up local gradients,
+  // so a wide plateau with all its actual "depth" in a thin blurred rim
+  // produced zero visible shading no matter how extreme bumpScale got — this
+  // was confirmed empirically (bumpScale up to 0.05, 10x+ the normal range,
+  // still invisible on both faces) before switching to a precomputed normal
+  // map, which encodes the same height differences as a real per-pixel
+  // surface direction instead of relying on the renderer to notice a slope.
   const frontBumpCanvas = document.createElement('canvas');
   const backBumpCanvas = document.createElement('canvas');
   frontBumpCanvas.width = backBumpCanvas.width = TEX_W;
   frontBumpCanvas.height = UNIFIED_TEX_H;
   backBumpCanvas.height = BACK_TEX_H;
-  const frontBumpTex = new THREE.CanvasTexture(frontBumpCanvas);
-  const backBumpTex = new THREE.CanvasTexture(backBumpCanvas);
+
+  // The actual GPU-facing normal maps, derived from the height canvases
+  // above by heightToNormalMap(). Same dimensions/1:1 UV mapping.
+  const frontNormalCanvas = document.createElement('canvas');
+  const backNormalCanvas = document.createElement('canvas');
+  frontNormalCanvas.width = backNormalCanvas.width = TEX_W;
+  frontNormalCanvas.height = UNIFIED_TEX_H;
+  backNormalCanvas.height = BACK_TEX_H;
+  const frontNormalTex = new THREE.CanvasTexture(frontNormalCanvas);
+  const backNormalTex = new THREE.CanvasTexture(backNormalCanvas);
+  // Normal maps encode surface direction, not color — sampling them through
+  // an sRGB decode would distort every vector. NoColorSpace keeps the raw
+  // 0..255 values linear.
+  frontNormalTex.colorSpace = THREE.NoColorSpace;
+  backNormalTex.colorSpace = THREE.NoColorSpace;
 
   // Kicked off once, here, independent of theme/font state — paperDetailTile
   // is module-scope (shared across every card instance there'll ever be,
@@ -875,6 +890,43 @@ export function initCard(container) {
     );
   }
 
+  // Converts a grayscale height canvas (0..255 luminance = surface height)
+  // into a tangent-space normal map on dstCanvas, via a simple central-
+  // difference (Sobel-lite) slope estimate at every pixel. This replaced a
+  // live bumpMap (see the height-canvas comment above for why): computing
+  // the normal once, per-pixel, up front is more work here but is what
+  // actually lets THREE's lighting see the paper relief and letterpress dip
+  // as real surface direction instead of a slope the shader has to notice
+  // fragment-by-fragment. strength controls how many degrees of tilt one
+  // step of height difference produces — independent of, and multiplied
+  // together with, the material's own normalScale.
+  function heightToNormalMap(srcCanvas, dstCanvas, strength) {
+    const w = srcCanvas.width, h = srcCanvas.height;
+    const src = srcCanvas.getContext('2d').getImageData(0, 0, w, h).data;
+    const dstCtx = dstCanvas.getContext('2d');
+    const dst = dstCtx.createImageData(w, h);
+    const heightAt = (x, y) => {
+      if (x < 0) x = 0; else if (x >= w) x = w - 1;
+      if (y < 0) y = 0; else if (y >= h) y = h - 1;
+      return src[(y * w + x) * 4] / 255;
+    };
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const dx = (heightAt(x + 1, y) - heightAt(x - 1, y)) * strength;
+        const dy = (heightAt(x, y + 1) - heightAt(x, y - 1)) * strength;
+        let nx = -dx, ny = -dy, nz = 1;
+        const inv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+        nx *= inv; ny *= inv; nz *= inv;
+        const i = (y * w + x) * 4;
+        dst.data[i] = (nx * 0.5 + 0.5) * 255;
+        dst.data[i + 1] = (ny * 0.5 + 0.5) * 255;
+        dst.data[i + 2] = (nz * 0.5 + 0.5) * 255;
+        dst.data[i + 3] = 255;
+      }
+    }
+    dstCtx.putImageData(dst, 0, 0);
+  }
+
   // The front's bump map: paper relief (see paintReliefBase) plus a
   // separate, deliberately deeper impression under the printed name. The
   // dip is built as its own throwaway canvas — filled with a mid-gray
@@ -916,7 +968,8 @@ export function initCard(container) {
     ctx.drawImage(mask, 0, 0);
     ctx.restore();
 
-    frontBumpTex.needsUpdate = true;
+    heightToNormalMap(frontBumpCanvas, frontNormalCanvas, NORMAL_STRENGTH);
+    frontNormalTex.needsUpdate = true;
   }
 
   // Back's bump map: paper relief only — no letterpress, the name is never
@@ -928,7 +981,8 @@ export function initCard(container) {
     const ctx = backBumpCanvas.getContext('2d');
     ctx.clearRect(0, 0, w, h);
     paintReliefBase(ctx, w, h);
-    backBumpTex.needsUpdate = true;
+    heightToNormalMap(backBumpCanvas, backNormalCanvas, NORMAL_STRENGTH);
+    backNormalTex.needsUpdate = true;
   }
 
   // Redraws ONLY the toggle chevron, not the whole front canvas — dropdownOpen
@@ -1269,7 +1323,7 @@ export function initCard(container) {
     buildBackBumpMap();
   }
 
-  function cardStockMaterial(map, bumpTexture) {
+  function cardStockMaterial(map, normalTexture) {
     return new THREE.MeshPhysicalMaterial({
       map,
       roughness: 0.82,
@@ -1278,11 +1332,8 @@ export function initCard(container) {
       sheen: 0.08,
       sheenRoughness: 0.8,
       sheenColor: new THREE.Color(0xfff6e8),
-      bumpMap: bumpTexture,
-      // Was 0.0018, tuned for the old GPU-repeated (3x2) bump texture —
-      // see PAPER_VISIBILITY's own comment above for why that tuning
-      // didn't carry over to the new full-face map at the same value.
-      bumpScale: 0.0045
+      normalMap: normalTexture,
+      normalScale: new THREE.Vector2(NORMAL_MAP_SCALE, NORMAL_MAP_SCALE)
     });
   }
 
@@ -1301,8 +1352,8 @@ export function initCard(container) {
      Built exactly once, at its one fixed size — nothing here is ever
      rebuilt or resized again. ---------- */
 
-  const frontMat = cardStockMaterial(frontTex, frontBumpTex);
-  const backMat = cardStockMaterial(backTex, backBumpTex);
+  const frontMat = cardStockMaterial(frontTex, frontNormalTex);
+  const backMat = cardStockMaterial(backTex, backNormalTex);
   const edgeSideMat = edgeMaterial();
   const edgeCapMat = new THREE.MeshBasicMaterial({ visible: false });
   const hitMat = new THREE.MeshBasicMaterial({ visible: false });
