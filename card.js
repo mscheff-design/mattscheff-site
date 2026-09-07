@@ -119,9 +119,13 @@ const CARD_PAD_FRACTION = 0.09;
 // the many opacity variants) rather than literal color strings, so a theme
 // switch just means reassigning these and redrawing.
 let PALETTE = getPalette();
-// single source of truth for the stock color — used for the card's own
-// front/back faces AND both dropdown tabs, so nothing can drift apart.
-let CARD_STOCK_COLOR = PALETTE.cardStock;
+// The card's paper color is a fixed, real material choice (a pale warm
+// cream stock), deliberately NOT theme-driven (unlike everything else
+// here): a physical business card doesn't change its own stock color when
+// the site's color theme is switched via ?themes=1, any more than the
+// hero's wood/paper backdrop does. Used for the card's own front/back
+// faces AND both dropdown tabs, so nothing can drift apart.
+const CARD_STOCK_COLOR = '#FFE8BA';
 let INK_COLOR = PALETTE.ink;
 // The card's extruded edge (the thin "paper thickness" strip visible along
 // its side at a tilt) — optional per theme; falls back to the original
@@ -170,8 +174,8 @@ const PAPER_TEXTURE_PATH = 'assets/card-paper-texture.jpg';
 // buildPaperDetailTile's own contrast lift, also dialed back for the same
 // reason. Nudged back up slightly afterward — restrained still, just a
 // hair more present than the fully-dialed-back values.
-const PAPER_VISIBILITY = 0.46; // 0..1 — diffuse-layer strength of the paper fiber tint
-const PAPER_RELIEF_AMOUNT = 11; // 0..255 gray-units of height-map variation from the paper's own fibers
+const PAPER_VISIBILITY = 0.5; // 0..1 — diffuse-layer strength of the paper fiber tint
+const PAPER_RELIEF_AMOUNT = 13; // 0..255 gray-units of height-map variation from the paper's own fibers
 const LETTERPRESS_DEPTH = 90; // 0..255 gray-units the name's impression subtracts from the height map
 const LETTERPRESS_BLUR_PX = 3; // softens the flat recess's own edges — the printed ink stays sharp
 // The directional bevel rims drawn on top of the flat recess (see
@@ -1150,10 +1154,13 @@ export function initCard(container) {
     // structurally unable to drift from whatever's actually printed here,
     // even if this layout changes later.
     const namePx = fitNameSize(ctx, w, bh, pad);
-    ctx.fillStyle = INK_COLOR;
+    // Both names the same color — "Scheffler"'s own ink(0.55), just a
+    // hair darker (0.62). Tried matching "Matthew" to the crayon trails'
+    // per-visit random color and to a fixed red first; neither stuck.
+    ctx.fillStyle = ink(0.62);
     ctx.font = `700 ${namePx}px ${FONT_DISPLAY}`;
     ctx.fillText(CONTACT.first, pad, bh * NAME_FIRST_Y_F);
-    ctx.fillStyle = ink(0.55);
+    ctx.fillStyle = ink(0.62);
     ctx.font = `italic 700 ${namePx}px ${FONT_DISPLAY}`;
     ctx.fillText(CONTACT.last, pad, bh * NAME_LAST_Y_F);
 
@@ -1171,19 +1178,19 @@ export function initCard(container) {
     JOBS.forEach((job, i) => {
       const rowTopF = ROWS_TOP_F + i * ROW_HEIGHT_F;
 
-      // Dates measured first (fixed size, right-aligned) so the name's own
+      // Dates measured first (fixed size, right-aligned) so the role's own
       // fit below reserves the actual room they take instead of the two
       // just overlapping on a narrow portrait row.
       ctx.font = `400 ${Math.round(bh * 0.027)}px ${FONT_MONO}`;
       const datesWidthPx = ctx.measureText(job.dates).width;
-      const nameMaxWidthPx = w - pad * 2 - datesWidthPx - bh * 0.02;
-      const namePx = fitTextSize(
-        ctx, [job.name], nameMaxWidthPx, Math.round(bh * 0.052),
+      const roleMaxWidthPx = w - pad * 2 - datesWidthPx - bh * 0.02;
+      const rolePx = fitTextSize(
+        ctx, [job.role], roleMaxWidthPx, Math.round(bh * 0.052),
         (px) => `500 ${px}px ${FONT_DISPLAY}`
       );
       ctx.fillStyle = ink(0.88);
       ctx.textAlign = 'left';
-      ctx.fillText(job.name, pad, bh * (rowTopF + 0.075));
+      ctx.fillText(job.role, pad, bh * (rowTopF + 0.075));
 
       ctx.save();
       ctx.font = `400 ${Math.round(bh * 0.027)}px ${FONT_MONO}`;
@@ -1192,7 +1199,9 @@ export function initCard(container) {
       ctx.fillText(job.dates, w - pad, bh * (rowTopF + 0.07));
       ctx.restore();
 
-      const tagsText = job.tags.join(' · ');
+      // Company folded in here instead of drawn as its own big line —
+      // the role above is the emphasized field now, see jobs.js.
+      const tagsText = `${job.name} · ${job.tags.join(' · ')}`;
       const tagsPx = fitTrackedSize(ctx, [tagsText], w - pad * 2, Math.round(bh * 0.023), 1.1);
       drawTracked(ctx, tagsText, pad, bh * (rowTopF + 0.11), tagsPx, ink(0.35), 1.1);
 
@@ -1679,7 +1688,8 @@ export function initCard(container) {
   // whenever the dev-only theme switcher (themeSwitcher.js) changes theme.
   onThemeChange(() => {
     PALETTE = getPalette();
-    CARD_STOCK_COLOR = PALETTE.cardStock;
+    // CARD_STOCK_COLOR is intentionally not reassigned here — see its own
+    // comment above; the card's paper color doesn't follow theme changes.
     INK_COLOR = PALETTE.ink;
     LINK_COLOR = PALETTE.accent;
     CARD_EDGE_COLOR = PALETTE.cardEdge || '#e6dcc4';

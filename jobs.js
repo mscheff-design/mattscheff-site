@@ -2,6 +2,10 @@
 // tab (card.js) and the "Selected Work" section (index.html) read from,
 // so the two never describe the same job with different wording again.
 //
+// role is the emphasized field in both consumers (the big line); name
+// (the company) is folded into the smaller secondary line alongside
+// dates instead.
+//
 // tags is an array (not a preformatted string) because each consumer
 // joins it differently: card.js joins with ' · ' for its canvas-drawn
 // tags line, index.html joins with ' · ' (+ dates) for the row subtitle
@@ -9,6 +13,7 @@
 export const JOBS = [
   {
     id: 'urban-architecture',
+    role: 'Digital Consultant, Social Media Strategist',
     name: 'Urban Architecture Inc.',
     dates: '2022 – Present',
     tags: ['BRAND STRATEGY', 'SHOPIFY DEVELOPMENT', 'EDITORIAL'],
@@ -16,6 +21,7 @@ export const JOBS = [
   },
   {
     id: 'bernard-figueroa-studio',
+    role: 'Social Media Coordinator & Studio Assistant',
     name: 'Bernard Figueroa Studio',
     dates: '2025 – Present',
     tags: ['PHOTOGRAPHY', 'SOCIAL', 'EMAIL'],
@@ -23,6 +29,7 @@ export const JOBS = [
   },
   {
     id: 'statmask',
+    role: 'Digital Manager, Fulfillment Lead',
     name: 'STATMASK',
     dates: '2020 – 2022',
     tags: ['PRODUCT PHOTOGRAPHY', 'PAID SOCIAL', 'E-COMMERCE'],
@@ -30,6 +37,7 @@ export const JOBS = [
   },
   {
     id: 'contributor-development-partnership',
+    role: 'Training Assistant',
     name: 'Contributor Development Partnership',
     dates: '2023',
     tags: ['TRAINING', 'CRM', 'DOCUMENTATION'],

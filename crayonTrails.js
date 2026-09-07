@@ -2,7 +2,14 @@
 export const CRAYON_COLORS = ['#df4931', '#2850ac', '#dcb719', '#1f7a54'];
 export const CRAYON_DEFAULTS = {
   width: 17, opacity: .46, gestureThreshold: 12, drawLength: 400, gapLength: 0,
-  holdSeconds: 24, fadeSeconds: 32, maxStamps: 1800, densityLimit: 70
+  // densityLimit is in "stamps added" per 48px cell — a single straight
+  // pass through a cell alone adds roughly 30-40 (cell width / the ~1.7px
+  // stamp spacing), so the old value of 70 left almost no room for a
+  // shape that doubles back on itself (a heart, a loop retraced) before
+  // hitting the cap. Raised well past what ordinary expressive doodling
+  // needs; it's still there as a backstop against literally circling the
+  // same spot indefinitely.
+  holdSeconds: 24, fadeSeconds: 32, maxStamps: 1800, densityLimit: 400
 };
 export function makeRandom(seed) {
   let n = seed >>> 0;
@@ -182,7 +189,16 @@ export function mountCrayonTrails(hero, {
       const cycle=cfg.drawLength+cfg.gapLength;
       const along=cfg.gapLength>0 ? phase%cycle : phase;
       if ((cfg.gapLength>0 && along>cfg.drawLength) || blocked(px,py)) continue;
-      // A per-area pigment budget decays, so circling never makes a solid blob.
+      // A per-area pigment budget, decaying over time, stops truly
+      // relentless circling in one exact spot from accumulating forever —
+      // but it's a hard stop on ADDING new stamps once a generous budget
+      // is used up, not a gradual fade. Fading alpha by density (the
+      // previous two tunings here) dimmed every stamp in a well-travelled
+      // spot a little more than the last, which is exactly what read as
+      // spotty/inconsistent in an ordinary doodle with some overlap (a
+      // heart shape, a loop retraced a couple times) — normal drawing
+      // revisits the same small area constantly, so it should stay one
+      // consistent wax color there, not visibly fade as it fills in.
       const key=`${Math.floor(px/48)},${Math.floor(py/48)}`;
       const old=density.get(key)||{amount:0,time};
       const amount=old.amount*Math.exp(-(time-old.time)/12000);
@@ -195,7 +211,7 @@ export function mountCrayonTrails(hero, {
       // Half the original ±0.08rad jitter — less scratchy zig-zag along
       // the stroke, closer to one continuous waxy line.
       stamps.push({x:px,y:py,time,angle:angle+(random()-.5)*.04,
-        size:cfg.width*pressure,alpha:cfg.opacity*marginWeight*taper*(1-amount/(cfg.densityLimit*1.3)),brush:Math.floor(random()*brushes.length)});
+        size:cfg.width*pressure,alpha:cfg.opacity*marginWeight*taper,brush:Math.floor(random()*brushes.length)});
     }
     if(stamps.length>cfg.maxStamps) stamps.splice(0,stamps.length-cfg.maxStamps);
     schedule();
@@ -204,9 +220,17 @@ export function mountCrayonTrails(hero, {
   const preferences=()=>{setEnabled(fine.matches&&!motion.matches);};
   const visibility=()=>{breakStroke();if(document.hidden)cancelWork();else schedule();};
   const scroll=()=>breakStroke();
-  hero.addEventListener('pointermove',move,{passive:true});
-  hero.addEventListener('pointerleave',breakStroke,{passive:true});
-  hero.addEventListener('pointerdown',breakStroke,{passive:true});
+  // window/documentElement, not hero — nav is a DOM SIBLING of hero, not a
+  // descendant, so a listener on hero itself never sees pointer events
+  // whose target is inside nav (they bubble through nav's own ancestor
+  // chain, never through hero). card.js's own tilt-tracking hit this same
+  // class of problem and already listens on window for exactly this
+  // reason. move()'s own bounds check against `surface`'s rect already
+  // rejects/breaks the stroke once the cursor leaves the drawable area, so
+  // listening this broadly doesn't risk drawing outside it.
+  window.addEventListener('pointermove',move,{passive:true});
+  document.documentElement.addEventListener('pointerleave',breakStroke,{passive:true});
+  window.addEventListener('pointerdown',breakStroke,{passive:true});
   window.addEventListener('scroll',scroll,{passive:true,capture:true});
   document.addEventListener('visibilitychange',visibility);
   motion.addEventListener('change',preferences); fine.addEventListener('change',preferences);
@@ -222,7 +246,7 @@ export function mountCrayonTrails(hero, {
     get markCount(){return stamps.length;},
     destroy(){
       if(disposed)return;disposed=true;cancelWork();
-      hero.removeEventListener('pointermove',move);hero.removeEventListener('pointerleave',breakStroke);hero.removeEventListener('pointerdown',breakStroke);
+      window.removeEventListener('pointermove',move);document.documentElement.removeEventListener('pointerleave',breakStroke);window.removeEventListener('pointerdown',breakStroke);
       window.removeEventListener('scroll',scroll,true);document.removeEventListener('visibilitychange',visibility);
       motion.removeEventListener('change',preferences);fine.removeEventListener('change',preferences);toggle?.removeEventListener('click',toggleClick);
       sizeObserver.disconnect();intersection.disconnect();canvas.remove();stamps=[];density.clear();

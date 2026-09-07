@@ -670,7 +670,6 @@ initCollapsibleSection('photographyHeader', 'photographyPanel');
 const card = initCard(document.getElementById('card3d'));
 initHeroSurface({
   hero: document.querySelector('.hero'),
-  cardHitTest: card.hitsCard,
   cardIsBusy: () => !card.isCardSettled(),
   navElement: document.querySelector('nav')
 });
@@ -933,8 +932,8 @@ JOBS.forEach((job, i) => {
   row.innerHTML = `
     <span class="row-num">${String(i + 1).padStart(2, '0')}</span>
     <div class="row-body">
-      <div class="row-name">${job.name}</div>
-      <div class="row-sub">${job.tags.join(' · ')} · ${job.dates}</div>
+      <div class="row-name">${job.role}</div>
+      <div class="row-sub">${job.name} · ${job.dates}</div>
     </div>
     <div class="row-tag">${job.tags.join('<br>')}</div>
     <span class="row-arrow">→</span>

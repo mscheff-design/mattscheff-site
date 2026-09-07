@@ -72,10 +72,14 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
-/** Host supplies the real card hit test and busy state — see card.js's hitsCard()/isCardSettled(). */
-export function initHeroSurface({ hero, cardHitTest, cardIsBusy, navElement }) {
-  if (typeof cardHitTest !== 'function' || typeof cardIsBusy !== 'function') {
-    throw new TypeError('initHeroSurface needs cardHitTest and cardIsBusy callbacks.');
+/** Host supplies the card's busy state — see card.js's isCardSettled(). Marks
+    are deliberately NOT blocked from the card's own screen position (see the
+    mountCrayonTrails call below) — the crayon canvas sits behind the card in
+    z-order, so a mark recorded there just stays hidden until the card moves
+    off it, rather than leaving a permanent gap shaped like the card. */
+export function initHeroSurface({ hero, cardIsBusy, navElement }) {
+  if (typeof cardIsBusy !== 'function') {
+    throw new TypeError('initHeroSurface needs a cardIsBusy callback.');
   }
   injectStyles();
 
@@ -154,8 +158,14 @@ export function initHeroSurface({ hero, cardHitTest, cardIsBusy, navElement }) {
     surface: materials,
     toggle,
     isBusy: cardIsBusy,
-    isPointBlocked: cardHitTest,
-    getExclusionRects: () => (navElement ? [navElement.getBoundingClientRect()] : []),
+    // Trying marks under nav too, per request — nav sits above the crayon
+    // canvas in z-order (z-index:100 vs the backdrop's auto) with its own
+    // frosted-glass blur, so marks there show through blurred/desaturated
+    // rather than fully hidden like they are behind the opaque card.
+    // navElement is still passed in and available — revert by restoring
+    // `navElement ? [navElement.getBoundingClientRect()] : []` here if this
+    // doesn't work out.
+    getExclusionRects: () => [],
     isPaperPoint
   });
   materials.append(toggle);
