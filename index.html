@@ -61,11 +61,21 @@ nav::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1
 .radio-toggle .icon-pause{display:none}
 .nav-radio.is-playing .icon-play{display:none}
 .nav-radio.is-playing .icon-pause{display:block}
-.nav-radio.is-playing .radio-toggle{color:var(--accent)}
+/* Fixed, not theme-driven — green/red/yellow read as universal transport-
+   control colors (play/pause/live-signal), the same way the card's paper
+   stock and the hero's wood are fixed real materials rather than
+   swapping with ?themes=1. Reuses the crayon trails' own vermilion/pine
+   green/gold (see CRAYON_COLORS in crayonTrails.js) rather than a fourth
+   unrelated palette. :not(.is-playing) matches .is-playing's own
+   specificity (three classes) so both stay correct even when nav is
+   over a dark section (nav.is-on-dark's own radio-toggle color is only
+   two classes plus an element, and would otherwise win when paused). */
+.nav-radio:not(.is-playing) .radio-toggle{color:#1f7a54}
+.nav-radio.is-playing .radio-toggle{color:#df4931}
 .radio-viz{display:flex;align-items:flex-end;gap:2px;height:9px;filter:drop-shadow(0 1px 1.5px rgba(var(--ink-rgb),0.14))}
 .radio-viz span{display:block;width:2px;height:100%;border-radius:1px;background:rgba(var(--ink-rgb),0.6);transform-origin:bottom;transform:scaleY(0.18);transition:transform 0.2s ease,background-color 0.2s ease}
 .radio-viz.on-shape span{background:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.6)}
-.nav-radio.is-playing .radio-viz span{background:var(--accent)}
+.nav-radio.is-playing .radio-viz span{background:#dcb719}
 .radio-station{all:unset;cursor:pointer;font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.68);transition:color 0.2s;white-space:nowrap;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.12)}
 .radio-station.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.68)}
 .radio-station:hover{color:rgba(var(--ink-rgb),0.85)}

@@ -88,14 +88,22 @@ function injectStyles() {
     .radio-toggle .icon-pause{display:none}
     .nav-radio.is-playing .icon-play{display:none}
     .nav-radio.is-playing .icon-pause{display:block}
-    .nav-radio.is-playing .radio-toggle{color:var(--accent)}
+    /* Fixed, not theme-driven — green/red/yellow read as universal transport-
+       control colors (play/pause/live-signal), the same way the card's paper
+       stock and the hero's wood are fixed real materials rather than
+       swapping with ?themes=1. Reuses the crayon trails' own vermilion/pine
+       green/gold (see CRAYON_COLORS in crayonTrails.js) rather than a fourth
+       unrelated palette. Kept in sync with index.html's own copy of this
+       block — see this file's own top-of-file sync convention. */
+    .nav-radio:not(.is-playing) .radio-toggle{color:#1f7a54}
+    .nav-radio.is-playing .radio-toggle{color:#df4931}
     /* Not a real audio analyser — see radio.js's comment above vizBars for
        why (the NTS stream sends no CORS headers, so Web Audio can't read
        real frequency data from it). Three bars on independent sine waves. */
     .radio-viz{display:flex;align-items:flex-end;gap:2px;height:9px;filter:drop-shadow(0 1px 1.5px rgba(var(--ink-rgb),0.14))}
     .radio-viz span{display:block;width:2px;height:100%;border-radius:1px;background:rgba(var(--ink-rgb),0.6);transform-origin:bottom;transform:scaleY(0.18);transition:transform 0.2s ease,background-color 0.2s ease}
     .radio-viz.on-shape span{background:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.6)}
-    .nav-radio.is-playing .radio-viz span{background:var(--accent)}
+    .nav-radio.is-playing .radio-viz span{background:#dcb719}
     .radio-station{all:unset;cursor:pointer;font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.68);transition:color 0.2s;white-space:nowrap;text-shadow:0 1px 2px rgba(var(--ink-rgb),0.12)}
     .radio-station.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),0.68)}
     .radio-station:hover{color:rgba(var(--ink-rgb),0.85)}
