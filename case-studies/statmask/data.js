@@ -37,12 +37,43 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'textMedia',
+      type: 'glance',
+      props: {
+        heading: 'At a glance',
+        caseId: 'STM — 03',
+        items: [
+          { label: 'Client', value: 'STATMASK' },
+          { label: 'Role', value: 'Digital Manager, Fulfillment Lead' },
+          { label: 'Engagement', value: '2020–2022' }
+        ],
+        scope: 'Product photography · Paid social · E-commerce'
+      }
+    },
+    {
+      type: 'module',
+      props: {
+        heading: 'Overview',
+        chapter: true,
+        chapterLabel: 'Overview',
+        lede: 'STATMASK needed to go from concept to a working storefront and ad creative in weeks, not months.',
+        bullets: [
+          'Launched into a suddenly crowded category at the start of 2020.',
+          'Photography, paid social, and the e-commerce build ran as one connected effort for two years.'
+        ],
+        closing: 'The photography had to work everywhere at once — storefront, ad, and email — from day one.'
+      }
+    },
+    {
+      type: 'module',
       props: {
         heading: 'The challenge',
-        body: 'Every other DTC mask brand launching in the same window looked identical — the same stock photography, the same templated storefront, the same three ad formats. STATMASK needed a visual identity distinct enough to earn attention in a suddenly crowded category, on a launch timeline measured in weeks.',
-        media: { type: 'image', src: placeholder('CATEGORY LANDSCAPE') },
-        orientation: 'right'
+        chapter: true,
+        chapterLabel: 'Challenge',
+        lede: 'Every other DTC mask brand launching in the same window looked identical.',
+        bullets: [
+          'Same stock photography, same templated storefront, same three ad formats across the category.',
+          'STATMASK needed a visual identity distinct enough to earn attention — on a launch timeline measured in weeks.'
+        ]
       }
     },
     {
@@ -63,12 +94,17 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'textMedia',
+      type: 'module',
       props: {
         heading: 'The approach',
-        body: 'We shot a modular photography system — product-only, on-body, and lifestyle — sized and cropped for every paid social placement from day one, so creative testing didn’t wait on a separate shoot. The storefront was built around the same photography, keeping product pages, ads, and email visually identical rather than stitched together after the fact.',
-        media: { type: 'image', src: placeholder('MODULAR SHOOT SYSTEM') },
-        orientation: 'left'
+        chapter: true,
+        chapterLabel: 'Approach',
+        lede: 'A modular photography system, sized for every placement from day one.',
+        bullets: [
+          'Product-only, on-body, and lifestyle shots — cropped for every paid social placement before testing began.',
+          'The storefront built around the same photography, so product pages, ads, and email stayed visually identical.'
+        ],
+        closing: 'Creative testing never waited on a separate shoot.'
       }
     },
     {

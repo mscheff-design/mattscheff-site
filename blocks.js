@@ -82,6 +82,77 @@ export function textBlock(props) {
   return wrap;
 }
 
+// "At a Glance" — a case-file ledger sheet, standardized across every case
+// study (see moduleBlock below for its Overview/Challenge/Approach
+// counterpart). Contained to the normal content column, not full-bleed —
+// it's meant to read as a page in the case file, not a banner. Three rows:
+// a tag + optional archival case number (caseId, e.g. "UA — 01"), the
+// Client/Principal/Role/Engagement fields, then Scope spanning full width.
+// The stem (a vertical hairline dropping from the case number down to the
+// second hairline) is a quiet echo of the chapter rail's own hash+numeral
+// language elsewhere on the page — not a literal physical connection to
+// it (the rail is fixed near the viewport edge and only shows above
+// 1180px; this sheet sits in the contained column regardless), just the
+// same visual vocabulary so the two don't read as unrelated systems.
+export function glanceBlock(props) {
+  const wrap = el('div', 'cs-block cs-glance');
+  const sheet = el('div', 'cs-glance-sheet');
+  const frame = el('div', 'cs-glance-frame');
+
+  const head = el('div', 'cs-glance-head');
+  head.appendChild(el('div', 'cs-glance-tag', props.heading || 'At a glance'));
+  if (props.caseId) {
+    const caseId = el('div', 'cs-glance-caseid');
+    caseId.appendChild(el('span', 'cs-glance-caseid-mark'));
+    caseId.appendChild(el('span', 'cs-glance-caseid-text', props.caseId));
+    head.appendChild(caseId);
+  }
+  frame.appendChild(head);
+  frame.appendChild(el('div', 'cs-glance-hr cs-glance-hr--top'));
+
+  const fields = el('div', 'cs-glance-fields');
+  (props.items || []).forEach(({ label, value }) => {
+    const field = el('div', 'cs-glance-field');
+    field.appendChild(el('div', 'cs-glance-label', label));
+    field.appendChild(el('div', 'cs-glance-value', value));
+    fields.appendChild(field);
+  });
+  frame.appendChild(fields);
+  if (props.caseId) frame.appendChild(el('div', 'cs-glance-stem'));
+
+  sheet.appendChild(frame);
+  sheet.appendChild(el('div', 'cs-glance-hr cs-glance-hr--bottom'));
+  if (props.scope) {
+    const scope = el('div', 'cs-glance-scope');
+    scope.appendChild(el('div', 'cs-glance-label', 'Scope'));
+    scope.appendChild(el('div', 'cs-glance-value', props.scope));
+    sheet.appendChild(scope);
+  }
+  wrap.appendChild(sheet);
+  return wrap;
+}
+
+// The standardized shape for Overview/Challenge/Approach: a short narrative
+// lede (sets the scene), the parsed-out scannable bullets (the actual
+// content, may contain <strong> lead-ins the same way body arrays
+// elsewhere do), and an optional closing line that hands off to whatever
+// comes next. No media slot by design — text-only, matching how these
+// three sections work in the one case study with real copy; photography/
+// identity storytelling happens in the surrounding textMedia/
+// fullBleedMedia/gallery blocks instead.
+export function moduleBlock(props) {
+  const wrap = el('div', 'cs-block cs-module');
+  if (props.heading) wrap.appendChild(el('h2', 'cs-module-heading', props.heading));
+  if (props.lede) wrap.appendChild(el('p', 'cs-module-lede', props.lede));
+  if (props.bullets && props.bullets.length) {
+    const list = el('ul', 'cs-module-bullets');
+    props.bullets.forEach((b) => list.appendChild(el('li', 'cs-module-bullet', b)));
+    wrap.appendChild(list);
+  }
+  if (props.closing) wrap.appendChild(el('p', 'cs-module-closing', props.closing));
+  return wrap;
+}
+
 export function fullBleedMediaBlock(props) {
   const wrap = el('div', 'cs-block cs-full-bleed' + (props.theme === 'dark' ? ' cs-full-bleed--dark' : ''));
   const inner = el('div', 'cs-full-bleed-inner');
@@ -245,11 +316,13 @@ export function nextProjectBlock(props) {
 // slower scale-in instead, and quotes get a slower plain fade with no
 // vertical motion, since a pull-quote reads better materializing quietly
 // than sliding in like a data row. Everything else keeps the default.
-const REVEAL_VARIANTS = { fullBleedMedia: 'scale', quote: 'soft' };
+const REVEAL_VARIANTS = { fullBleedMedia: 'scale', quote: 'soft', glance: 'ledger' };
 
 const BLOCK_FACTORIES = {
   hero: heroBlock,
   text: textBlock,
+  glance: glanceBlock,
+  module: moduleBlock,
   textMedia: textMediaBlock,
   fullBleedMedia: fullBleedMediaBlock,
   statRow: statRowBlock,
@@ -396,6 +469,56 @@ function injectStyles() {
     .cs-text-heading{font-family:var(--font-serif);font-weight:400;font-size:clamp(24px,3vw,32px);color:var(--ink);margin-bottom:16px}
     .cs-text-body{font-family:var(--font-serif);font-size:17px;line-height:1.65;color:rgba(var(--ink-rgb),0.75);max-width:62ch;margin-bottom:20px}
     .cs-text-body:last-child{margin-bottom:0}
+
+    /* at a glance — a case-file ledger sheet, contained to the normal
+       content column (not full-bleed — it reads as a page in the file,
+       not a banner). See glanceBlock's own doc comment for the structure. */
+    .cs-glance-frame{position:relative}
+    .cs-glance-head{display:flex;align-items:baseline;justify-content:space-between;gap:24px;padding-bottom:18px}
+    .cs-glance-tag{font-family:var(--font-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4)}
+    .cs-glance-caseid{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+    .cs-glance-caseid-mark{width:10px;height:1px;background:rgba(var(--ink-rgb),0.35)}
+    .cs-glance-caseid-text{font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.5)}
+    .cs-glance-hr{height:1px;background:rgba(var(--ink-rgb),0.12)}
+    /* the rail-echo stem — spans exactly the frame's height (head is
+       excluded from that height calc since it sits above the frame's own
+       content flow start... no: frame wraps head+hr-top+fields, so the
+       stem runs from the top of the head down to the frame's bottom edge,
+       which lines up with cs-glance-hr--bottom right after it. */
+    .cs-glance-stem{position:absolute;top:0;bottom:0;right:0;width:1px;background:rgba(var(--ink-rgb),0.12)}
+    .cs-glance-fields{display:grid;grid-template-columns:repeat(4,1fr);gap:28px 32px;padding:32px 0}
+    .cs-glance-label{font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4);margin-bottom:10px}
+    .cs-glance-value{font-family:var(--font-serif);font-size:16px;line-height:1.5;color:var(--ink)}
+    .cs-glance-scope{padding-top:32px}
+    .cs-glance-scope .cs-glance-value{max-width:64ch}
+    @media (max-width:640px){
+      .cs-glance-fields{grid-template-columns:1fr;gap:20px}
+      .cs-glance-head{flex-wrap:wrap;gap:10px}
+    }
+    /* internal reveal stagger — the outer rise/unfold comes from
+       reveal.js's 'ledger' variant (see REVEAL_VARIANTS above); these
+       micro-delays on the hairlines/fields ride that same is-revealed
+       toggle so the sheet reads as unfolding open top-to-bottom, not just
+       fading in as one flat unit. Scoped under .reveal-init, matching
+       reveal.js's own rule that nothing starts hidden without JS present. */
+    .cs-glance.reveal-init .cs-glance-hr,
+    .cs-glance.reveal-init .cs-glance-fields > *,
+    .cs-glance.reveal-init .cs-glance-scope{opacity:0;transition:opacity 0.3s ease}
+    .cs-glance.is-revealed .cs-glance-hr--top{opacity:1;transition-delay:0.05s}
+    .cs-glance.is-revealed .cs-glance-fields > *:nth-child(1){opacity:1;transition-delay:0.09s}
+    .cs-glance.is-revealed .cs-glance-fields > *:nth-child(2){opacity:1;transition-delay:0.13s}
+    .cs-glance.is-revealed .cs-glance-fields > *:nth-child(3){opacity:1;transition-delay:0.17s}
+    .cs-glance.is-revealed .cs-glance-fields > *:nth-child(4){opacity:1;transition-delay:0.21s}
+    .cs-glance.is-revealed .cs-glance-hr--bottom{opacity:1;transition-delay:0.24s}
+    .cs-glance.is-revealed .cs-glance-scope{opacity:1;transition-delay:0.28s}
+
+    /* overview / challenge / approach — narrative lede + snackable bullets */
+    .cs-module-heading{font-family:var(--font-serif);font-weight:400;font-size:clamp(24px,3vw,32px);color:var(--ink);margin-bottom:20px}
+    .cs-module-lede{font-family:var(--font-serif);font-size:19px;line-height:1.55;color:var(--ink);max-width:56ch;margin-bottom:28px}
+    .cs-module-bullets{list-style:none;margin:0 0 20px;padding:0;max-width:62ch;display:flex;flex-direction:column;gap:14px}
+    .cs-module-bullet{position:relative;padding-left:22px;font-family:var(--font-serif);font-size:16px;line-height:1.6;color:rgba(var(--ink-rgb),0.75)}
+    .cs-module-bullet::before{content:'';position:absolute;left:0;top:0.75em;width:12px;height:1px;background:${LINK_COLOR}}
+    .cs-module-closing{font-family:var(--font-serif);font-style:italic;font-size:16px;line-height:1.6;color:rgba(var(--ink-rgb),0.5);max-width:56ch;margin-top:24px}
 
     /* text + media split */
     .cs-text-media{display:flex;gap:64px;align-items:center}

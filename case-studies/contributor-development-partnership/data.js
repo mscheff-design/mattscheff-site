@@ -6,11 +6,11 @@
 // Deliberately text-forward and shorter than the other three case
 // studies: this engagement was training/CRM/documentation work with no
 // visual creative output to showcase, so rather than force it into the
-// same image-heavy template, it uses the plain `text` block (no media
-// slot) and skips textMedia/fullBleedMedia/gallery entirely. No hero
-// image either. Fewer blocks overall (6 vs. 8) on purpose — the shorter
-// length is itself part of how this case study reads differently from
-// the other three, not an oversight.
+// same image-heavy template, it uses only media-free blocks (glance,
+// module, statRow, quote) and skips textMedia/fullBleedMedia/gallery
+// entirely. No hero image either. The shorter length is itself part of
+// how this case study reads differently from the other three, not an
+// oversight.
 
 export const CASE_STUDY = {
   id: 'contributor-development-partnership',
@@ -22,10 +22,43 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'text',
+      type: 'glance',
+      props: {
+        heading: 'At a glance',
+        caseId: 'CDP — 04',
+        items: [
+          { label: 'Client', value: 'Contributor Development Partnership' },
+          { label: 'Role', value: 'Training Assistant' },
+          { label: 'Engagement', value: '2023' }
+        ],
+        scope: 'Onboarding documentation · CRM cleanup · Training systems'
+      }
+    },
+    {
+      type: 'module',
+      props: {
+        heading: 'Overview',
+        chapter: true,
+        chapterLabel: 'Overview',
+        lede: 'A fast-growing team of contributors, with no consistent onboarding and a CRM drifted out of sync with how the team actually worked.',
+        bullets: [
+          'Brought in during 2023 to fix a specific operational problem, not to redesign anything.',
+          'The fix needed to outlast the engagement — something the team could keep using on its own.'
+        ]
+      }
+    },
+    {
+      type: 'module',
       props: {
         heading: 'The challenge',
-        body: 'Onboarding took weeks not because the work itself was complex, but because there was no single reference for it — the process lived across a handful of Slack threads and one outdated PDF, and it depended on whichever teammate happened to remember the current version. The CRM had drifted the same way: fields nobody used anymore, records nobody fully trusted, and no clear owner responsible for keeping it current.'
+        chapter: true,
+        chapterLabel: 'Challenge',
+        lede: 'Onboarding took weeks — not because the work was complex, but because there was no single reference for it.',
+        bullets: [
+          'The process lived across a handful of Slack threads and one outdated PDF.',
+          'It depended on whichever teammate happened to remember the current version.',
+          'The CRM had drifted the same way: unused fields, records nobody trusted, no clear owner.'
+        ]
       }
     },
     {
@@ -46,10 +79,16 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'text',
+      type: 'module',
       props: {
         heading: 'The approach',
-        body: 'We rebuilt onboarding as a single, versioned reference doc instead of a scattered mix of threads and file attachments, then rebuilt the CRM’s fields and record ownership around how the team was actually working day to day, not how it had been set up two years earlier. The goal wasn’t a new tool — it was making the tools already in place trustworthy again.'
+        chapter: true,
+        chapterLabel: 'Approach',
+        lede: 'Not a new tool — just making the tools already in place trustworthy again.',
+        bullets: [
+          'Onboarding rebuilt as a single, versioned reference doc, replacing the scattered threads and attachments.',
+          'The CRM’s fields and record ownership rebuilt around how the team was actually working day to day.'
+        ]
       }
     },
     {

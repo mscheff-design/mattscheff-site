@@ -5,10 +5,11 @@
 // /assets/case-studies/bernard-figueroa-studio/) whenever the real
 // material is ready.
 //
-// Block order is deliberately different from urban-architecture's
-// (quote comes right after the hero, no dark full-bleed band, gallery
-// captions read as shoot notes) to demonstrate that each case study
-// doesn't have to follow the same template shape.
+// Block order is deliberately different from urban-architecture's (the
+// pull-quote sits between Overview and the Challenge module rather than
+// after it, no dark full-bleed band, gallery captions read as shoot
+// notes) to demonstrate that each case study doesn't have to follow the
+// same template shape.
 
 function placeholder(label, w = 1200, h = 800, bg = 'd8cfc0', fg = '1c140a') {
   const escapedLabel = String(label).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -30,6 +31,33 @@ export const CASE_STUDY = {
       }
     },
     {
+      type: 'glance',
+      props: {
+        heading: 'At a glance',
+        caseId: 'BFS — 02',
+        items: [
+          { label: 'Client', value: 'Bernard Figueroa Studio' },
+          { label: 'Role', value: 'Social Media Coordinator & Studio Assistant' },
+          { label: 'Engagement', value: '2025–Present' }
+        ],
+        scope: 'Photography direction · Social content · Email program'
+      }
+    },
+    {
+      type: 'module',
+      props: {
+        heading: 'Overview',
+        chapter: true,
+        chapterLabel: 'Overview',
+        lede: 'A weekly social and email cadence needed photography that could actually keep up with it — not a shoot every few months.',
+        bullets: [
+          'Campaigns were leaning on stock imagery or shots months past their moment.',
+          'Since 2025, photography direction, social content, and the email program run as one connected pipeline.',
+          'Every shoot is planned to serve both channels from day one, not repurposed after the fact.'
+        ]
+      }
+    },
+    {
       type: 'quote',
       props: {
         text: 'Every email and post finally looks like it came from the same studio. That wasn’t true before.',
@@ -37,12 +65,17 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'textMedia',
+      type: 'module',
       props: {
         heading: 'The challenge',
-        body: 'Social and email were run separately from the studio’s photography, so campaigns leaned on stock imagery or reused shots months past their moment. There was no shot list, no consistent color grade, and email design changed voice with every send.',
-        media: { type: 'image', src: placeholder('BEFORE — MIXED ASSETS') },
-        orientation: 'left'
+        chapter: true,
+        chapterLabel: 'Challenge',
+        lede: 'Social and email were run separately from the studio’s own photography — and it showed.',
+        bullets: [
+          'Campaigns leaned on stock imagery or shots months past their moment.',
+          'No shot list, no consistent color grade.',
+          'Email design changed voice with every send.'
+        ]
       }
     },
     {
@@ -63,12 +96,17 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'textMedia',
+      type: 'module',
       props: {
         heading: 'The approach',
-        body: 'We built a repeatable shoot framework — same lighting setup, same color grade, same shot-list structure — so a week’s photography could be planned once and cut for email, social, and print. Email templates and social formats were redesigned around that same visual system, so a send and a post finally read as the same studio.',
-        media: { type: 'image', src: placeholder('SYSTEM / TEMPLATES') },
-        orientation: 'right'
+        chapter: true,
+        chapterLabel: 'Approach',
+        lede: 'A repeatable shoot framework, built once and reused every week.',
+        bullets: [
+          'Same lighting setup, same color grade, same shot-list structure — planned once, cut for email, social, and print.',
+          'Email templates and social formats redesigned around that same visual system.'
+        ],
+        closing: 'A send and a post finally read as the same studio.'
       }
     },
     {
