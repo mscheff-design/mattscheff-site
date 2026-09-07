@@ -1993,7 +1993,6 @@ export function initCard(container) {
   // hover to fall back on, only this) fully win over native scrolling
   // exactly like before, without claiming the rest of the hero too.
   interactionRoot.style.touchAction = 'auto';
-  document.body.style.cursor = 'grab';
 
   interactionRoot.addEventListener('pointerdown', (e) => {
     if (mode !== 'idle' || flipping || physicsSuspended) return;
@@ -2047,6 +2046,11 @@ export function initCard(container) {
     if (isTouchDevice) return;
     if (!dragging) updateHoverTilt(e.clientX, e.clientY);
     if (!dragging) updateGuideHints(e.clientX, e.clientY);
+    // hovering is already a real hitsCard() raycast result, set inside
+    // updateHoverTilt just above — reusing it here instead of a second
+    // raycast is what keeps the hand cursor scoped to the actual card
+    // shape (not just interactionRoot's much wider box) at no extra cost.
+    if (!dragging) interactionRoot.style.cursor = hovering ? 'grab' : '';
 
     // pointerDownOnCard (set at pointerdown, see below) is a real raycast
     // hit-test against the card mesh — gating on it here, not just at
@@ -2192,7 +2196,7 @@ export function initCard(container) {
     dragStartY = posY;
     lastDragProgress = 0;
     liftProgressTarget = 1;
-    document.body.style.cursor = 'grabbing';
+    interactionRoot.style.cursor = 'grabbing';
     updateElevation();
   }
 
@@ -2218,7 +2222,11 @@ export function initCard(container) {
 
   function endDrag() {
     dragging = false;
-    document.body.style.cursor = 'grab';
+    // Reset, not 'grab' — hovering is stale (beginDrag zeroed it, and
+    // nothing's updated it mid-drag); the very next pointermove re-checks
+    // the real cursor position via hitsCard and sets 'grab' again if it's
+    // still actually over the card.
+    interactionRoot.style.cursor = '';
     liftProgressTarget = 0;
     // Provisional — if this same drag opens/closes the dropdown further
     // down, openDropdown()/closeDropdown() will call this again with the
@@ -2405,9 +2413,9 @@ export function initCard(container) {
      own call site (alongside updateHoverTilt) for why both are driven off
      the same pointermove. ---------- */
 
-  const ICON_ARROW = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 7l4-4 4 4"/></svg>';
-  const ICON_CURVE = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.2c-2.6 3-6.3 4.4-9.8 3.9"/><path d="M6.4 6.3L2.9 9.2l2.7 2.6"/></svg>';
-  const ICON_FLIP = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.3 8.4a4.7 4.7 0 0 1 8-3.3M12.7 7.6a4.7 4.7 0 0 1-8 3.3"/><path d="M11 2.6v2.8H8.2M5 13.4v-2.8h2.8"/></svg>';
+  const ICON_ARROW = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 7l4-4 4 4"/></svg>';
+  const ICON_CURVE = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.2c-2.6 3-6.3 4.4-9.8 3.9"/><path d="M6.4 6.3L2.9 9.2l2.7 2.6"/></svg>';
+  const ICON_FLIP = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.3 8.4a4.7 4.7 0 0 1 8-3.3M12.7 7.6a4.7 4.7 0 0 1-8 3.3"/><path d="M11 2.6v2.8H8.2M5 13.4v-2.8h2.8"/></svg>';
 
   function makeGuide(extraClass) {
     const el = document.createElement('div');
@@ -2458,7 +2466,7 @@ export function initCard(container) {
   // only thing that ever moves it, is one of the states this hides for),
   // so there's no drift to chase the way a truly per-frame position would
   // need to account for.
-  const MOBILE_GUIDE_FLIP_OPACITY = 0.6;
+  const MOBILE_GUIDE_FLIP_OPACITY = 0.75;
   function positionMobileFlipGuide() {
     if (!isTouchDevice) return;
     const hostRect = interactionRoot.getBoundingClientRect();
@@ -2535,7 +2543,7 @@ export function initCard(container) {
     const flipStrength = inside && !dropdownOpen
       ? THREE.MathUtils.clamp(1 - Math.hypot(px / GUIDE_HALF_W_PX, py / GUIDE_HALF_H_PX), 0, 1)
       : 0;
-    const GUIDE_MAX_OPACITY = 0.85;
+    const GUIDE_MAX_OPACITY = 1;
 
     guideTop.style.opacity = topStrength * GUIDE_MAX_OPACITY;
     guideLeft.style.opacity = leftStrength * GUIDE_MAX_OPACITY;
@@ -2784,7 +2792,7 @@ function injectStyles() {
     .card3d-confirm{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);text-shadow:0 0 6px rgba(var(--accent-rgb),0.5);opacity:0;pointer-events:none;transition:opacity 0.35s ease;white-space:nowrap;z-index:5}
     .card3d-confirm.is-visible{opacity:1}
 
-    .card3d-guide{position:absolute;display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-rgb),0.32);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.25s ease;z-index:4}
+    .card3d-guide{position:absolute;display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10.5px;font-weight:500;color:rgba(var(--ink-rgb),0.5);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.25s ease;z-index:4}
     .card3d-guide-icon{display:flex;line-height:0}
     .card3d-guide--top{transform:translate(-50%,-100%);flex-direction:column-reverse;gap:4px}
     .card3d-guide--top .card3d-guide-icon.is-down{transform:rotate(180deg)}
