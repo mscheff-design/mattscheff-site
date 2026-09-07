@@ -54,7 +54,15 @@ function injectStyles() {
        it in every direction; this is just how much of it stays covered. */
     .hero-materials .hero-paper{position:absolute;inset:0;background:var(--card-stock)}
     .hero-materials .hero-paper::after{content:'';position:absolute;inset:0;opacity:.045;background:url('assets/paper-grain.svg') repeat;background-size:140px}
-    .hero-materials .crayon-trails{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+    /* height NOT 100% — crayonTrails.js sets it explicitly via JS, to a
+       high-water mark that only ever grows (see its resize()), so the
+       canvas's own backing store doesn't get reallocated on every frame
+       of the résumé's open/close animation. .hero-materials's own
+       overflow:hidden (this rule) is what actually crops the — often
+       taller-than-currently-needed — canvas down to whatever's visible
+       right now; .hero-materials's own height already animates smoothly
+       on its own, independent of any of this. */
+    .hero-materials .crayon-trails{position:absolute;top:0;left:0;width:100%;pointer-events:none}
     /* z-index:200 is the one layer here that DOES need to escape .hero's
        elevation — a real button has to stay clickable even if .hero is
        currently sitting at z-index:150. pointer-events re-enabled locally

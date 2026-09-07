@@ -114,20 +114,32 @@ export function mountCrayonTrails(hero, {
   function resize() {
     const nextWidth=surface.clientWidth, nextHeight=surface.clientHeight;
     if (!nextWidth || !nextHeight) return;
+    // Height is a high-water mark — it only ever grows, never shrinks
+    // back down with the container. Setting canvas.width/height forces
+    // the browser to reallocate the ENTIRE backing store, regardless of
+    // how little or much gets drawn afterward — that reallocation itself
+    // is what was reading as jitter, since the résumé's own open/close
+    // animation fires this on nearly every frame for ~500ms. Freezing the
+    // buffer at whatever's the tallest it's ever needed to be means that
+    // reallocation only happens once, the first time a given height is
+    // ever reached — every later open/close of the SAME or a smaller
+    // extent is a complete no-op here. What's actually visible at any
+    // moment is cropped down by .hero-materials's own overflow:hidden,
+    // which already tracks .hero's live height smoothly on its own,
+    // fully independent of the canvas's buffer size — see this function's
+    // canvas.style.height line, and the .crayon-trails CSS comment.
+    const grew=nextHeight>height;
+    if (grew) height=nextHeight;
     const nextDpr=Math.min(window.devicePixelRatio||1,2);
-    if (nextWidth===width && nextHeight===height && dpr===nextDpr) return;
-    width=nextWidth; height=nextHeight; dpr=nextDpr;
-    // Setting canvas.width/height wipes the bitmap immediately — during a
-    // continuous size change (the backdrop's own height transition fires
-    // this every frame), leaving the redraw to a separately-scheduled rAF
-    // left a real gap where the browser could composite the now-blank
-    // canvas before that rAF ran, reading as a flicker through the whole
-    // transition. Repainting synchronously, in the same tick as the
-    // resize, closes that gap.
+    // Skip only when NONE of width/height/dpr actually need a new buffer —
+    // canvas.style.height being unset is how the very first call (nothing
+    // allocated yet) is told apart from a later no-op call.
+    if (!grew && canvas.style.height && nextWidth===width && dpr===nextDpr) return;
+    width=nextWidth; dpr=nextDpr;
     canvas.width=Math.round(width*dpr); canvas.height=Math.round(height*dpr);
+    canvas.style.height=height+'px';
     ctx.setTransform(dpr,0,0,dpr,0,0);
-    breakStroke(); density.clear();
-    cancelWork();
+    breakStroke();
     paint();
   }
   function move(event) {
@@ -136,10 +148,18 @@ export function mountCrayonTrails(hero, {
     if (target?.closest?.('a,button,input,textarea,select,[data-crayon-ignore]')) {breakStroke();return;}
     const rect=surface.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    const x=(event.clientX-rect.left)*width/rect.width, y=(event.clientY-rect.top)*height/rect.height;
+    // y is a direct offset, NOT a height/rect.height ratio like x's width
+    // one — the canvas's own buffer height is a high-water mark (see
+    // resize()) and can legitimately be much taller than what's currently
+    // visible through .hero-materials's own overflow:hidden crop, so that
+    // ratio would scale y up incorrectly whenever the two differ. Canvas
+    // coordinates are already in CSS px (ctx.setTransform handles the
+    // dpr scaling), and the buffer's top always matches rect's top, so a
+    // plain offset is exactly right regardless of how tall the buffer is.
+    const x=(event.clientX-rect.left)*width/rect.width, y=event.clientY-rect.top;
     const excluded=getExclusionRects();
     const blocked=(px,py)=>{
-      const cx=rect.left+px*rect.width/width,cy=rect.top+py*rect.height/height;
+      const cx=rect.left+px*rect.width/width,cy=rect.top+py;
       // Absolute canvas px, not a fraction of the canvas's own (dynamic)
       // width/height — the host's wood-corner geometry is pinned to a
       // fixed-size region that doesn't grow when this canvas does, so a
@@ -147,7 +167,11 @@ export function mountCrayonTrails(hero, {
       // with it as soon as the canvas resizes taller.
       return excluded.some(r=>insideRect(cx,cy,r,6)) || isPointBlocked(cx,cy) || !isPaperPoint(px,py);
     };
-    if (x<0 || y<0 || x>width || y>height || blocked(x,y)) {breakStroke();return;}
+    // Bounded by rect.height (what's actually visible right now), not
+    // height (the buffer's high-water mark) — a point beyond the visible,
+    // currently-cropped area shouldn't be drawable even though it's
+    // technically still inside the oversized buffer.
+    if (x<0 || y<0 || x>width || y>rect.height || blocked(x,y)) {breakStroke();return;}
     const time=performance.now();
     if (!previous || time-previous.time>320) { previous={x,y,time};smooth={x,y};traveled=0;phase=0;return; }
     const rawDistance=Math.hypot(x-previous.x,y-previous.y);
@@ -204,7 +228,11 @@ export function mountCrayonTrails(hero, {
       const amount=old.amount*Math.exp(-(time-old.time)/12000);
       if (amount>cfg.densityLimit) continue;
       density.set(key,{amount:amount+1,time});
-      const edgeDistance=Math.min(px/width,1-px/width,py/height,1-py/height);
+      // py/rect.height, not py/height — height is the canvas buffer's
+      // high-water mark (see resize()), which can be taller than what's
+      // actually visible right now; the margin vignette should read
+      // against the real visible edge, not a sometimes-much-taller one.
+      const edgeDistance=Math.min(px/width,1-px/width,py/rect.height,1-py/rect.height);
       const marginWeight=.42+.58*Math.max(0,1-edgeDistance/.32);
       const taper=cfg.gapLength>0 ? Math.min(1,along/18,(cfg.drawLength-along)/24) : Math.min(1,phase/14);
       const pressure=.88+.09*Math.sin(phase*.018)+.03*Math.sin(phase*.09);
