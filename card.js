@@ -125,7 +125,7 @@ let PALETTE = getPalette();
 // the site's color theme is switched via ?themes=1, any more than the
 // hero's wood/paper backdrop does. Used for the card's own front/back
 // faces AND both dropdown tabs, so nothing can drift apart.
-const CARD_STOCK_COLOR = '#FFE8BA';
+const CARD_STOCK_COLOR = '#FFF9E8';
 let INK_COLOR = PALETTE.ink;
 // The card's extruded edge (the thin "paper thickness" strip visible along
 // its side at a tilt) — optional per theme; falls back to the original

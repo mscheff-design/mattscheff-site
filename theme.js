@@ -96,11 +96,20 @@ const THEMES = {
   // restrained sans (Manrope) doing both the card's hero name and all
   // body copy, differentiated only by weight/size, the way a real
   // letterhead system uses one typeface throughout rather than pairing
-  // faces. Deliberately flat: no color-block field, no circular motifs —
-  // DM Mono stays the nav/label face unchanged, since a monospace already
-  // reads as "typewritten concierge desk" without any further help.
-  // Requires Manrope to actually be loaded (see each page's Google Fonts
-  // <link>).
+  // faces. Deliberately flat: no color-block field, no circular motifs.
+  // fontMono was DM Mono originally (reasoning then: a monospace already
+  // reads as "typewritten concierge desk" without further help) — moved
+  // off it per explicit request once this became the live default: DM
+  // Mono turned out to be the exact face the Urban Architecture case
+  // study's own real client site uses, and the user wants this portfolio
+  // reading as distinctly its own thing rather than sharing a mono with
+  // client work referenced inside it. Tried JetBrains Mono first (still
+  // used by "brief" below) — too engineered/technical for what the user
+  // actually wanted, which was something warmer and rounder, closer in
+  // spirit to Avenir Light. Settled on Fira Mono: Erik Spiekermann's
+  // humanist mono for Mozilla, genuinely rounder terminals with real
+  // warmth, understated rather than quirky. Requires Manrope and Fira
+  // Mono to actually be loaded (see each page's Google Fonts <link>).
   letterhead: {
     bg: '#EDEDE9',
     ink: '#1A1B1E',
@@ -115,7 +124,7 @@ const THEMES = {
     cardStock: '#FAFAF7',
     error: '#B23A3A',
     black: '#000',
-    fontMono: `'DM Mono',monospace`,
+    fontMono: `'Fira Mono',monospace`,
     fontSerif: `'Manrope',sans-serif`,
     fontDisplay: `'Manrope',sans-serif`
   },
