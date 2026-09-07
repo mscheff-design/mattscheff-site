@@ -182,8 +182,9 @@ export function mountCrayonTrails(hero, {
     const from=smooth;
     // Lower pull-toward-target factor than the original .62 — the smoothed
     // point lags the raw pointer more, which reads as a gentler, more
-    // fluid stroke instead of tracking the cursor almost 1:1.
-    const to={x:from.x+(x-from.x)*.42,y:from.y+(y-from.y)*.42};
+    // fluid stroke instead of tracking the cursor almost 1:1. Nudged down
+    // again (.42 -> .36) for a bit more of that same fluidity.
+    const to={x:from.x+(x-from.x)*.36,y:from.y+(y-from.y)*.36};
     const distance=Math.hypot(to.x-from.x,to.y-from.y);
     smooth=to;
     if (distance<1) return;
@@ -202,7 +203,7 @@ export function mountCrayonTrails(hero, {
     else {
       let diff=rawAngle-smoothAngle;
       diff=((diff+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
-      smoothAngle+=diff*0.35;
+      smoothAngle+=diff*0.28;
     }
     const angle=smoothAngle;
     const spacing=Math.max(1.4,cfg.width*.1);
