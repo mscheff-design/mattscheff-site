@@ -2429,12 +2429,28 @@ export function initCard(container) {
   const guideLeft = makeGuide('card3d-guide--left');
   const guideRight = makeGuide('card3d-guide--right');
   const guideFlip = makeGuide('card3d-guide--flip');
-  const guideIcon = { top: guideTop.querySelector('.card3d-guide-icon'), left: guideLeft.querySelector('.card3d-guide-icon'), right: guideRight.querySelector('.card3d-guide-icon'), flip: guideFlip.querySelector('.card3d-guide-icon') };
-  const guideText = { top: guideTop.querySelector('.card3d-guide-text'), left: guideLeft.querySelector('.card3d-guide-text'), right: guideRight.querySelector('.card3d-guide-text'), flip: guideFlip.querySelector('.card3d-guide-text') };
+  // Same '--flip' positioning class as guideFlip (sits below the card,
+  // grows downward) — reused for its geometry only, not its meaning:
+  // this is a separate element so it can carry its own "drag down to
+  // close" text/icon without guideFlip's click-to-flip hint (which is
+  // already unconditionally hidden whenever dropdownOpen — see
+  // flipStrength below) ever needing to double up as both.
+  const guideClose = makeGuide('card3d-guide--flip');
+  const guideIcon = { top: guideTop.querySelector('.card3d-guide-icon'), left: guideLeft.querySelector('.card3d-guide-icon'), right: guideRight.querySelector('.card3d-guide-icon'), flip: guideFlip.querySelector('.card3d-guide-icon'), close: guideClose.querySelector('.card3d-guide-icon') };
+  const guideText = { top: guideTop.querySelector('.card3d-guide-text'), left: guideLeft.querySelector('.card3d-guide-text'), right: guideRight.querySelector('.card3d-guide-text'), flip: guideFlip.querySelector('.card3d-guide-text'), close: guideClose.querySelector('.card3d-guide-text') };
+  guideIcon.top.innerHTML = ICON_ARROW;
+  guideText.top.textContent = 'drag up to view résumé';
   guideIcon.left.innerHTML = ICON_CURVE;
   guideIcon.right.innerHTML = ICON_CURVE;
   guideIcon.flip.innerHTML = ICON_FLIP;
   guideText.flip.textContent = isTouchDevice ? 'tap to flip' : 'click to flip';
+  // Static — these guides only ever mean one thing, so unlike the old
+  // guideTop (which used to double as both "drag up" and "drag down to
+  // close") their icon/text are set once here rather than in
+  // updateGuideContent().
+  guideIcon.close.innerHTML = ICON_ARROW;
+  guideIcon.close.style.transform = 'rotate(180deg)';
+  guideText.close.textContent = 'drag down to close';
 
   // The drag-based guides (top/left/right) have no gesture left to hint
   // at on mobile (see the pointermove listener's own comment) —
@@ -2453,6 +2469,7 @@ export function initCard(container) {
     guideTop.style.display = 'none';
     guideLeft.style.display = 'none';
     guideRight.style.display = 'none';
+    guideClose.style.display = 'none';
   }
 
   // Mobile has no hover to fade guideFlip in near the cursor the way
@@ -2481,14 +2498,13 @@ export function initCard(container) {
     guideFlip.style.opacity = (!flipped && !flipping && !dropdownOpen && !cancelDropdownTween && dropdownProgress === 0) ? MOBILE_GUIDE_FLIP_OPACITY : 0;
   }
 
-  // Only the top/left/right guides' TEXT (and the top guide's icon
-  // direction) change with state — updated once per actual state
-  // transition (here and in openDropdown/closeDropdown), not per frame;
-  // updateGuideHints() below only ever touches position/opacity.
+  // Only the left/right guides' text changes with state — updated once
+  // per actual state transition (here and in openDropdown/closeDropdown),
+  // not per frame; updateGuideHints() below only ever touches
+  // position/opacity. guideTop always means "drag up to view résumé" now
+  // (guideClose, above, owns "drag down to close" as its own separate,
+  // statically-set guide), so it no longer needs updating here at all.
   function updateGuideContent() {
-    guideIcon.top.innerHTML = ICON_ARROW;
-    guideIcon.top.classList.toggle('is-down', dropdownOpen);
-    guideText.top.textContent = dropdownOpen ? 'drag down to close' : 'drag up to view résumé';
     // Mobile keeps the left/right throw as plain email/vCard always (see
     // throwCard) — never repurposed for résumé download the way desktop's
     // still is — so the guide text has to stay accurate to that rather
@@ -2508,6 +2524,7 @@ export function initCard(container) {
     guideLeft.style.opacity = 0;
     guideRight.style.opacity = 0;
     guideFlip.style.opacity = 0;
+    guideClose.style.opacity = 0;
   }
 
   function updateGuideHints(clientX, clientY) {
@@ -2536,12 +2553,22 @@ export function initCard(container) {
 
     // Mobile has no drag-up-to-extend to hint at any more (see endDrag) —
     // the toggle row's own tap target is the only way there, and that
-    // needs no hover-proximity hint the way a drag gesture does.
-    const topStrength = inside && !flipped && !isTouchDevice ? THREE.MathUtils.clamp(-py / GUIDE_HALF_H_PX, 0, 1) : 0;
+    // needs no hover-proximity hint the way a drag gesture does. Also
+    // excluded once dropdownOpen: "drag up to view résumé" no longer
+    // applies once it's already open — guideClose (below) takes over as
+    // the only bottom-anchored hint in that state.
+    const topStrength = inside && !flipped && !isTouchDevice && !dropdownOpen ? THREE.MathUtils.clamp(-py / GUIDE_HALF_H_PX, 0, 1) : 0;
     const leftStrength = inside ? THREE.MathUtils.clamp(-px / GUIDE_HALF_W_PX, 0, 1) : 0;
     const rightStrength = inside ? THREE.MathUtils.clamp(px / GUIDE_HALF_W_PX, 0, 1) : 0;
     const flipStrength = inside && !dropdownOpen
       ? THREE.MathUtils.clamp(1 - Math.hypot(px / GUIDE_HALF_W_PX, py / GUIDE_HALF_H_PX), 0, 1)
+      : 0;
+    // Proximity to the BOTTOM edge of the fully extended tab (bottomLimit
+    // already accounts for GUIDE_TAB_H_PX when dropdownOpen) — mirrors
+    // topStrength's own -py/GUIDE_HALF_H_PX shape, just measured from the
+    // opposite, extended edge instead of the card's fixed top edge.
+    const closeStrength = inside && dropdownOpen && !isTouchDevice
+      ? THREE.MathUtils.clamp((py - GUIDE_HALF_H_PX) / GUIDE_TAB_H_PX, 0, 1)
       : 0;
     const GUIDE_MAX_OPACITY = 1;
 
@@ -2549,6 +2576,7 @@ export function initCard(container) {
     guideLeft.style.opacity = leftStrength * GUIDE_MAX_OPACITY;
     guideRight.style.opacity = rightStrength * GUIDE_MAX_OPACITY;
     guideFlip.style.opacity = flipStrength * GUIDE_MAX_OPACITY;
+    guideClose.style.opacity = closeStrength * GUIDE_MAX_OPACITY;
 
     const originX = (hostRect.left + centerX) - containerRect.left;
     const originY = (hostRect.top + centerY) - containerRect.top;
@@ -2560,6 +2588,12 @@ export function initCard(container) {
     guideRight.style.top = originY + 'px';
     guideFlip.style.left = originX + 'px';
     guideFlip.style.top = (originY + GUIDE_HALF_H_PX + GUIDE_MARGIN_PX) + 'px';
+    // Anchored past the extended tab's own bottom edge (GUIDE_TAB_H_PX),
+    // not the card's own bottom (that's guideFlip's spot, and it's always
+    // hidden while dropdownOpen anyway) — so this sits below the résumé
+    // content itself, not overlapping it.
+    guideClose.style.left = originX + 'px';
+    guideClose.style.top = (originY + GUIDE_HALF_H_PX + GUIDE_TAB_H_PX + GUIDE_MARGIN_PX) + 'px';
   }
 
   /* ---------- contact form (fixed region on the back face) ---------- */
