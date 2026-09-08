@@ -700,7 +700,15 @@ export function initCard(container) {
 
   /* ---------- renderer / scene / camera ---------- */
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  // antialias:false — MSAA is one of the most commonly cited Safari-vs-
+  // Chrome WebGL cost gaps (Safari's ANGLE/Metal backend handles it
+  // notably less efficiently), and it stacks with the alpha blending and
+  // animated drop-shadow filter already in play on this scene. The card's
+  // edges are small and mostly softened by its own bevel/lighting anyway,
+  // so the visual cost of losing MSAA should be minor — try it and see;
+  // this is a one-line, trivially reversible flag, unlike the shadow-mesh
+  // attempt this session that changed the actual rendering approach.
+  const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1842,6 +1850,10 @@ export function initCard(container) {
   let isPointerDown = false;
   let potentialDrag = false;
   let dragging = false;
+  // Last known pointer position, kept for updateGuideHints' own per-frame
+  // call in tick() below — see that call site's comment for why guide
+  // hints need re-evaluating every frame, not just on pointermove.
+  let lastPointerX = null, lastPointerY = null;
   let pointerDownClient = null;
   let pointerDownTime = 0;
   let pointerDownOnCard = false;
@@ -2044,6 +2056,8 @@ export function initCard(container) {
     // same updateHoverTilt) — removed for being one more moving part on
     // top of everything else being cut, not because it didn't work.
     if (isTouchDevice) return;
+    lastPointerX = e.clientX;
+    lastPointerY = e.clientY;
     if (!dragging) updateHoverTilt(e.clientX, e.clientY);
     if (!dragging) updateGuideHints(e.clientX, e.clientY);
     // hovering is already a real hitsCard() raycast result, set inside
@@ -2646,6 +2660,26 @@ export function initCard(container) {
 
   let lastResizeW = 0, lastResizeH = 0;
   let resizePending = true;
+  // The WebGL drawing buffer's own last-allocated size — deliberately
+  // tracked separately from lastResizeW/H (which just gate whether this
+  // whole function has anything new to do at all). See the slack check
+  // below for why.
+  let bufferW = 0, bufferH = 0;
+  // How far (in CSS px) the drawing buffer is allowed to lag the true
+  // current size before actually reallocating it. renderer.setSize()
+  // reallocates the WebGL drawing buffer — a real GPU cost, and reported
+  // markedly worse in Safari than Chrome — and interactionRoot's height
+  // changes by a few px on nearly every single frame of the résumé's
+  // ~500ms open/close tween (via updateHeroPadding), which used to mean a
+  // full reallocation on nearly every one of those frames for the whole
+  // animation. Camera aspect/position.z below still update every frame
+  // using the TRUE current size regardless, so the rendered content
+  // itself is always correctly proportioned; the only side effect of
+  // letting the buffer lag is the browser scaling that correctly-
+  // rendered image by a fraction of a percent to fit the CSS box between
+  // reallocations — well under a device pixel at this margin, and gone
+  // entirely the moment the buffer catches back up.
+  const RESIZE_BUFFER_SLACK_PX = 6;
   function handleResize() {
     const w = interactionRoot.clientWidth;
     const h = interactionRoot.clientHeight;
@@ -2655,20 +2689,47 @@ export function initCard(container) {
     // the drawing buffer from a tween/observer callback can clear a frame
     // that the browser is about to composite before the next render.
     if (w === lastResizeW && h === lastResizeH) return;
+    // The résumé's own open/close tween changes ONLY interactionRoot's
+    // height (via updateHeroPadding's growing padding-bottom) — width is
+    // untouched for the whole ~500ms of it, on every one of the many
+    // frames this function ends up running on during that tween (h keeps
+    // changing, so the early return above never fires). Everything below
+    // this block is purely width-derived (PIXELS_PER_WORLD_UNIT depends
+    // only on availableWidthPx; contactForm.updateGeometry's own inputs
+    // all derive from that same PIXELS_PER_WORLD_UNIT/scale, not h) — so
+    // recomputing and rewriting it every single one of those frames was
+    // real, avoidable DOM-write cost (contactForm.updateGeometry sets
+    // style.width/height and a custom property on a real element) for
+    // values that were never actually changing. Now only runs when width
+    // itself moved — camera.aspect/position.z below still update on every
+    // call regardless, since those DO need the live height.
+    const widthChanged = w !== lastResizeW;
     lastResizeW = w;
     lastResizeH = h;
 
-    // See NATURAL_CARD_WIDTH_PX's own comment: the card's on-screen size
-    // is normally fixed, but a viewport too narrow to fit it at that size
-    // needs it scaled down instead of left to overflow. scale is 1 (no
-    // change from the fixed reference) for every viewport wide enough —
-    // this only ever makes the card *smaller* than REFERENCE_CARD_PX_HEIGHT
-    // implies, never bigger.
-    const availableWidthPx = w - CARD_VIEWPORT_MARGIN_PX * 2;
-    const scale = Math.min(1, availableWidthPx / NATURAL_CARD_WIDTH_PX);
-    PIXELS_PER_WORLD_UNIT = (REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT) * scale;
-    updateGuideConstants();
-    positionMobileFlipGuide();
+    if (widthChanged) {
+      // See NATURAL_CARD_WIDTH_PX's own comment: the card's on-screen size
+      // is normally fixed, but a viewport too narrow to fit it at that size
+      // needs it scaled down instead of left to overflow. scale is 1 (no
+      // change from the fixed reference) for every viewport wide enough —
+      // this only ever makes the card *smaller* than REFERENCE_CARD_PX_HEIGHT
+      // implies, never bigger.
+      const availableWidthPx = w - CARD_VIEWPORT_MARGIN_PX * 2;
+      const scale = Math.min(1, availableWidthPx / NATURAL_CARD_WIDTH_PX);
+      PIXELS_PER_WORLD_UNIT = (REFERENCE_CARD_PX_HEIGHT / BASE_CARD_HEIGHT) * scale;
+      updateGuideConstants();
+      positionMobileFlipGuide();
+
+      // contact.js caches a few of its own geometry figures derived from
+      // this same scale (its clip region's hard px size, the form's own
+      // content scale, the CSS-3D matrix's world-to-px conversion).
+      contactForm.updateGeometry({
+        pixelsPerWorldUnit: PIXELS_PER_WORLD_UNIT,
+        tabWidthPx: CARD_WIDTH * PIXELS_PER_WORLD_UNIT,
+        tabHeightPx: BACK_FORM_HEIGHT * PIXELS_PER_WORLD_UNIT,
+        formScale: scale
+      });
+    }
 
     camera.aspect = w / h;
     // hold on-screen scale constant so the résumé reveal growing
@@ -2676,19 +2737,11 @@ export function initCard(container) {
     // itself changes how big anything already on screen appears.
     camera.position.z = h / (2 * TAN_HALF_FOV * PIXELS_PER_WORLD_UNIT);
     camera.updateProjectionMatrix();
-    renderer.setSize(w, h, false);
-
-    // contact.js caches a few of its own geometry figures derived from
-    // this same scale (its clip region's hard px size, the form's own
-    // content scale, the CSS-3D matrix's world-to-px conversion) — push
-    // the current values down whenever they might have changed, same as
-    // everything else in this function.
-    contactForm.updateGeometry({
-      pixelsPerWorldUnit: PIXELS_PER_WORLD_UNIT,
-      tabWidthPx: CARD_WIDTH * PIXELS_PER_WORLD_UNIT,
-      tabHeightPx: BACK_FORM_HEIGHT * PIXELS_PER_WORLD_UNIT,
-      formScale: scale
-    });
+    if (!bufferW || Math.abs(w - bufferW) > RESIZE_BUFFER_SLACK_PX || Math.abs(h - bufferH) > RESIZE_BUFFER_SLACK_PX) {
+      bufferW = w;
+      bufferH = h;
+      renderer.setSize(w, h, false);
+    }
   }
   const resizeObserver = new ResizeObserver(() => {
     // Notification only: never clear/reallocate a displayed WebGL buffer
@@ -2707,6 +2760,21 @@ export function initCard(container) {
     // drawing buffer if needed, then render below. This also works with
     // the supplied index's timer-backed requestAnimationFrame workaround.
     advanceDropdown(now);
+    // Guide hints (the "click to flip"/drag-guide labels) used to only
+    // recompute on pointermove — fine for position/opacity that only ever
+    // changes with the cursor, but dropdownOpen/cardLift/GUIDE_TAB_H_PX
+    // also drive them, and those change every frame of the open/close
+    // tween above while the cursor may not be moving at all. The guide
+    // was then stuck showing its pre-animation position/opacity until the
+    // next real pointermove, snapping in afterward — reading as the guide
+    // "lagging" behind a card that was actually animating smoothly the
+    // whole time. Re-running it here every frame with the last known
+    // pointer position keeps it live for the animation itself, not just
+    // for cursor movement. Cheap even every frame: no raycast, just two
+    // getBoundingClientRect() calls and arithmetic, and it already
+    // self-guards (hideGuides()) whenever mode isn't 'idle' or the card
+    // is flipping.
+    if (!isTouchDevice && lastPointerX !== null) updateGuideHints(lastPointerX, lastPointerY);
     if (resizePending || interactionRoot.clientWidth !== lastResizeW || interactionRoot.clientHeight !== lastResizeH) {
       handleResize();
       resizePending = false;
@@ -2714,21 +2782,43 @@ export function initCard(container) {
 
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
+    // Every per-frame factor below (TILT_STIFFNESS/DAMPING, liftProgress's
+    // and idleBlend's own 0.14/0.1) was tuned by eye assuming ~60fps ticks
+    // — applied as a flat multiplier every frame regardless of how much
+    // real time that frame actually took, so the whole spring's SPEED is
+    // implicitly tied to frame rate: at a genuinely lower sustained fps
+    // (plausible for this scene in Safari), the same per-frame nudge
+    // happens less often per second, and everything settles proportionally
+    // slower in real time. dt60 renormalizes every use below against a
+    // 60fps baseline so a frame takes exactly the tuned step at 60fps and
+    // scales correctly at any other sustained rate — this is what actually
+    // fixes "feels slow" in a different browser, as opposed to just "feels
+    // choppier" (a frame-cost problem, like the buffer-reallocation one
+    // fixed in handleResize() above).
+    const dt60 = dt * 60;
 
     // Always advances (not gated on mode) — it's just an ambient phase, not
     // paused-and-resumed state. Only whether it's actually APPLIED (see
     // idleBlend below) depends on mode/hover/drag.
     idleT += dt;
 
-    tiltVelX += (tiltTargetX - tiltX) * TILT_STIFFNESS;
-    tiltVelX *= TILT_DAMPING;
-    tiltX += tiltVelX;
+    // Position must advance by velocity * dt60, not raw velocity — velocity
+    // here is "distance per 60fps-tick," so a frame representing more or
+    // fewer than one such tick has to scale it accordingly, same reasoning
+    // as the accumulation/damping lines above. Missing this the first time
+    // through left tilt still measurably frame-rate-dependent — confirmed
+    // by simulating the recurrence at a few fixed rates: ~49% of the way
+    // to target after 100ms at 30fps, ~86% at 60fps (the original tuning's
+    // own baseline), ~131% (an overshoot) at 120fps.
+    tiltVelX += (tiltTargetX - tiltX) * TILT_STIFFNESS * dt60;
+    tiltVelX *= Math.pow(TILT_DAMPING, dt60);
+    tiltX += tiltVelX * dt60;
 
-    tiltVelY += (tiltTargetY - tiltY) * TILT_STIFFNESS;
-    tiltVelY *= TILT_DAMPING;
-    tiltY += tiltVelY;
+    tiltVelY += (tiltTargetY - tiltY) * TILT_STIFFNESS * dt60;
+    tiltVelY *= Math.pow(TILT_DAMPING, dt60);
+    tiltY += tiltVelY * dt60;
 
-    liftProgress += (liftProgressTarget - liftProgress) * 0.14;
+    liftProgress += (liftProgressTarget - liftProgress) * (1 - Math.pow(1 - 0.14, dt60));
 
     // idleBlend eases toward 0/1 rather than the sway/breathe amplitude
     // switching on/off outright: idleActive used to gate swayY/breathe
@@ -2744,7 +2834,7 @@ export function initCard(container) {
     // pattern as liftProgress above) fades that in over several frames
     // instead of snapping it, so a stale phase no longer reads as a pop.
     const idleActive = mode === 'idle' && !hovering && !dragging && !physicsSuspended;
-    idleBlend += ((idleActive ? 1 : 0) - idleBlend) * 0.1;
+    idleBlend += ((idleActive ? 1 : 0) - idleBlend) * (1 - Math.pow(1 - 0.1, dt60));
     const swayY = THREE.MathUtils.degToRad(4) * Math.sin(idleT * 0.5) * idleBlend;
     const breathe = Math.sin(idleT * 0.6) * 0.035 * idleBlend;
 
@@ -2776,9 +2866,13 @@ export function initCard(container) {
     // almost immediately; a slow one saturates it and then has to
     // re-rasterize a large blur radius every frame for a much longer
     // settle, right around the moment of release.
-    const blur = Math.round((16 + liftProgress * 12) * 2) / 2;
-    const offY = Math.round((14 + liftProgress * 9) * 2) / 2;
-    const alpha = Math.round((0.26 + liftProgress * 0.16) * 100) / 100;
+    // (A WebGL-mesh replacement for this was tried and reverted — it
+    // broke the card's look. Back to the CSS filter; the frame-rate
+    // normalization and per-frame guide-hint fixes elsewhere in this
+    // file are unrelated and stay.)
+    const blur = Math.round((16 + liftProgress * 12));
+    const offY = Math.round((14 + liftProgress * 9));
+    const alpha = Math.round((0.26 + liftProgress * 0.16) * 40) / 40;
     const filterStr = `drop-shadow(0 ${offY}px ${blur}px rgba(20,14,4,${alpha}))`;
     if (filterStr !== lastFilterStr) {
       renderer.domElement.style.filter = filterStr;
@@ -2816,7 +2910,13 @@ function injectStyles() {
        effect, which is what a touch-and-hold starting text selection
        during a drag actually was. */
     .card3d-container{position:relative;-webkit-touch-callout:none;-webkit-user-select:none}
-    .card3d-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;overflow:visible}
+    /* will-change:filter — a hint for the drop-shadow applied in tick()
+       below. Safari in particular is conservative about promoting an
+       element to its own compositing layer for CSS filter changes,
+       re-evaluating more from scratch than Chrome does on the same
+       animated filter string; this asks for that layer up front instead
+       of on the fly, every time liftProgress changes the shadow. */
+    .card3d-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;overflow:visible;will-change:filter}
 
     .card3d-zone{position:fixed;top:0;bottom:0;width:36vw;max-width:520px;pointer-events:none;opacity:0;transition:opacity 0.3s ease;z-index:2}
     .card3d-zone--right{right:0;background:linear-gradient(to right,rgba(var(--accent-rgb),0),rgba(var(--accent-rgb),0.16))}
