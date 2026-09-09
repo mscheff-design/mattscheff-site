@@ -257,6 +257,10 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 /* No outline stroke here — the grease mark itself is the only visual
    feedback, for hover, keyboard focus, and the active/expanded state alike. */
 .project-tile:focus-visible .grease-mark--hover{opacity:1}
+/* Overrides the rule above for one focus event only — see
+   focusTileQuietly()'s own comment for why this exists. Needs the extra
+   class for specificity to actually win over the rule it's overriding. */
+.project-tile.suppress-focus-mark:focus-visible .grease-mark--hover{opacity:0}
 .project-frame{aspect-ratio:3/4}
 .project-frame .cover-slide{position:relative;width:100%;height:100%}
 .project-frame .cs-img,.project-frame .frame-placeholder{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(15%) contrast(1.08) brightness(0.85) saturate(0.9)}
@@ -278,9 +282,9 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .loupe-root canvas{display:block;width:100%;height:100%}
 
 /* Reusable contact sheet component (see createContactSheet() in the
-   script), mounted inline into #psExpanded whenever a master tile is
-   clicked (see toggleProject()/expandProject() further down). .cs-root's
-   own background/padding/border is set above, shared with .contact-sheet.
+   script), mounted into the shared sheetPanel modal whenever a master
+   tile is clicked (see toggleProject()/openGallery() further down).
+   .cs-root's own background/padding/border is set above, shared with .contact-sheet.
    Each cell carries its own frame + rebate label together
    (.cs-frame-cell), so column count is a pure CSS grid concern — see the
    @media rules below — with no JS row-rebuilding. */
@@ -314,28 +318,22 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 
 .rebate-bottom{margin-top:6px}
 
-/* Clicking a master tile expands that project's own gallery directly
-   below the master grid (see toggleProject()/expandProject()) — one at a
-   time, animated open with a grid-template-rows 0fr->1fr transition (true
-   auto height, no JS measuring). Now that the whole Photography section
-   is a dark background (not just islands within a light one — see
-   .photo-section), this needed no light/dark split the way an earlier
-   attempt did: the heading, close control, and footer rebate below are
-   styled for dark from the start, the same as .photo-header itself. */
-.ps-expanded{margin-top:24px;position:relative;display:grid;grid-template-rows:0fr;transition:grid-template-rows 0.4s ease}
-.ps-expanded.is-open{grid-template-rows:1fr}
-.ps-expanded-inner{overflow:hidden}
-/* The graphical link between a tile and its own expanded sheet — a small
-   accent triangle pointing up, horizontally aligned (via positionPointer()
-   in the script) under whichever tile is currently active. Without it the
-   sheet just appears somewhere below the grid with no visual claim to
-   which tile it belongs to; this makes that connection explicit instead
-   of implicit. position:absolute keeps it out of the grid-rows height
-   calculation entirely, so it never affects the open/close animation —
-   its own opacity fade is a separate, simpler transition tied to is-open. */
-.ps-pointer{position:absolute;top:-7px;width:14px;height:7px;transform:translateX(-50%);opacity:0;transition:opacity 0.25s ease,left 0.3s ease;pointer-events:none}
-.ps-pointer::before{content:'';position:absolute;inset:0;background:var(--accent);clip-path:polygon(50% 0%,0% 100%,100% 100%)}
-.ps-expanded.is-open .ps-pointer{opacity:1}
+/* Clicking a master tile opens that project's own gallery as its own
+   full-screen sheet (see toggleProject()/openGallery(), and the shared
+   sheetBackdrop/sheetPanel this reuses — see .sheet-panel.mode-grid
+   below and .sheet-panel.mode-viewer further down for level 3's single-
+   image view, the other mode this same shell hosts). A separate popup
+   rather than an inline expand below the master grid on purpose: the
+   card's own render loop pauses while any full-screen sheet is open (see
+   card.js's setPaused()) — with the gallery inline on the same page, a
+   viewer scrolled down to browse photos left the card fully rendering
+   the whole time, invisible but still competing for the same main
+   thread/GPU, which is what actually caused reported Safari choppiness
+   specifically while a gallery was open. A popup makes that impossible
+   by construction: the two are never on screen, or being rendered, at
+   the same time. The heading/close control/footer rebate below are
+   styled for dark from the start, matching the section's own dark
+   background (see .photo-section). */
 .ps-expanded-heading{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px 24px;margin-bottom:18px}
 .ps-title-group{display:flex;align-items:baseline;gap:14px;min-width:0}
 .ps-title{font-family:var(--font-display);font-weight:700;font-size:clamp(22px,2.4vw,34px);letter-spacing:-0.01em;color:rgba(var(--ink-light-rgb),0.92);margin:0;overflow-wrap:anywhere}
@@ -346,10 +344,27 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .ps-close:hover{color:var(--accent);border-color:var(--accent)}
 .ps-close:focus-visible{outline:1.5px solid var(--accent);outline-offset:3px}
 
-/* is-active marks whichever master tile's gallery is currently expanded —
-   its own grease mark stays visible as the indicator, not a plain stroke. */
+/* same quiet mono-link treatment as .ps-close, kept as its own class
+   since the two sit side by side in .ps-meta and can each carry their
+   own label/state independently */
+.ps-statement-toggle{all:unset;cursor:pointer;font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-light-rgb),0.45);border-bottom:0.5px solid rgba(var(--ink-light-rgb),0.3);padding-bottom:2px;transition:color 0.2s,border-color 0.2s}
+.ps-statement-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.ps-statement-toggle:focus-visible{outline:1.5px solid var(--accent);outline-offset:3px}
+/* Reuses .collapsible-panel's own grid-template-rows animation (see its
+   definition further up) — margin-top only, not margin-bottom, so a
+   closed (0fr) panel doesn't leave a visible gap of its own; the text's
+   own padding-bottom supplies breathing room before the grid once open. */
+.ps-statement{margin-top:4px}
+.ps-statement-text{font-family:var(--font-serif);font-size:15px;line-height:1.65;color:rgba(var(--ink-light-rgb),0.7);max-width:62ch;padding-bottom:20px}
+
+/* is-active marks whichever master tile's gallery is currently open — just
+   the label underline now. The grease mark used to also force-show here,
+   back when the gallery sat inline and the master grid stayed visible
+   alongside it; now that opening a gallery covers the grid with a
+   full-screen popup (see openGallery()), nobody can see this tile while
+   its mark would be showing anyway — pure hover/focus is all the mark
+   needs to do. */
 .project-tile.is-active .frame-label{text-decoration:underline;text-underline-offset:3px}
-.project-tile.is-active .grease-mark--hover{opacity:1}
 
 @media (max-width:959px){
   .project-grid{grid-template-columns:repeat(3,1fr)}
@@ -366,18 +381,42 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
 .footer-links a{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-light-rgb),0.25);letter-spacing:0.08em;text-decoration:none;transition:color 0.2s}
 .footer-links a:hover{color:rgba(var(--ink-light-rgb),0.6)}
 
-/* floating sheet backdrop — the level-3 coverflow photo viewer. Currently
-   unreachable (nothing calls openViewer() since the project-gallery
-   dropdown was removed — see the note near createContactSheet()), kept in
-   place for whenever it's reconnected. mode-viewer is the only mode left,
-   kept as a class (rather than folded into .sheet-panel directly) since
-   sheetPanel.className is still reset wholesale on each render. */
+/* floating sheet backdrop — one shared full-screen shell hosting two
+   modes: mode-grid (a project's contact-sheet gallery, opened via
+   openGallery()/toggleProject()) and mode-viewer (the level-3 single-
+   image coverflow, opened via openViewer() from within a grid). Kept as
+   classes on sheetPanel (rather than separate elements) since
+   sheetPanel.className is reset wholesale on each render, and only one
+   mode is ever showing at a time — closing the viewer returns to the
+   grid it was opened from (see closeViewer()), closing the grid closes
+   the whole backdrop (see closeGallery()). */
 .sheet-backdrop{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(8,6,3,0.96);opacity:0;pointer-events:none;transition:opacity 0.3s ease}
 .sheet-backdrop.open{opacity:1;pointer-events:auto}
 
 .sheet-panel{position:relative;opacity:0}
 .sheet-backdrop.open .sheet-panel{opacity:1}
 .sheet-panel.mode-viewer{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--black)}
+/* mode-grid: sized well short of the viewport (unlike mode-viewer's own
+   full-bleed 100vw/100vh) so the backdrop reads as a real frame around
+   it — the grid scrolls internally past that height, the same
+   .contact-sheet/.cs-root treatment (dark ground, grain, padding/border)
+   it always had just carries over unchanged now that it mounts here
+   instead of inline below the master grid. */
+/* Padding lives here now, not on the mounted content itself — this
+   content used to sit inline inside .photo-section's own page padding
+   (padding:0 48px 120px); moved into a position:fixed modal, none of
+   that ancestor spacing applies any more, so the panel supplies its own.
+   Right padding is generous enough to clear .sheet-close, fixed to the
+   backdrop's own top-right corner, not this panel's. */
+.sheet-panel.mode-grid{width:min(1200px,92vw);max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:40px 56px 32px;scrollbar-width:none}
+.sheet-panel.mode-grid::-webkit-scrollbar{display:none}
+/* Custom thin scroll indicator, native scrollbar hidden above — see
+   galleryScrollTrack's own setup comment in the script for why this is a
+   persistent, reused node rather than one rebuilt per render. ink-light,
+   not ink, since this modal (like the rest of Photography) sits on a
+   dark ground. */
+.gallery-scroll-track{position:absolute;top:16px;bottom:16px;right:10px;width:3px;background:rgba(var(--ink-light-rgb),0.14);border-radius:2px;pointer-events:none;transition:opacity 0.2s ease}
+.gallery-scroll-thumb{position:absolute;left:0;width:100%;background:rgba(var(--ink-light-rgb),0.4);border-radius:2px}
 
 .sheet-close{all:unset;position:absolute;top:28px;right:40px;font-family:var(--font-mono);font-size:20px;color:rgba(var(--ink-light-rgb),0.4);cursor:pointer;transition:color 0.2s;z-index:4}
 .sheet-close:hover{color:rgba(var(--ink-light-rgb),0.9)}
@@ -564,8 +603,6 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
       <div class="project-grid" id="projectGrid"></div>
     </div>
 
-    <div class="ps-expanded" id="psExpanded" hidden><div class="ps-pointer" aria-hidden="true"></div><div class="ps-expanded-inner" id="psExpandedInner"></div></div>
-
     </div>
     </div>
 
@@ -713,12 +750,22 @@ document.getElementById('card3d').addEventListener('resume-job-click', (e) => {
      2. Run assets/generate-manifests.sh to create manifest.json + thumbs/.
      3. Add one entry below. Nothing else needs to change. */
 
+// statement: DRAFT PLACEHOLDER COPY on every entry below — plausible,
+// specific-in-tone text so the "Statement" toggle (see renderExpandedSheet)
+// has something real to expand rather than lorem ipsum, not the user's
+// actual words. Swap each one for the real statement whenever it's ready;
+// nothing else about the toggle/layout needs to change when that happens.
 const PROJECTS = [
-  { projectCode: 'MLND', year: '2017', title: 'Motherland', folderPath: 'assets/motherland (2017)/', selectedIndex: 0 },
-  { projectCode: 'HELO', year: '2018', title: 'Heliographs', folderPath: 'assets/heliographs/', selectedIndex: 0 },
-  { projectCode: 'RFDF', year: '2018', title: 'Refraction / Diffraction', folderPath: null, selectedIndex: 0 },
-  { projectCode: 'WDNS', year: '2019', title: 'We Do Not Spring Up From Nothing', folderPath: null, selectedIndex: 0 },
-  { projectCode: 'FCMG', year: '2020', title: "His Father's Castle, His Mother's Glory", folderPath: 'assets/his fathers castle his mothers glory (2020)/', selectedIndex: 0 }
+  { projectCode: 'MLND', year: '2017', title: 'Motherland', folderPath: 'assets/motherland (2017)/', selectedIndex: 0,
+    statement: `A return to a place I mostly knew secondhand — through my mother's own stories, not my own memory of it. I wasn't trying to document what was actually there. I was trying to see what she carried with her when she left it.` },
+  { projectCode: 'HELO', year: '2018', title: 'Heliographs', folderPath: 'assets/heliographs/', selectedIndex: 0,
+    statement: `Made only in direct sun, printed the same day each was shot. The name is the old word for photography, before it had a name of its own — an attempt to work at the speed light actually moves, instead of the speed we're used to processing it at.` },
+  { projectCode: 'RFDF', year: '2018', title: 'Refraction / Diffraction', folderPath: null, selectedIndex: 0,
+    statement: `Two ways light misbehaves at an edge — bending through what it passes into, scattering around what it can't get past. This series treats both as a way of seeing rather than something to correct for.` },
+  { projectCode: 'WDNS', year: '2019', title: 'We Do Not Spring Up From Nothing', folderPath: null, selectedIndex: 0,
+    statement: `A line I'd heard long before I knew where it came from — the idea that nobody arrives from nowhere. This series is less interested in lineage as fact than in what actually gets passed down, and what quietly doesn't.` },
+  { projectCode: 'FCMG', year: '2020', title: "His Father's Castle, His Mother's Glory", folderPath: 'assets/his fathers castle his mothers glory (2020)/', selectedIndex: 0,
+    statement: `A phrase that stayed with me long before I understood where it came from. This series is about the parts of inheritance nobody hands down on purpose.` }
 ];
 
 PROJECTS.forEach(project => {
@@ -927,7 +974,7 @@ const projectTiles = new Map();
   tile.setAttribute('role', 'button');
   tile.tabIndex = 0;
   tile.setAttribute('aria-expanded', 'false');
-  tile.setAttribute('aria-controls', 'psExpanded');
+  tile.setAttribute('aria-controls', 'sheetPanel');
   tile.setAttribute('aria-label', `${project.title}, ${project.year}`);
   tile.appendChild(frame);
   tile.insertAdjacentHTML('beforeend', greaseMarkSVG('grease-mark--hover'));
@@ -948,7 +995,19 @@ const projectTiles = new Map();
     let shownIndex = 0;
     let showingA = true;
     setInterval(() => {
-      if (reduceMotionQuery.matches) return;
+      // Also paused while any project's level-2 gallery is open
+      // (activeProject, declared further down and read here via closure —
+      // this timer's callback only ever runs well after that declaration
+      // has executed, so no TDZ issue). This ran unconditionally before,
+      // every 2.4s per tile (an <img src> swap — a real decode+repaint,
+      // not just an opacity toggle) regardless of whether a much heavier
+      // expanded gallery was also sitting on the page — reported as
+      // Safari-specific lag that came and went with a gallery being open,
+      // which is consistent with this background work competing for
+      // main-thread time against a much bigger paint tree specifically in
+      // that state. The master grid isn't usually what anyone's looking
+      // at while a project's own gallery is expanded anyway.
+      if (reduceMotionQuery.matches || activeProject) return;
       const nextIndex = (shownIndex + 1) % project.photos.length;
       const hiddenImg = showingA ? imgB : imgA;
       hiddenImg.src = thumbSrc(project, nextIndex);
@@ -991,15 +1050,43 @@ JOBS.forEach((job, i) => {
   workProjectsEl.appendChild(row);
 });
 
-/* ---------- level 2: clicking a master tile expands that project's own
-   gallery directly below the master grid — one at a time. Level 3 (cover
-   flow) is the full-viewport individual-photo viewer; job case studies
-   are real pages now, not a sheet mode. ---------- */
+/* ---------- level 2: clicking a master tile opens that project's own
+   gallery as a full-screen sheet — one at a time. Level 3 (cover flow) is
+   the individual-photo viewer reached from within it; job case studies
+   are real pages now, not a sheet mode. Both levels share one backdrop —
+   see .sheet-backdrop's own CSS comment. ---------- */
 
-const psExpanded = document.getElementById('psExpanded');
-const psExpandedInner = document.getElementById('psExpandedInner');
 const sheetBackdrop = document.getElementById('sheetBackdrop');
 const sheetPanel = document.getElementById('sheetPanel');
+
+// Custom thin scroll indicator for mode-grid — native scrollbar hidden
+// via CSS (see .sheet-panel.mode-grid), same pattern as blocks.js's
+// case-study scroll-frame (cs-full-bleed-scroll-track/-thumb): an
+// absolutely-positioned track/thumb pinned to the panel's own edges
+// regardless of scroll offset, sized/positioned from real scroll state.
+// Created once, not per-render — sheetPanel's own innerHTML gets
+// replaced on every renderExpandedSheet()/renderCoverflow() call, which
+// would detach this if it were appended fresh each time; kept as one
+// persistent node (just re-appended after each clear) and the 'scroll'
+// listener attached once to sheetPanel itself, so neither leaks or
+// duplicates across re-renders.
+const galleryScrollTrack = document.createElement('div');
+galleryScrollTrack.className = 'gallery-scroll-track';
+const galleryScrollThumb = document.createElement('div');
+galleryScrollThumb.className = 'gallery-scroll-thumb';
+galleryScrollTrack.appendChild(galleryScrollThumb);
+function updateGalleryScrollThumb() {
+  const trackHeight = galleryScrollTrack.clientHeight;
+  const maxScroll = sheetPanel.scrollHeight - sheetPanel.clientHeight;
+  if (maxScroll <= 0) { galleryScrollTrack.style.opacity = '0'; return; }
+  galleryScrollTrack.style.opacity = '1';
+  const ratio = sheetPanel.clientHeight / sheetPanel.scrollHeight;
+  const thumbHeight = Math.max(24, ratio * trackHeight);
+  const scrollRatio = sheetPanel.scrollTop / maxScroll;
+  galleryScrollThumb.style.height = `${thumbHeight}px`;
+  galleryScrollThumb.style.top = `${scrollRatio * (trackHeight - thumbHeight)}px`;
+}
+sheetPanel.addEventListener('scroll', updateGalleryScrollThumb);
 
 let activeProject = null;
 let cfIndex = 0;
@@ -1007,11 +1094,16 @@ let activeLoupe = null;
 let cfEdgePrevEl = null;
 let cfEdgeNextEl = null;
 let cfMainEl = null;
-// Set when the viewer opens, restored when it closes — a full-viewport
+// Set when the grid opens, restored when it closes — a full-viewport
 // overlay covers the page while open, but closing it should hand focus and
-// scroll position back to exactly where the visitor was, not reset either one.
-let viewerTrigger = null;
+// scroll position back to exactly where the visitor was, not reset either
+// one. galleryTrigger is the master tile that opened the grid; viewerTrigger
+// (below) is the separate, inner case: the specific photo frame that opened
+// level 3 from within an already-open grid — closing the grid needs the
+// former, closing the viewer (back to the grid) needs the latter.
+let galleryTrigger = null;
 let scrollYBeforeViewer = 0;
+let viewerTrigger = null;
 
 function disposeLoupe() {
   if (activeLoupe) {
@@ -1025,19 +1117,6 @@ function updateTileStates() {
     const isActive = !!activeProject && activeProject.id === id;
     tile.classList.toggle('is-active', isActive);
     tile.setAttribute('aria-expanded', String(isActive));
-    // The mark is normally only assigned lazily on first hover (see the
-    // tile's mouseenter listener) — a keyboard/click activation that never
-    // hovered would otherwise show this as the active indicator with no
-    // href set at all. Assigning it here too (assignedGreaseMark caches by
-    // index, so this is a no-op if hover already claimed one) guarantees
-    // it's always showing something real.
-    if (isActive) {
-      const markImage = tile.querySelector('.grease-mark image');
-      if (markImage && !markImage.getAttribute('href')) {
-        const idx = PROJECTS.findIndex(p => p.id === id);
-        markImage.setAttribute('href', assignedGreaseMark(idx));
-      }
-    }
   });
 }
 
@@ -1046,72 +1125,90 @@ function toggleProject(id) {
   else expandProject(id);
 }
 
-function positionExpandedPointer(tile) {
-  const pointer = psExpanded.querySelector('.ps-pointer');
-  if (!pointer || !tile) return;
-  const tileRect = tile.getBoundingClientRect();
-  const containerRect = psExpanded.getBoundingClientRect();
-  pointer.style.left = `${tileRect.left + tileRect.width / 2 - containerRect.left}px`;
+// openGallery/closeGallery own the shared sheetBackdrop/sheetPanel shell
+// (see its own CSS comment) for mode-grid; expandProject/collapseProject
+// are kept as the public names toggleProject and the tile click/keydown
+// handlers already call, now just thin wrappers.
+function openGallery(project, triggerEl) {
+  activeProject = project;
+  updateTileStates();
+  galleryTrigger = triggerEl || null;
+  scrollYBeforeViewer = window.scrollY;
+  sheetBackdrop.classList.add('open', 'mode-grid');
+  sheetBackdrop.setAttribute('aria-hidden', 'false');
+  sheetPanel.className = 'sheet-panel mode-grid';
+  document.body.style.overflow = 'hidden';
+  // The card's own render loop pauses for as long as this sheet covers
+  // it — see card.js's setPaused(). Level 3 (openViewer) reuses this same
+  // sheet rather than opening a second one, so it doesn't need its own
+  // pause/resume call.
+  card.setPaused(true);
+  renderExpandedSheet(project);
+  sheetPanel.scrollTop = 0;
+  sheetPanel.querySelector('.ps-close')?.focus({ preventScroll: true });
 }
-window.addEventListener('resize', () => {
-  if (activeProject) positionExpandedPointer(projectTiles.get(activeProject.id));
-});
+
+function closeGallery() {
+  const previous = activeProject;
+  activeProject = null;
+  updateTileStates();
+  disposeLoupe();
+  sheetBackdrop.classList.remove('open', 'mode-grid', 'mode-viewer');
+  sheetBackdrop.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  card.setPaused(false);
+  sheetPanel.innerHTML = '';
+  sheetPanel.className = 'sheet-panel';
+  window.scrollTo(0, scrollYBeforeViewer);
+  const returnTo = (galleryTrigger && document.contains(galleryTrigger)) ? galleryTrigger : projectTiles.get(previous?.id);
+  focusTileQuietly(returnTo);
+  galleryTrigger = null;
+}
+
+// Returning focus to the trigger tile after closing is correct
+// accessibility practice regardless of input modality, but Safari applies
+// :focus-visible to this kind of scripted .focus() call more liberally
+// than Chrome does — closing the gallery with a plain mouse click can
+// still light up the just-closed tile's :focus-visible grease mark there,
+// reading as "this one's still selected," exactly what removing the old
+// is-active rule was meant to avoid. suppress-focus-mark hides just that
+// one reveal (see its CSS) and clears itself on the very next real
+// pointer/keyboard interaction, so genuine keyboard Tab-navigation is
+// completely unaffected.
+function focusTileQuietly(tile) {
+  if (!tile) return;
+  tile.classList.add('suppress-focus-mark');
+  // mousemove matters as much as pointerdown/keydown here — the tile
+  // keeps real browser focus after this (only the VISUAL reveal is
+  // suppressed, not focus itself), so simply hovering it afterward, with
+  // no click at all, still matches :focus-visible. Without clearing on
+  // mousemove too, that hover would have found the suppression still
+  // active and shown no mark at all instead of the normal hover reveal —
+  // mousemove fires before the cursor actually reaches the tile, so the
+  // suppression is already gone by the time :hover itself applies.
+  const clear = () => tile.classList.remove('suppress-focus-mark');
+  document.addEventListener('pointerdown', clear, { once: true });
+  document.addEventListener('keydown', clear, { once: true });
+  document.addEventListener('mousemove', clear, { once: true });
+  tile.focus({ preventScroll: true });
+}
 
 function expandProject(id) {
   const project = PROJECTS.find(p => p.id === id);
   if (!project) return;
-  const alreadyOpen = psExpanded.classList.contains('is-open');
-  activeProject = project;
-  updateTileStates();
-  positionExpandedPointer(projectTiles.get(id));
-  renderExpandedSheet(project);
-  if (alreadyOpen) {
-    // Switching between two already-open projects: the container's own
-    // height animation already played for whichever one opened it, and
-    // playing it again here would collapse-then-reopen for no reason —
-    // just swap the content in place.
-    return;
-  }
-  psExpanded.hidden = false;
-  // Force layout before adding is-open, so the browser registers the
-  // starting grid-template-rows:0fr on THIS frame — otherwise the
-  // hidden->grid switch and the 0fr->1fr transition can land in the same
-  // paint and the transition never visibly runs.
-  void psExpanded.offsetHeight;
-  psExpanded.classList.add('is-open');
-  psExpanded.querySelector('.ps-close').focus({ preventScroll: true });
-  if (!reduceMotionQuery.matches) psExpanded.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  // psExpandedInner's own overflow:hidden (CSS) is only needed while this
-  // transition is actually running or the panel is closed — left on
-  // permanently it also clips each frame's own grease mark, sized larger
-  // than its frame on purpose (see .grease-mark). Switch to visible once
-  // the open animation actually finishes; collapseProject sets it back to
-  // hidden the instant a close starts, so the shrink still clips correctly.
-  psExpanded.addEventListener('transitionend', function onOpen(e) {
-    if (e.target !== psExpanded || e.propertyName !== 'grid-template-rows') return;
-    psExpanded.removeEventListener('transitionend', onOpen);
-    if (psExpanded.classList.contains('is-open')) psExpandedInner.style.overflow = 'visible';
-  });
+  // activeProject can't already be set here — the backdrop's own
+  // pointer-events:auto covers the master grid the instant it's open, so
+  // there's no way to click a different tile while one is already
+  // expanded (unlike the old inline-expand version this replaced).
+  openGallery(project, projectTiles.get(id));
 }
 
 function collapseProject() {
-  const previous = activeProject;
-  activeProject = null;
-  updateTileStates();
-  psExpanded.classList.remove('is-open');
-  psExpandedInner.style.overflow = 'hidden';
-  const cleanup = () => {
-    if (activeProject) return; // superseded by a new expand before this fired
-    psExpanded.hidden = true;
-    psExpandedInner.innerHTML = '';
-  };
-  if (reduceMotionQuery.matches) cleanup();
-  else psExpanded.addEventListener('transitionend', cleanup, { once: true });
-  projectTiles.get(previous?.id)?.focus({ preventScroll: true });
+  closeGallery();
 }
 
 function renderExpandedSheet(project) {
-  psExpandedInner.innerHTML = '';
+  sheetPanel.innerHTML = '';
   const projectIdx = PROJECTS.indexOf(project);
   const code = project.code || project.id.toUpperCase();
   const count = project.photos.length;
@@ -1127,13 +1224,39 @@ function renderExpandedSheet(project) {
       <span>${project.year} / SELECTED FRAMES</span>
     </div>
   `;
+  // Quiet, opt-in — only shown when a project actually has one (not every
+  // entry needs to yet; see PROJECTS' own statement fields). Reuses
+  // .collapsible-panel/.collapsible-panel-inner (same grid-template-rows
+  // trick as the Work/Education/Skills section panels) for the open/close
+  // animation rather than a bespoke one.
+  let statementWrap = null;
+  if (project.statement) {
+    const statementToggle = document.createElement('button');
+    statementToggle.type = 'button';
+    statementToggle.className = 'ps-statement-toggle';
+    statementToggle.textContent = 'Statement';
+    statementToggle.setAttribute('aria-expanded', 'false');
+    heading.querySelector('.ps-meta').appendChild(statementToggle);
+
+    statementWrap = document.createElement('div');
+    statementWrap.className = 'ps-statement collapsible-panel';
+    statementWrap.innerHTML = `<div class="collapsible-panel-inner"><p class="ps-statement-text">${project.statement}</p></div>`;
+    statementToggle.addEventListener('click', () => {
+      const open = !statementWrap.classList.contains('is-open');
+      statementWrap.classList.toggle('is-open', open);
+      statementToggle.setAttribute('aria-expanded', String(open));
+      statementToggle.textContent = open ? 'Hide statement' : 'Statement';
+    });
+  }
+
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
   closeButton.className = 'ps-close';
   closeButton.textContent = 'Close series';
   closeButton.addEventListener('click', () => collapseProject());
   heading.querySelector('.ps-meta').appendChild(closeButton);
-  psExpandedInner.appendChild(heading);
+  sheetPanel.appendChild(heading);
+  if (statementWrap) sheetPanel.appendChild(statementWrap);
 
   const sheetEl = createContactSheet({
     projectCode: code,
@@ -1144,7 +1267,7 @@ function renderExpandedSheet(project) {
       if (project.photos.length > 0) openViewer(index, triggerEl);
     }
   });
-  psExpandedInner.appendChild(sheetEl);
+  sheetPanel.appendChild(sheetEl);
 
   const footerRebate = document.createElement('div');
   footerRebate.className = 'rebate rebate-bottom';
@@ -1153,27 +1276,32 @@ function renderExpandedSheet(project) {
     <div class="rebate-dots"></div>
     <span class="rebate-text">© MATTHEW SCHEFFLER</span>
   `;
-  psExpandedInner.appendChild(footerRebate);
+  sheetPanel.appendChild(footerRebate);
+
+  sheetPanel.appendChild(galleryScrollTrack);
+  requestAnimationFrame(updateGalleryScrollThumb);
 }
 
+// Level 3 is only ever reached from within an already-open level-2 grid
+// now (see onFrameClick in renderExpandedSheet) — the backdrop, body
+// scroll lock, and card pause are already in place from openGallery(), so
+// this only swaps the sheet's own mode/content, and closeViewer() below
+// returns to that same grid rather than closing everything.
 function openViewer(index, triggerEl) {
   cfIndex = index;
   viewerTrigger = triggerEl || null;
-  scrollYBeforeViewer = window.scrollY;
-  sheetBackdrop.classList.add('open', 'mode-viewer');
-  sheetBackdrop.setAttribute('aria-hidden', 'false');
+  sheetBackdrop.classList.remove('mode-grid');
+  sheetBackdrop.classList.add('mode-viewer');
   sheetPanel.className = 'sheet-panel mode-viewer';
-  document.body.style.overflow = 'hidden';
   renderCoverflow();
 }
 
 function closeViewer() {
-  sheetBackdrop.classList.remove('open', 'mode-viewer');
-  sheetBackdrop.setAttribute('aria-hidden', 'true');
-  document.body.style.overflow = '';
   disposeLoupe();
-  sheetPanel.innerHTML = '';
-  window.scrollTo(0, scrollYBeforeViewer);
+  sheetBackdrop.classList.remove('mode-viewer');
+  sheetBackdrop.classList.add('mode-grid');
+  sheetPanel.className = 'sheet-panel mode-grid';
+  renderExpandedSheet(activeProject);
   if (viewerTrigger && document.contains(viewerTrigger)) viewerTrigger.focus({ preventScroll: true });
   viewerTrigger = null;
 }
@@ -1276,26 +1404,39 @@ function bindSwipe(el) {
   }, { passive: true });
 }
 
-document.getElementById('sheetClose').addEventListener('click', closeViewer);
+// Mode-aware: mode-viewer's close steps back to the grid it came from
+// (closeViewer), any other mode (mode-grid) closes the whole sheet
+// (closeGallery) — see .sheet-backdrop's own CSS comment for the shape
+// of this shared shell.
+function closeActiveSheetMode() {
+  if (sheetPanel.classList.contains('mode-viewer')) closeViewer();
+  else closeGallery();
+}
+
+document.getElementById('sheetClose').addEventListener('click', closeActiveSheetMode);
 
 sheetBackdrop.addEventListener('click', (e) => {
-  if (e.target === sheetBackdrop) closeViewer();
+  if (e.target === sheetBackdrop) closeActiveSheetMode();
 });
 
 sheetPanel.addEventListener('click', (e) => {
+  // Click-to-close on empty background only makes sense for mode-viewer's
+  // minimal single-image layout — mode-grid's panel is mostly filled with
+  // browsable content, where the same behavior would mean accidental
+  // closes while just moving the mouse between photos.
+  if (!sheetPanel.classList.contains('mode-viewer')) return;
   if (e.target === sheetPanel || e.target.id === 'cfStage' || e.target.classList.contains('lv3-main')) {
     closeViewer();
   }
 });
 
 document.addEventListener('keydown', (e) => {
-  if (sheetBackdrop.classList.contains('open')) {
-    if (e.key === 'Escape') closeViewer();
+  if (!sheetBackdrop.classList.contains('open')) return;
+  if (e.key === 'Escape') { closeActiveSheetMode(); return; }
+  if (sheetPanel.classList.contains('mode-viewer')) {
     if (e.key === 'ArrowRight') cfNext();
     if (e.key === 'ArrowLeft') cfPrev();
-    return;
   }
-  if (e.key === 'Escape' && activeProject) collapseProject();
 });
 </script>
 

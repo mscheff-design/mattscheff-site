@@ -2541,6 +2541,20 @@ export function initCard(container) {
     guideClose.style.opacity = 0;
   }
 
+  // updateGuideHints runs every animation frame (see tick()'s per-frame
+  // call), forever, once the pointer has moved once — but hostRect/
+  // containerRect only ever actually change on a real resize or during
+  // the résumé's own tween (dropdownAnimation). getBoundingClientRect()
+  // forces a synchronous layout recalculation whose cost scales with the
+  // WHOLE page's layout complexity, not just this component — calling it
+  // unconditionally every frame meant every other, unrelated part of the
+  // page (e.g. a large photo gallery expanded elsewhere) directly taxed
+  // the card's own frame budget just by existing, which is exactly the
+  // "card gets choppy specifically while a gallery is open" report. Cache
+  // both rects and only re-measure when something could plausibly have
+  // moved them; handleResize() clears the cache on a real confirmed size
+  // change, and an active dropdownAnimation covers the tween.
+  let cachedHostRect = null, cachedContainerRect = null;
   function updateGuideHints(clientX, clientY) {
     if (physicsSuspended || mode !== 'idle' || flipping) { hideGuides(); return; }
 
@@ -2554,8 +2568,12 @@ export function initCard(container) {
     // top/bottom padding differ). So the shared center point is computed
     // in interactionRoot-space, then re-expressed in container-space
     // (originX/Y below) for the actual left/top writes.
-    const hostRect = interactionRoot.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
+    if (!cachedHostRect || dropdownAnimation) {
+      cachedHostRect = interactionRoot.getBoundingClientRect();
+      cachedContainerRect = container.getBoundingClientRect();
+    }
+    const hostRect = cachedHostRect;
+    const containerRect = cachedContainerRect;
     const centerX = hostRect.width / 2;
     const centerY = hostRect.height / 2 - cardLift * PIXELS_PER_WORLD_UNIT;
     const px = clientX - hostRect.left - centerX;
@@ -2706,6 +2724,10 @@ export function initCard(container) {
     const widthChanged = w !== lastResizeW;
     lastResizeW = w;
     lastResizeH = h;
+    // A confirmed real size change — invalidate updateGuideHints' own
+    // cached rects (see its comment) so its next call re-measures fresh
+    // instead of using stale geometry.
+    cachedHostRect = null;
 
     if (widthChanged) {
       // See NATURAL_CARD_WIDTH_PX's own comment: the card's on-screen size
@@ -2881,14 +2903,54 @@ export function initCard(container) {
 
     renderer.render(scene, camera);
     contactForm.update();
+    tickScheduled = false;
+    if (cardVisible && !explicitlyPaused) scheduleTick();
+  }
+  // The render loop used to run forever regardless of scroll position —
+  // full WebGL render, shadow filter, per-frame guide-hint math, physics
+  // — at 100% cost even with the card scrolled completely off-screen
+  // (viewing the gallery, the footer, anywhere else on the page). That's
+  // not a cost this file should ever be paying while invisible, and it
+  // directly competes for the same main thread/GPU as whatever else is
+  // on screen at the time — reported as the card feeling worse
+  // specifically while a heavy photo gallery was open, which requires
+  // having scrolled the card out of view to begin with. rootMargin gives
+  // a little headroom so rendering resumes just before it's actually in
+  // view, not exactly on the scroll boundary.
+  let cardVisible = true;
+  // Separate from cardVisible: a full-screen modal (the photo gallery)
+  // can sit directly on top of the card while the card's own section is
+  // still technically intersecting the viewport underneath it — geometry
+  // alone can't see that it's covered. setPaused() is how a host page
+  // says so explicitly instead of relying on scroll position.
+  let explicitlyPaused = false;
+  let tickScheduled = false;
+  function scheduleTick() {
+    if (tickScheduled) return;
+    tickScheduled = true;
     requestAnimationFrame(tick);
   }
-  requestAnimationFrame(tick);
+  const visibilityObserver = new IntersectionObserver((entries) => {
+    cardVisible = entries[0].isIntersecting;
+    if (cardVisible && !explicitlyPaused) scheduleTick();
+  }, { rootMargin: '200px 0px 200px 0px', threshold: 0 });
+  visibilityObserver.observe(interactionRoot);
+  scheduleTick();
 
   // Exposed for hero-level features that need to know where the card
   // actually is (a real raycast, not a DOM rect) and whether it's mid-
   // animation, without duplicating either check — see heroSurface.js.
-  return { hitsCard, isCardSettled };
+  // setPaused(true/false) — see explicitlyPaused above; a host page
+  // calls this around anything that fully covers the card (a modal),
+  // so the render loop stops paying for a frame nobody can see.
+  return {
+    hitsCard,
+    isCardSettled,
+    setPaused(paused) {
+      explicitlyPaused = !!paused;
+      if (!explicitlyPaused && cardVisible) scheduleTick();
+    }
+  };
 }
 
 function injectStyles() {

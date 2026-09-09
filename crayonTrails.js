@@ -36,17 +36,6 @@ export function mountCrayonTrails(hero, {
   surface.append(canvas);
   const ctx = canvas.getContext('2d');
   if (!ctx) { canvas.remove(); throw new Error('2D canvas is unavailable.'); }
-  // Explicit, not left to each browser's own default: every stamp is a
-  // noisy 64x64 brush texture (see `brushes` below) drawn at its actual
-  // stamp size, usually well under 64px — a real downscale, not a 1:1
-  // blit. Browsers differ in their default minification filter quality;
-  // a cheaper default can average away the deliberate per-pixel grain
-  // that's supposed to read as a waxy, broken texture, leaving a flatter,
-  // more solid-looking mark instead — reported as marks looking "bolder"
-  // in Safari specifically. Forcing the best quality here removes that
-  // as a source of cross-browser difference.
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const fine = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
   let enabled = fine.matches && !motion.matches;
@@ -103,22 +92,8 @@ export function mountCrayonTrails(hero, {
     const now=performance.now();
     const life=(cfg.holdSeconds+cfg.fadeSeconds)*1000;
     stamps=stamps.filter(s=>now-s.time<life);
-    // height is a high-water mark that only ever grows (see resize()) —
-    // once the résumé's been opened once, it can stay far taller than
-    // what .hero-materials's own overflow:hidden actually shows. Every
-    // regular paint() (on nearly every stroke, and every ~150ms while
-    // marks are fading) was clearing and re-compositing that FULL
-    // oversized buffer regardless of how little of it is visible right
-    // now — real, avoidable work, and canvas clear/composite over a large
-    // area is markedly slower in Safari than Chrome. Bounding to the
-    // currently visible height fixes that; it's safe because any actual
-    // visible-height CHANGE fires resize()'s own observer, which always
-    // repaints using the height current at that moment — so nothing below
-    // the fold is ever left stale once it becomes visible again.
-    const drawHeight=surface.clientHeight||height;
-    ctx.clearRect(0,0,width,drawHeight);
+    ctx.clearRect(0,0,width,height);
     for (const s of stamps) {
-      if (s.y-s.size>drawHeight) continue;
       const fade=opacityAt((now-s.time)/1000,cfg.holdSeconds,cfg.fadeSeconds);
       ctx.globalAlpha=s.alpha*fade;
       // Absolute CSS px, not a fraction of width/height — a stamp's
@@ -132,7 +107,7 @@ export function mountCrayonTrails(hero, {
     ctx.globalAlpha=1;
     if(toothPattern){
       ctx.globalCompositeOperation='destination-out';ctx.fillStyle=toothPattern;
-      ctx.fillRect(0,0,width,drawHeight);ctx.globalCompositeOperation='source-over';
+      ctx.fillRect(0,0,width,height);ctx.globalCompositeOperation='source-over';
     }
     if (stamps.length && visible && !document.hidden) fadeTimer=setTimeout(schedule,150);
   }
@@ -205,25 +180,11 @@ export function mountCrayonTrails(hero, {
     if (rawDistance>180 || rawDistance/elapsed<.015) {breakStroke();return;}
     previous={x,y,time};
     const from=smooth;
-    // Both blend factors below (.36 position, .28 angle) were tuned by eye
-    // assuming pointermove fires at a roughly steady rate — but they were
-    // applied flat, per EVENT, not scaled by how much real time actually
-    // passed since the last one. Browsers genuinely differ in native
-    // pointermove dispatch/coalescing rates, so the same flat blend at a
-    // different event cadence changes how much the smoothed point lags
-    // the raw cursor per unit of screen distance — reported as reduced
-    // smoothness in Safari specifically. elapsedNorm renormalizes against
-    // a ~60Hz baseline (the cadence these were tuned against) the same
-    // way card.js's tilt spring does against a 60fps render baseline, so
-    // a step at that baseline rate is unchanged and other rates scale
-    // correctly.
-    const elapsedNorm=elapsed/16.67;
     // Lower pull-toward-target factor than the original .62 — the smoothed
     // point lags the raw pointer more, which reads as a gentler, more
     // fluid stroke instead of tracking the cursor almost 1:1. Nudged down
     // again (.42 -> .36) for a bit more of that same fluidity.
-    const posBlend=1-Math.pow(1-.36,elapsedNorm);
-    const to={x:from.x+(x-from.x)*posBlend,y:from.y+(y-from.y)*posBlend};
+    const to={x:from.x+(x-from.x)*.36,y:from.y+(y-from.y)*.36};
     const distance=Math.hypot(to.x-from.x,to.y-from.y);
     smooth=to;
     if (distance<1) return;
@@ -242,7 +203,7 @@ export function mountCrayonTrails(hero, {
     else {
       let diff=rawAngle-smoothAngle;
       diff=((diff+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
-      smoothAngle+=diff*(1-Math.pow(1-0.28,elapsedNorm));
+      smoothAngle+=diff*0.28;
     }
     const angle=smoothAngle;
     const spacing=Math.max(1.4,cfg.width*.1);
