@@ -328,7 +328,6 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    click/keydown listeners (see handleTileActivate()) don't depend on the
    image being the event target, so tap-to-open is unaffected. */
 .project-frame .cs-img,.project-frame .frame-placeholder{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(15%) contrast(1.08) brightness(0.85) saturate(0.9);pointer-events:none;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
-.project-frame .cs-img{transition:opacity 1s ease}
 .project-frame .frame-placeholder{background:linear-gradient(135deg,rgba(var(--ink-light-rgb),0.03) 0%,rgba(var(--ink-light-rgb),0.06) 100%)}
 .project-frame .frame-label{font-size:8px;letter-spacing:0.08em;text-transform:uppercase}
 .project-num{position:absolute;top:3px;right:3px;z-index:1;font-family:var(--font-mono);font-size:8px;letter-spacing:0.05em;color:#F4811F;text-shadow:0 0 4px rgba(244,129,31,0.65)}
@@ -551,7 +550,7 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
 .lv3-grain{position:absolute;inset:-20%;pointer-events:none;z-index:1;opacity:0.05;background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:180px 180px;animation:lv3GrainShift 1s steps(4) infinite}
 @keyframes lv3GrainShift{0%{transform:translate(0,0)}25%{transform:translate(-2%,2%)}50%{transform:translate(2%,-1%)}75%{transform:translate(-1%,-2%)}100%{transform:translate(0,0)}}
 
-.lv3-stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;z-index:2;transition:opacity 0.15s ease}
+.lv3-stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;z-index:2}
 
 /* height/max-width both shrunk from 85vh/90vw — the real gap between
    this and .lv3-edge (max-width - 2*edge-width, at min) used to be as
@@ -561,7 +560,10 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
    itself are pure black-on-black (.lv3-edge's own brightness(0.7) filter
    darkens it further), so even the old positive gap read as no space at
    all rather than as a deliberate seam. */
-.lv3-main{position:relative;height:80vh;max-width:72vw;display:flex;align-items:center;justify-content:center;z-index:2}
+/* overflow:hidden added for navigate()'s own slide transition (see its
+   comment) — two stacked, absolutely-positioned images pass through this
+   box's edges mid-slide and need to be clipped to it. */
+.lv3-main{position:relative;height:80vh;max-width:72vw;display:flex;align-items:center;justify-content:center;z-index:2;overflow:hidden}
 /* Restored here only, of the four places that used to carry the SVG
    chromatic-aberration filter — this is the single lightbox image, one
    instance at a time, not a whole grid. The Safari-specific cost was
@@ -578,8 +580,15 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
    here (unlike .cs-img) — sheetPanel's click-to-close only matches taps
    that land on .lv3-main itself (empty space around a letterboxed image),
    and routing the image's own hit-testing to its parent would make a tap
-   on the visible photo closeViewer() too, which isn't the intent. */
-.lv3-main img{width:100%;height:100%;object-fit:contain;display:block;filter:url(#chromaticAberrationSubtle) grayscale(15%) contrast(1.08) brightness(0.92) saturate(0.9);-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
+   on the visible photo closeViewer() too, which isn't the intent.
+   position:absolute/inset:0 (replacing the old plain flex-centered sizing)
+   is what lets navigate() stack an outgoing/incoming pair exactly on top
+   of each other and slide them past one another — .lv3-main's own flex
+   centering is now moot for this child (absolutely positioned elements
+   aren't flex items) but harmless to leave. transition:transform is the
+   actual slide animation; nothing else here ever touches transform, so a
+   permanent rule is simpler than toggling a class per-navigation. */
+.lv3-main img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;filter:url(#chromaticAberrationSubtle) grayscale(15%) contrast(1.08) brightness(0.92) saturate(0.9);-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none;transition:transform 0.32s cubic-bezier(.22,1,.36,1)}
 
 /* height matches .lv3-main's own (see its comment) — same value in both
    places so the edge previews stay vertically aligned with the main
@@ -994,15 +1003,15 @@ document.getElementById('card3d').addEventListener('resume-job-click', (e) => {
 // copy written to match that voice, since neither had a formal statement
 // of its own.
 const PROJECTS = [
-  { projectCode: 'JPAN', year: '2018', title: 'Japan', folderPath: 'assets/japan (2018)/', selectedIndex: 0,
+  { projectCode: 'JPAN', year: '2018', title: 'Japan', folderPath: 'assets/japan (2018)/', lead: '_DSF4242',
     statement: `Tokyo & Kyoto, 2018<br><br>A twelve-day study abroad excursion during my second year of college.` },
-  { projectCode: 'EURP', year: '2019', title: 'Europe', folderPath: 'assets/europe (2019)/', selectedIndex: 0,
+  { projectCode: 'EURP', year: '2019', title: 'Europe', folderPath: 'assets/europe (2019)/', lead: 'DSCF8784',
     statement: `Venice, Paris, Copenhagen, London<br><br>Photographs from a few adventures around Europe — no single itinerary, just whatever caught my eye along the way.` },
-  { projectCode: 'MLND', year: '2017', title: 'Motherland', folderPath: 'assets/motherland (2017)/', selectedIndex: 0,
+  { projectCode: 'MLND', year: '2017', title: 'Motherland', folderPath: 'assets/motherland (2017)/', lead: '_DSF3176',
     statement: `Ildiko Bulter Gallery, New York City<br>April 25th - May 7th 2018<br><br>“In returning to China for the first time since my adoption, these photographs serve as placeholders for a life I might have had; memories of what could have been. In navigating through this world for the first time, locations, peoples, and objects seem to imbue themselves with a secret, unknown significance. Having grown up in the U.S. nearly all my life, these pictures are impressions of a nation that I never knew. Using photography as a personal interface for both recollection and location, this is an attempt to piece together elements of an unconscious memory that have seemingly been lost forever. These images are my way of reconciling with the struggle for identity. Of feeling one way and being perceived as another. Of understanding my roots and planting others. Of discovering who I could have been and who I am today.”<br><br><em>yes, yes,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;that’s what<br>I wanted,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;I always wanted,<br>I always wanted,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;to return<br>to the body<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;where I was born.</em><br>— Allen Ginsberg, “Song” (1956)` },
-  { projectCode: 'HELO', year: '2018', title: 'Heliographs', folderPath: 'assets/heliographs/', selectedIndex: 0,
+  { projectCode: 'HELO', year: '2018', title: 'Heliographs', folderPath: 'assets/heliographs/', lead: '_DSF3566',
     statement: `January 2018<br><br>These images were captured from the window of an airplane during sunset (somewhere over the Arctic Circle). Using long exposure and physical gestures, a glowing sliver of daylight is transfigured into a sequence of fluid forms. Individually, these images are ephemeral and gossamer, but when viewed as a grid, a kind of celestial symbology appears. The viewer may interpret this sequence as a “cosmic alphabet”, calling attention to humankind’s tendency to attach visual significance to the randomness and chaos of our natural world.` },
-  { projectCode: 'FCMG', year: '2020', title: "His Father's Castle, His Mother's Glory", folderPath: 'assets/his fathers castle his mothers glory (2020)/', selectedIndex: 0,
+  { projectCode: 'FCMG', year: '2020', title: "His Father's Castle, His Mother's Glory", folderPath: 'assets/his fathers castle his mothers glory (2020)/', lead: '25280013',
     statement: `These photographs are dedicated to my father, who lost his parents and found them again. In 2020, during the pandemic, on a trip to his childhood home, I watched my father contend with decades of unresolved trauma and neglect from his own father, himself a survivor of domestic abuse. Perhaps revisiting his parents' vacant home was the final way for my dad to reconcile years of rage and pain with the love, tenderness, and forgiveness he has learned to give himself.<br><br>— Matthew Scheffler` }
 ];
 
@@ -1194,24 +1203,41 @@ function createContactSheet(config) {
   }
 }
 
-/* ---------- level 1: project cover tiles, the master sheet, auto-cycling ---------- */
+/* ---------- level 1: project cover tiles, the master sheet ---------- */
 
 const projectGrid = document.getElementById('projectGrid');
-const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 const projectTiles = new Map();
+
+// Resolves each project's `lead` filename (set on the PROJECTS entry) to
+// its actual index in the manifest-loaded `photos` array, falling back to
+// 0 if it's ever not found (e.g. a photo referenced by `lead` gets pulled
+// from a folder later). Also becomes the project's selectedIndex — the
+// same photo used as the static tile cover is what mobile's direct-open
+// (see handleTileActivate/openViewerDirect) opens the viewer on, so
+// tapping the tile lands on the photo the visitor was just looking at
+// rather than jumping to some other "first" one.
+function resolveLeadIndex(project) {
+  const idx = project.photos.indexOf(project.lead);
+  return idx === -1 ? 0 : idx;
+}
 
 (async function initLevel1() {
   await Promise.all(PROJECTS.map(loadManifest));
 
   PROJECTS.forEach((project, projectIdx) => {
   const hasPhotos = project.photos.length > 0;
+  project.selectedIndex = hasPhotos ? resolveLeadIndex(project) : 0;
   const frame = document.createElement('div');
   frame.className = 'frame project-frame' + (hasPhotos ? '' : ' is-empty');
 
+  // A single static cover image, not an auto-cycling one — deliberately
+  // picked per project (PROJECTS' own `lead` field) rather than left to
+  // rotate through the whole set at random, at the user's request: letting
+  // every tile's cover change every 2.4s read as disjointed, without any
+  // real creative direction behind which photo was showing at a glance.
   const coverHTML = hasPhotos
     ? `<div class="cover-slide">
-         <img class="cs-img cs-a" src="${thumbSrc(project, 0)}" alt="${project.title}">
-         <img class="cs-img cs-b" src="${thumbSrc(project, project.photos.length > 1 ? 1 : 0)}" style="opacity:0" alt="${project.title}">
+         <img class="cs-img" src="${thumbSrc(project, project.selectedIndex)}" alt="${project.title}">
        </div>`
     : `<div class="frame-placeholder"></div>`;
 
@@ -1241,35 +1267,6 @@ const projectTiles = new Map();
   });
   projectTiles.set(project.id, tile);
   projectGrid.appendChild(tile);
-
-  if (project.photos.length > 1) {
-    const imgA = frame.querySelector('.cs-a');
-    const imgB = frame.querySelector('.cs-b');
-    let shownIndex = 0;
-    let showingA = true;
-    setInterval(() => {
-      // Also paused while any project's level-2 gallery is open
-      // (activeProject, declared further down and read here via closure —
-      // this timer's callback only ever runs well after that declaration
-      // has executed, so no TDZ issue). This ran unconditionally before,
-      // every 2.4s per tile (an <img src> swap — a real decode+repaint,
-      // not just an opacity toggle) regardless of whether a much heavier
-      // expanded gallery was also sitting on the page — reported as
-      // Safari-specific lag that came and went with a gallery being open,
-      // which is consistent with this background work competing for
-      // main-thread time against a much bigger paint tree specifically in
-      // that state. The master grid isn't usually what anyone's looking
-      // at while a project's own gallery is expanded anyway.
-      if (reduceMotionQuery.matches || activeProject) return;
-      const nextIndex = (shownIndex + 1) % project.photos.length;
-      const hiddenImg = showingA ? imgB : imgA;
-      hiddenImg.src = thumbSrc(project, nextIndex);
-      imgA.style.opacity = showingA ? '0' : '1';
-      imgB.style.opacity = showingA ? '1' : '0';
-      showingA = !showingA;
-      shownIndex = nextIndex;
-    }, 2400);
-  }
   });
 
   // One random mark framing the whole mobile carousel box (CSS keeps it
@@ -1676,6 +1673,10 @@ function renderCoverflow() {
   updateStage();
 }
 
+// Sets everything BUT the main image — used both for the initial render
+// (openViewer -> renderCoverflow, where there's no previous main image to
+// slide against) and at the end of navigate()'s slide, once the incoming
+// image has already taken over the #cfMainImg id.
 function updateStage() {
   const project = activeProject;
   const total = project.photos.length;
@@ -1693,23 +1694,74 @@ function updateStage() {
   document.getElementById('cfCount').textContent = `${String(cfIndex + 1).padStart(2, '0')} / ${total}`;
 }
 
-function updateStageWithTransition() {
-  const stage = document.getElementById('cfStage');
-  stage.style.opacity = '0';
-  setTimeout(() => {
+// The old crossfade (whole #cfStage, edges included, faded to 0 and back
+// over a 150ms setTimeout) read as a blackout-and-jump-cut rather than
+// motion between photos — this is what the user meant by "no fluid
+// motion." Replaced with a real directional slide of just the main image:
+// the incoming photo is stacked on top of the outgoing one inside
+// .lv3-main (both position:absolute/inset:0 — see that rule's own
+// comment) starting off-stage on the swipe's leading side, then both
+// slide across together over .lv3-main img's own transition:transform.
+// The edge previews and label/count still snap instantly once the slide
+// finishes (via the existing updateStage()) — they're small, already-dark
+// peek thumbnails, not worth animating in their own right.
+//
+// dir: 1 for next (content moves leftward, as in a swipe-left-to-advance
+// gesture), -1 for prev. cfAnimating guards against a second swipe/
+// click/key landing mid-transition — the transition is short enough
+// (320ms) that simply dropping the extra input reads as normal, not
+// laggy, and avoids the complexity of either queuing input or
+// interrupting an in-flight transform.
+let cfAnimating = false;
+function navigate(dir) {
+  if (cfAnimating || !activeProject) return;
+  const total = activeProject.photos.length;
+  const targetIndex = (cfIndex + dir + total) % total;
+
+  const oldImg = document.getElementById('cfMainImg');
+  const newImg = document.createElement('img');
+  newImg.src = fullSrc(activeProject, targetIndex);
+  newImg.alt = `${activeProject.title}, frame ${targetIndex + 1}`;
+  // No transition yet — this initial transform has to land instantly, off
+  // to the side the new photo is about to slide in from, before the
+  // element is even visible.
+  newImg.style.transition = 'none';
+  newImg.style.transform = `translateX(${dir * 100}%)`;
+  cfMainEl.appendChild(newImg);
+
+  cfAnimating = true;
+  // Forces layout so the browser commits the instant transform above
+  // before the transition is re-enabled below — without this the two
+  // style writes coalesce into one and there's nothing to animate from.
+  void newImg.offsetWidth;
+  newImg.style.transition = '';
+  requestAnimationFrame(() => {
+    oldImg.style.transform = `translateX(${-dir * 100}%)`;
+    newImg.style.transform = 'translateX(0)';
+  });
+
+  let done = false;
+  function finish() {
+    if (done) return;
+    done = true;
+    oldImg.remove();
+    newImg.id = 'cfMainImg';
+    newImg.style.transform = '';
+    cfIndex = targetIndex;
     updateStage();
-    requestAnimationFrame(() => { stage.style.opacity = '1'; });
-  }, 150);
+    cfAnimating = false;
+  }
+  // transitionend is the normal path; the timeout is a backstop for
+  // prefers-reduced-motion (a 0-duration transition doesn't reliably fire
+  // transitionend in every browser) or any other case a transition just
+  // doesn't run — without it cfAnimating could get stuck true and freeze
+  // navigation entirely.
+  newImg.addEventListener('transitionend', finish, { once: true });
+  setTimeout(finish, 400);
 }
 
-function cfNext() {
-  cfIndex = (cfIndex + 1) % activeProject.photos.length;
-  updateStageWithTransition();
-}
-function cfPrev() {
-  cfIndex = (cfIndex - 1 + activeProject.photos.length) % activeProject.photos.length;
-  updateStageWithTransition();
-}
+function cfNext() { navigate(1); }
+function cfPrev() { navigate(-1); }
 
 function bindSwipe(el) {
   let startX = 0, startY = 0, tracking = false;
