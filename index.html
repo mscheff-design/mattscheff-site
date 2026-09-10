@@ -452,7 +452,11 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
      than one. Native scrollbar hidden. */
   .project-grid{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;touch-action:pan-x;scrollbar-width:none}
   .project-grid::-webkit-scrollbar{display:none}
-  .project-tile{flex:0 0 86%;scroll-snap-align:start;scroll-snap-stop:always}
+  .project-tile{flex:0 0 92%;scroll-snap-align:start;scroll-snap-stop:always}
+  /* Taller than the shared desktop/tablet 3:4 — on a phone this sat with
+     a lot of dead black space above/below it in the section; a taller
+     frame at a wider tile width fills more of that. */
+  .project-frame{aspect-ratio:2/3}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
 }
 
