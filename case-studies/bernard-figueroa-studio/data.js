@@ -49,20 +49,9 @@ export const CASE_STUDY = {
         heading: 'Overview',
         chapter: true,
         chapterLabel: 'Overview',
-        body: 'Bernard Figueroa designs and produces sculptural lighting in bronze, glass, and mixed materials. The studio operates across two locations, New Jersey and Montpellier, and the work is made in collaboration with foundries and artisan glassblowers rather than in volume production.<br><br>I was hired to develop the portfolio website. The role expanded into studio assistant, content producer, and gallery liaison as it became clear that the site depended on material the studio did not yet have in an organized form.<br><br>The work is sold to collectors, decorators, and design professionals who are buying a hand-made object. Everything produced for the studio has to reflect that, and has to fit around a production schedule set by material and fabrication rather than by a content calendar.',
+        body: 'Bernard Figueroa designs and produces sculptural lighting in bronze, glass, and mixed materials. The studio operates across two locations, New Jersey and Montpellier, and the work is made in collaboration with foundries and artisan glassblowers rather than in volume production.<br><br>I was hired to develop the portfolio website — it presents the work by piece, with images, materials, and specifications, and I manage the site and its content as new work is completed and documented. The role expanded into studio assistant, content producer, and gallery liaison as it became clear that the site depended on material the studio did not yet have in an organized form.<br><br>The work is sold to collectors, decorators, and design professionals who are buying a hand-made object. Everything produced for the studio has to reflect that, and has to fit around a production schedule set by material and fabrication rather than by a content calendar.',
         media: { type: 'video', src: '/assets/case-studies/bernard-figueroa-studio/video/panel.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/panel-poster.webp' },
         orientation: 'right'
-      }
-    },
-    {
-      type: 'text',
-      props: {
-        heading: 'Website',
-        chapter: true,
-        chapterLabel: 'Website',
-        body: [
-          'The portfolio site presents the work by piece, with images, materials, and specifications. I manage the site and its content, adding new work as it is completed and documented.'
-        ]
       }
     },
     {
