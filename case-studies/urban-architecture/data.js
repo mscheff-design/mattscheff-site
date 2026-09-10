@@ -3,19 +3,9 @@
 // REAL COPY — user-provided narrative. Overview/Challenge/Approach modules
 // provided 2026-09-04/05; a full-page draft (Overview, Identity, Storefront,
 // Voice, Email, Video, Operations, Status) provided 2026-09-09 and used as
-// the authoritative source for those sections below. Media is still
-// placeholder() SVGs — swap those for real assets under
-// /assets/case-studies/urban-architecture/ when available; each label notes
-// what it stands in for.
-
-function placeholder(label, w = 1200, h = 800, bg = 'd8cfc0', fg = '1c140a') {
-  const escapedLabel = String(label).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'>
-    <rect width='100%' height='100%' fill='#${bg}'/>
-    <text x='50%' y='50%' font-family='monospace' font-size='20' fill='#${fg}' fill-opacity='0.5' text-anchor='middle' dominant-baseline='middle'>${escapedLabel}</text>
-  </svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
+// the authoritative source for those sections below. Every placeholder()
+// SVG has since been swapped for a real asset — the last ones (From the
+// Collection's video triptych) went in 2026-09-10.
 
 export const CASE_STUDY = {
   id: 'urban-architecture',
@@ -62,30 +52,30 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'text',
+      type: 'textColumns',
       props: {
         heading: `The challenge`,
         chapter: true,
-        chapterLabel: `Challenge`,
-        body: [
-          `Urban Architecture’s audience is small, informed, and selective: collectors, interior designers, architects, and curators. Reaching more people was never the objective. The site had to be immediately credible to the few visitors who mattered.`,
-          `Most of the business existed in forms that do not translate directly to the internet. Knowledge held in conversation. Relationships held in a Rolodex. Prices held in European spreadsheets and printed reference books. Sales conducted through direct inquiry.`,
-          `Each of those required a decision about what it should become online and what should stay personal. The e-commerce build and the visibility strategy also had to be developed in parallel, without either compromising the other.`
-        ]
-      }
-    },
-    {
-      type: 'text',
-      props: {
-        heading: `The approach`,
-        chapter: true,
-        chapterLabel: `Approach`,
-        body: [
-          `Four words governed the strategy: micro, targeted, intentional, authentic.`,
-          `Keith sits at the center. The brand is built around him as The Merchant of Memphis, with authority that comes from having been there since the beginning.`,
-          `The visual system is quiet and editorial. It gives the objects room and assumes intelligence in the visitor, avoiding over-explanation and sales language. In this market, restraint carries a signal of its own.`,
-          `Every part of the system extends something already true. A small, taste-conscious audience recognizes anything manufactured quickly, so the work builds on existing knowledge and existing relationships rather than imitating them.`,
-          `The objective throughout is a small number of high-value relationships rather than reach.`
+        chapterLabel: `Challenge & Approach`,
+        columns: [
+          {
+            heading: `The challenge`,
+            body: [
+              `Urban Architecture’s audience is small, informed, and selective: collectors, interior designers, architects, and curators. Reaching more people was never the objective. The site had to be immediately credible to the few visitors who mattered.`,
+              `Most of the business existed in forms that do not translate directly to the internet. Knowledge held in conversation. Relationships held in a Rolodex. Prices held in European spreadsheets and printed reference books. Sales conducted through direct inquiry.`,
+              `Each of those required a decision about what it should become online and what should stay personal. The e-commerce build and the visibility strategy also had to be developed in parallel, without either compromising the other.`
+            ]
+          },
+          {
+            heading: `The approach`,
+            body: [
+              `Four words governed the strategy: micro, targeted, intentional, authentic.`,
+              `Keith sits at the center. The brand is built around him as The Merchant of Memphis, with authority that comes from having been there since the beginning.`,
+              `The visual system is quiet and editorial. It gives the objects room and assumes intelligence in the visitor, avoiding over-explanation and sales language. In this market, restraint carries a signal of its own.`,
+              `Every part of the system extends something already true. A small, taste-conscious audience recognizes anything manufactured quickly, so the work builds on existing knowledge and existing relationships rather than imitating them.`,
+              `The objective throughout is a small number of high-value relationships rather than reach.`
+            ]
+          }
         ]
       }
     },
@@ -213,14 +203,25 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'textMedia',
+      type: 'text',
       props: {
-        heading: `From the Shelf`,
+        heading: `From the Collection`,
         chapter: true,
-        chapterLabel: `Video`,
-        body: `<em>From the Shelf</em> was developed as a recurring video series featuring Keith discussing pieces from the collection. My role covers direction, production, and editing, with an emphasis on his knowledge, humor, and natural delivery.<br><br>Several episodes can be recorded in one session, allowing for regular publication around his availability.`,
-        media: { type: 'image', src: placeholder('FROM THE SHELF — REEL, MUTED AUTOPLAY') },
-        orientation: 'left'
+        chapterLabel: `From the Collection`,
+        body: [
+          `<em>From the Collection</em> was developed as a recurring video series featuring Keith discussing pieces from the collection. My role covers direction, production, and editing, with an emphasis on his knowledge, humor, and natural delivery.`,
+          `Several episodes can be recorded in one session, allowing for regular publication around his availability.`
+        ]
+      }
+    },
+    {
+      type: 'videoTriptych',
+      props: {
+        videos: [
+          { src: '/assets/case-studies/urban-architecture/video/sowden.mp4', poster: '/assets/case-studies/urban-architecture/video/sowden-poster.webp' },
+          { src: '/assets/case-studies/urban-architecture/video/reel-01.mp4', poster: '/assets/case-studies/urban-architecture/video/reel-01-poster.webp' },
+          { src: '/assets/case-studies/urban-architecture/video/hilton-cucumber.mp4', poster: '/assets/case-studies/urban-architecture/video/hilton-cucumber-poster.webp' }
+        ]
       }
     },
     {
@@ -232,13 +233,6 @@ export const CASE_STUDY = {
         body: [
           `The site is live, with a searchable catalog and direct inquiry process. The identity has been adapted for web, email, print, and video. The first digital dispatch is awaiting Keith’s approval of the mailing list.`
         ]
-      }
-    },
-    {
-      type: 'fullBleedMedia',
-      props: {
-        theme: 'dark',
-        media: { type: 'image', src: placeholder('CLOSING — ARCHIVE PHOTOGRAPH OF KEITH', 1600, 1000, '141008', 'd2c8b4') }
       }
     },
     {

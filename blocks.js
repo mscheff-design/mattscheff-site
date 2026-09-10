@@ -118,6 +118,29 @@ export function textBlock(props) {
   return wrap;
 }
 
+// Two text sections side by side on desktop (e.g. Challenge next to
+// Approach), stacked on mobile — for a pair that reads better as a
+// comparison than as two separate full-width stops. Reuses .cs-text-
+// heading/.cs-text-body verbatim for each column so the typography
+// matches plain textBlock exactly; only the outer layout differs.
+// renderCaseStudyPage assigns exactly one chapter-nav id/stop per
+// top-level block (off props.heading/chapter/chapterLabel), so the pair
+// shares one — props.heading here is used only for that id, not
+// rendered, since each column already shows its own heading.
+export function textColumnsBlock(props) {
+  const wrap = el('div', 'cs-block cs-text-columns');
+  const grid = el('div', 'cs-text-columns-grid');
+  (props.columns || []).forEach((col) => {
+    const column = el('div', 'cs-text-columns-col');
+    if (col.heading) column.appendChild(el('h2', 'cs-text-heading', col.heading));
+    const paragraphs = Array.isArray(col.body) ? col.body : [col.body];
+    paragraphs.filter(Boolean).forEach((p) => column.appendChild(el('p', 'cs-text-body', p)));
+    grid.appendChild(column);
+  });
+  wrap.appendChild(grid);
+  return wrap;
+}
+
 // "At a Glance" — a case-file ledger sheet, standardized across every case
 // study (see moduleBlock below for its Overview/Challenge/Approach
 // counterpart). Contained to the normal content column, not full-bleed —
@@ -361,6 +384,7 @@ const REVEAL_VARIANTS = { fullBleedMedia: 'scale', quote: 'soft', glance: 'ledge
 const BLOCK_FACTORIES = {
   hero: heroBlock,
   text: textBlock,
+  textColumns: textColumnsBlock,
   glance: glanceBlock,
   module: moduleBlock,
   textMedia: textMediaBlock,
@@ -509,6 +533,18 @@ function injectStyles() {
     .cs-text-heading{font-family:var(--font-serif);font-weight:400;font-size:clamp(24px,3vw,32px);color:var(--ink);margin-bottom:16px}
     .cs-text-body{font-family:var(--font-serif);font-size:17px;line-height:1.65;color:rgba(var(--ink-rgb),0.75);max-width:62ch;margin-bottom:20px}
     .cs-text-body:last-child{margin-bottom:0}
+
+    /* two text columns side by side (e.g. Challenge next to Approach) —
+       wider than .cs-block's normal 880px cap, since two ~62ch measures
+       side by side need more room than one. Each column's own .cs-text-
+       body keeps its 62ch cap, so a wide viewport doesn't stretch either
+       column's line length past what's comfortable to read. */
+    .cs-text-columns{max-width:min(1160px, 100% - 96px)}
+    .cs-text-columns-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px}
+    .cs-text-columns-col .cs-text-heading{font-size:clamp(22px,2.6vw,28px)}
+    @media (max-width:640px){
+      .cs-text-columns-grid{grid-template-columns:1fr;gap:40px}
+    }
 
     /* at a glance — a case-file ledger sheet, contained to the normal
        content column (not full-bleed — it reads as a page in the file,
