@@ -13,7 +13,7 @@
 export const JOBS = [
   {
     id: 'urban-architecture',
-    role: 'Digital Consultant, Social Media Strategist',
+    role: 'Digital Manager / Digital Strategy',
     name: 'Urban Architecture Inc.',
     dates: '2022 – Present',
     tags: ['BRAND STRATEGY', 'SHOPIFY DEVELOPMENT', 'EDITORIAL'],
