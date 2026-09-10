@@ -34,13 +34,10 @@ export const JOBS = [
     dates: '2020 – 2022',
     tags: ['PRODUCT PHOTOGRAPHY', 'PAID SOCIAL', 'META ADS'],
     caseStudyUrl: '/case-studies/statmask/'
-  },
-  {
-    id: 'contributor-development-partnership',
-    role: 'Training Assistant',
-    name: 'Contributor Development Partnership',
-    dates: '2023',
-    tags: ['TRAINING', 'CRM', 'DOCUMENTATION'],
-    caseStudyUrl: '/case-studies/contributor-development-partnership/'
   }
+  // Contributor Development Partnership moved out of the case-study
+  // roster to index.html's "Additional credits" list — it doesn't
+  // warrant a full case study page. Its case-study files are left on
+  // disk (unlinked, not deleted) under case-studies/
+  // contributor-development-partnership/.
 ];

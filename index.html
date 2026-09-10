@@ -208,6 +208,33 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .row-tag.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),var(--reactive-alpha,0.25))}
 .row-arrow{font-size:16px;color:rgba(var(--ink-rgb),0.2);transition:all 0.25s;opacity:0;margin-left:8px}
 
+/* Additional credits — roles that don't warrant their own case study
+   (see JOBS/case-studies/*), listed underneath the case-study rows
+   instead. Deliberately quieter than .row-name/.row-sub above: smaller
+   serif heading (below .row-name's 22px), no hover state, no cursor
+   affordance, nothing here is a click target. Separated from the case
+   studies by a hairline (same 0.5px rgba(--ink-rgb) treatment as
+   .project-row's own border) plus generous space, not a box or a second
+   background — the section should read as subordinate, not as a fourth
+   and fifth entry in the list above it. */
+.additional-credits{margin-top:32px;padding-top:28px;border-top:0.5px solid rgba(var(--ink-rgb),0.08)}
+.additional-credits h3{font-family:var(--font-serif);font-size:15px;font-weight:400;color:rgba(var(--ink-rgb),0.65);margin-bottom:4px}
+.additional-credits-sub{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-rgb),0.35);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:22px}
+.credits-list{list-style:none;display:flex;flex-direction:column;gap:16px}
+.credit-entry{display:flex;flex-direction:column;gap:3px}
+.credit-entry-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 6px;font-family:var(--font-mono);font-size:11px}
+.credit-entry-meta .credit-title{color:rgba(var(--ink-rgb),0.55)}
+.credit-entry-meta .credit-role,.credit-entry-meta .credit-year{color:rgba(var(--ink-rgb),0.4)}
+/* The site's existing meta separator (see .row-sub's own ' · ' join in
+   the script below) rather than an em dash — a ::before on every span
+   but the first keeps the separator out of the markup/copy itself. */
+.credit-entry-meta span:not(:first-child)::before{content:'·';margin-right:6px;color:rgba(var(--ink-rgb),0.25)}
+.credit-entry-desc{font-family:var(--font-mono);font-size:10.5px;color:rgba(var(--ink-rgb),0.35);letter-spacing:0.01em}
+@media (max-width:599px){
+  .credit-entry-meta{flex-direction:column;align-items:flex-start;gap:2px}
+  .credit-entry-meta span:not(:first-child)::before{content:none}
+}
+
 /* Education — same permanently-visible pattern as Skills below (reuses
    .section-header for the heading, a matching h3+list group shape) but a
    flex-wrap row instead of a fixed 3-column grid: one entry today
@@ -570,6 +597,30 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
   <div class="collapsible-panel is-open" id="workPanel">
     <div class="collapsible-panel-inner">
       <div class="work-projects" id="workProjects"></div>
+
+      <section class="additional-credits">
+        <h3>Additional credits</h3>
+        <div class="additional-credits-sub">Roles outside the case study work</div>
+        <ul class="credits-list">
+          <li class="credit-entry">
+            <div class="credit-entry-meta">
+              <span class="credit-title">Project Runway, Season 22</span>
+              <span class="credit-role">Production Assistant</span>
+              <!-- TODO: confirm actual year for Project Runway S22 — 2024 is a placeholder -->
+              <span class="credit-year">2024</span>
+            </div>
+            <p class="credit-entry-desc">Set operations for a network fashion competition series.</p>
+          </li>
+          <li class="credit-entry">
+            <div class="credit-entry-meta">
+              <span class="credit-title">Contributor Development Partnership</span>
+              <span class="credit-role">Training Assistant, contract</span>
+              <span class="credit-year">2023</span>
+            </div>
+            <p class="credit-entry-desc">Training materials and rollout support for NPR and PBS member stations migrating to a new donor CRM.</p>
+          </li>
+        </ul>
+      </section>
     </div>
   </div>
 </section>
@@ -577,7 +628,7 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
 <section class="education-section" id="education">
   <button class="section-header" id="educationHeader" aria-expanded="false" aria-controls="educationPanel">
     <span>Education</span>
-    <span>Fordham University · 2018</span>
+    <span>2018 – 2026</span>
     <span class="section-toggle-icon" aria-hidden="true">+</span>
   </button>
   <div class="collapsible-panel" id="educationPanel">
@@ -589,6 +640,13 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
             <li>Visual Arts</li>
             <li>New Media &amp; Digital Design</li>
             <li>2018</li>
+          </ul>
+        </div>
+        <div class="education-group">
+          <h3>New Jersey Film Academy</h3>
+          <ul>
+            <li>Production Office Management</li>
+            <li>2025 – 2026</li>
           </ul>
         </div>
       </div>
