@@ -290,7 +290,23 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 
 .frame{position:relative;background:var(--bg-frame);overflow:hidden;isolation:isolate;transition:opacity 0.2s}
 .frame:hover{opacity:0.85}
-.frame::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 60%,rgba(255,196,130,0.13) 100%);mix-blend-mode:screen}
+/* Warm radial glow (unchanged) plus a soft red/cyan edge fringe, layered
+   into the same background property so this stays one pseudo-element and
+   one screen-blend pass — the goal (per the user's own framing) is a
+   "viewing over a lightbox" feel: a hint of chromatic fringing at the
+   edges plus a warm hallation-like bleed, evoking backlit film rather
+   than a plain photo grid. Deliberately NOT the real chromaticAberration
+   SVG filter (see that filter's own comment, and .lv3-main img's) — that
+   multi-primitive filter graph was already found to cause real Safari
+   slowdowns specifically when applied to many images at once, which is
+   exactly this grid's situation. Plain CSS gradients + mix-blend-mode are
+   a native compositor operation, not a software filter chain, so the
+   cost here is close to free regardless of how many tiles are on screen —
+   this same technique (minus the fringe) has already been running on
+   this exact element with no reported issue. If this ever does turn out
+   to cost something real, it's a one-line revert of this rule (and its
+   .cs-frame::before twin below), not a structural change. */
+.frame::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,rgba(255,45,110,0.16),transparent 7%),linear-gradient(to left,rgba(45,220,255,0.14),transparent 7%),radial-gradient(ellipse at center,transparent 60%,rgba(255,196,130,0.13) 100%);mix-blend-mode:screen}
 .frame::after{content:'';position:absolute;left:0;right:0;bottom:0;height:32%;background:linear-gradient(to top,rgba(0,0,0,0.6),transparent);pointer-events:none}
 /* Fixed orange, not var(--accent) — this is the film-stock/grease-pencil
    annotation look (frame codes, exposure numbers), which reads as
@@ -378,6 +394,14 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    never overflows its own box regardless, so this was never load-bearing
    for the image itself. */
 .cs-frame{position:relative;aspect-ratio:1/1;background:var(--black);display:flex;align-items:center;justify-content:center;border:0.5px solid rgba(255,255,255,0.07);outline:none}
+/* Same lightbox glow/fringe treatment as .frame::before (level 1) — see
+   that rule's own comment for the full reasoning (plain gradients +
+   mix-blend-mode, not the expensive chromaticAberration SVG filter,
+   specifically because this grid can hold dozens of cells at once).
+   inset:0 only (no overscan), so this is safe even though .cs-frame
+   itself deliberately has no overflow:hidden (see the comment above it —
+   that's reserved for the grease-mark's own intentional overscan). */
+.cs-frame::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,rgba(255,45,110,0.16),transparent 7%),linear-gradient(to left,rgba(45,220,255,0.14),transparent 7%),radial-gradient(ellipse at center,transparent 60%,rgba(255,196,130,0.13) 100%);mix-blend-mode:screen}
 /* cover, not contain — every square aperture stays a uniform size/shape
    regardless of a given photo's own native orientation. contain preserves
    full-frame content but letterboxes landscape/portrait shots differently,
