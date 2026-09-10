@@ -384,14 +384,18 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
   .cs-frame-grid{grid-template-columns:repeat(3,1fr)}
 }
 @media (max-width:599px){
-  /* Master grid becomes a single-pane horizontal slider on phones — one
-     project fully visible at a time, swiped between, rather than a dense
-     multi-column grid of small tiles. Tapping a tile with real photos
-     skips straight to the one-at-a-time viewer now anyway (see
-     handleTileActivate()), so the grid's only job here is browsing
-     between PROJECTS, not between photos within one. */
-  .project-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:0}
-  .project-tile{flex:0 0 100%;scroll-snap-align:start}
+  /* Master grid becomes a carousel on phones — each project sized under
+     100% so the next one peeks in from the right edge (same flex/
+     scroll-snap idiom as blocks.js's .cs-gallery mobile carousel), swiped
+     between, rather than a dense multi-column grid of small tiles or a
+     flush edge-to-edge single pane. Native scrollbar hidden in favor of
+     the snap/peek affordance itself indicating there's more to swipe to.
+     Tapping a tile with real photos skips straight to the one-at-a-time
+     viewer now anyway (see handleTileActivate()), so the grid's only job
+     here is browsing between PROJECTS, not between photos within one. */
+  .project-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;scrollbar-width:none}
+  .project-grid::-webkit-scrollbar{display:none}
+  .project-tile{flex:0 0 84%;scroll-snap-align:start}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
 }
 
