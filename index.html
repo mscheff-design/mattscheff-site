@@ -950,12 +950,16 @@ document.getElementById('card3d').addEventListener('resume-job-click', (e) => {
      2. Run assets/generate-manifests.sh to create manifest.json + thumbs/.
      3. Add one entry below. Nothing else needs to change. */
 
-// statement: real artist-statement text for all three entries that carry
-// one (Motherland, Heliographs, His Father's Castle...), provided
-// 2026-09-10. Japan and Europe have none yet.
+// statement: real text on every entry now — Motherland, Heliographs, and
+// His Father's Castle... are the photographer's own exhibition/artist
+// statements (provided 2026-09-10); Japan and Europe are brief framing
+// copy written to match that voice, since neither had a formal statement
+// of its own.
 const PROJECTS = [
-  { projectCode: 'JPAN', year: '2018', title: 'Japan', folderPath: 'assets/japan (2018)/', selectedIndex: 0 },
-  { projectCode: 'EURP', year: '2019', title: 'Europe', folderPath: 'assets/europe (2019)/', selectedIndex: 0 },
+  { projectCode: 'JPAN', year: '2018', title: 'Japan', folderPath: 'assets/japan (2018)/', selectedIndex: 0,
+    statement: `Tokyo & Kyoto, 2018<br><br>A twelve-day study abroad excursion during my second year of college — my first trip somewhere so unfamiliar, camera in hand for all of it.` },
+  { projectCode: 'EURP', year: '2019', title: 'Europe', folderPath: 'assets/europe (2019)/', selectedIndex: 0,
+    statement: `Venice, Paris, Copenhagen, London<br><br>Photographs from a few adventures around Europe — no single itinerary, just whatever caught my eye along the way.` },
   { projectCode: 'MLND', year: '2017', title: 'Motherland', folderPath: 'assets/motherland (2017)/', selectedIndex: 0,
     statement: `Ildiko Bulter Gallery, New York City<br>April 25th - May 7th 2018<br><br>“In returning to China for the first time since my adoption, these photographs serve as placeholders for a life I might have had; memories of what could have been. In navigating through this world for the first time, locations, peoples, and objects seem to imbue themselves with a secret, unknown significance. Having grown up in the U.S. nearly all my life, these pictures are impressions of a nation that I never knew. Using photography as a personal interface for both recollection and location, this is an attempt to piece together elements of an unconscious memory that have seemingly been lost forever. These images are my way of reconciling with the struggle for identity. Of feeling one way and being perceived as another. Of understanding my roots and planting others. Of discovering who I could have been and who I am today.”` },
   { projectCode: 'HELO', year: '2018', title: 'Heliographs', folderPath: 'assets/heliographs/', selectedIndex: 0,
