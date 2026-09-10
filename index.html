@@ -306,7 +306,7 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    this exact element with no reported issue. If this ever does turn out
    to cost something real, it's a one-line revert of this rule (and its
    .cs-frame::before twin below), not a structural change. */
-.frame::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,rgba(255,45,110,0.16),transparent 7%),linear-gradient(to left,rgba(45,220,255,0.14),transparent 7%),radial-gradient(ellipse at center,transparent 60%,rgba(255,196,130,0.13) 100%);mix-blend-mode:screen}
+.frame::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,rgba(255,40,110,0.38),transparent 18%),linear-gradient(to left,rgba(40,220,255,0.34),transparent 18%),radial-gradient(ellipse at center,transparent 35%,rgba(255,170,90,0.3) 100%);mix-blend-mode:screen}
 .frame::after{content:'';position:absolute;left:0;right:0;bottom:0;height:32%;background:linear-gradient(to top,rgba(0,0,0,0.6),transparent);pointer-events:none}
 /* Fixed orange, not var(--accent) — this is the film-stock/grease-pencil
    annotation look (frame codes, exposure numbers), which reads as
@@ -401,7 +401,7 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    inset:0 only (no overscan), so this is safe even though .cs-frame
    itself deliberately has no overflow:hidden (see the comment above it —
    that's reserved for the grease-mark's own intentional overscan). */
-.cs-frame::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,rgba(255,45,110,0.16),transparent 7%),linear-gradient(to left,rgba(45,220,255,0.14),transparent 7%),radial-gradient(ellipse at center,transparent 60%,rgba(255,196,130,0.13) 100%);mix-blend-mode:screen}
+.cs-frame::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,rgba(255,40,110,0.38),transparent 18%),linear-gradient(to left,rgba(40,220,255,0.34),transparent 18%),radial-gradient(ellipse at center,transparent 35%,rgba(255,170,90,0.3) 100%);mix-blend-mode:screen}
 /* cover, not contain — every square aperture stays a uniform size/shape
    regardless of a given photo's own native orientation. contain preserves
    full-frame content but letterboxes landscape/portrait shots differently,
