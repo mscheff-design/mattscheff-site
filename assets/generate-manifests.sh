@@ -25,7 +25,15 @@ for dir in */; do
     names+=("$name")
     thumb="$dir/thumbs/$name.jpg"
     if [ ! -f "$thumb" ]; then
-      sips -s format jpeg -Z 480 "$f" --out "$thumb" >/dev/null
+      # 960px longest edge, quality 85 — the old -Z 480 default (sips'
+      # unspecified default quality) read soft/blurry once these became
+      # tiles' single static lead image rather than one of several
+      # auto-cycling frames: level-1 master-grid tiles can render up to
+      # ~360px wide even at fairly ordinary desktop widths, which needs
+      # ~720px of source at 2x/retina — 480px total was already short of
+      # that before any compression softness on top. 960/q85 covers that
+      # with headroom while staying a fraction of a full-res webp's size.
+      sips -s format jpeg -Z 960 -s formatOptions 85 "$f" --out "$thumb" >/dev/null
       echo "generated thumb: $thumb"
     fi
   done
