@@ -18,24 +18,6 @@ export const CRAYON_DEFAULTS = {
   // same spot indefinitely.
   holdSeconds: 24, fadeSeconds: 32, maxStamps: 1800, densityLimit: 400
 };
-// Persists which of the 4 mobile doodle variants is showing, so it
-// survives a full navigation back to "/" (e.g. via the Home nav link) —
-// not just the browser's own back/forward-cache restore, which already
-// keeps it for free. Same try/catch + validate-before-trusting convention
-// as theme.js's site-theme key and radio.js's nts-radio-state key. Only
-// ever read/written on touch devices, where the doodle exists at all.
-const DOODLE_STORAGE_KEY = 'crayon-doodle-state';
-function loadDoodleVariant() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(DOODLE_STORAGE_KEY));
-    return Number.isInteger(parsed?.variant) && parsed.variant >= 0 && parsed.variant < MOBILE_DOODLES.length
-      ? parsed.variant : null;
-  } catch { return null; }
-}
-function saveDoodleVariant(variant) {
-  try { localStorage.setItem(DOODLE_STORAGE_KEY, JSON.stringify({ variant })); }
-  catch { /* localStorage unavailable — mark still works this load, just won't persist */ }
-}
 export function makeRandom(seed) {
   let n = seed >>> 0;
   return () => { n = (Math.imul(n, 1664525) + 1013904223) >>> 0; return n / 4294967296; };
@@ -109,13 +91,7 @@ export function mountCrayonTrails(hero, {
 } = {}) {
   const cfg = { ...CRAYON_DEFAULTS, ...overrides };
   const random = makeRandom(seed);
-  // A stored variant (see DOODLE_STORAGE_KEY above) wins over a fresh
-  // random pick, so a returning visitor sees the same mark they last had
-  // rather than a new random one every full page load — null (nothing
-  // stored yet, or storage unavailable) falls through to today's random
-  // pick unchanged.
-  const storedVariant = isTouchDevice ? loadDoodleVariant() : null;
-  let chosenColor = color || (storedVariant !== null ? CRAYON_COLORS[storedVariant] : CRAYON_COLORS[Math.floor(random()*CRAYON_COLORS.length)]);
+  let chosenColor = color || CRAYON_COLORS[Math.floor(random()*CRAYON_COLORS.length)];
   const canvas = document.createElement('canvas');
   canvas.className = 'crayon-trails';
   canvas.setAttribute('aria-hidden', 'true');
@@ -131,21 +107,9 @@ export function mountCrayonTrails(hero, {
   let stamps = [], density = new Map();
   const doodle = isTouchDevice ? {
     path: null, emitted: 0, progress: 0, elapsed: 0, lastTime: null,
-    // complete starts true when restoring a stored variant — the mark
-    // should just appear already-finished on a fresh load, not replay its
-    // ~1.2s reveal tween every single time. composeDoodle() (called from
-    // resize(), in this function's own tail below) checks this same flag
-    // and emits the whole path at once when it's already true, and
-    // wakeDoodle()'s own guard then no-ops the animation loop entirely —
-    // same mechanism the reduced-motion path already relies on.
-    frame: 0, complete: storedVariant !== null, dismissed: false, measuredWidth: 0, delay: 300,
+    frame: 0, complete: false, dismissed: false, measuredWidth: 0, delay: 300,
     variant: Math.max(0, CRAYON_COLORS.indexOf(chosenColor))
   } : null;
-  // First time this variant has ever been chosen (nothing was stored) —
-  // write it down so the next full page load restores the same mark
-  // instead of picking a new random one. If something WAS already stored,
-  // it's already correct and doesn't need rewriting.
-  if (doodle && storedVariant === null) saveDoodleVariant(doodle.variant);
   // Build each color's nibs only on first use; switching never allocates
   // another full-size drawing canvas. At most four brush sets are cached.
   const brushCache = new Map();
@@ -469,7 +433,6 @@ export function mountCrayonTrails(hero, {
     // Cancel a partial reveal before replacing it, even on rapid taps.
     cancelWork();
     doodle.variant=(doodle.variant+1)%MOBILE_DOODLES.length;
-    saveDoodleVariant(doodle.variant);
     chosenColor=CRAYON_COLORS[doodle.variant];
     brushes=brushesFor(chosenColor);
     Object.assign(doodle, {path:null, emitted:0, progress:0, elapsed:0,
