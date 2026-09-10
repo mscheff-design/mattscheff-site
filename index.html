@@ -769,6 +769,18 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
 </div>
 
 <script>
+// Mobile browsers (Safari especially) restore the previous scroll
+// position on a plain reload/re-open by default — reported as "the
+// mobile site loads on Work experience, not the hero card." That's the
+// browser's own scroll-restoration replaying wherever a prior visit had
+// scrolled to, not anything this page's own code does (there's no
+// scrollIntoView/scrollTo/location.hash call anywhere that would land on
+// #work specifically). 'manual' stops that replay so a fresh load always
+// starts at the actual top of the page; back/forward navigation between
+// pages on this site is minimal enough that losing native scroll
+// restoration there isn't a real loss.
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
 // Some browser/OS combinations (confirmed on at least one real machine
 // this site was tested on) deliver requestAnimationFrame callbacks only
 // once every several seconds instead of ~60/sec, which makes every
