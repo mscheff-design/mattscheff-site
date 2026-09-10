@@ -50,6 +50,16 @@ function mediaEl(media, { eager = false } = {}) {
     iframe.src = media.src;
     iframe.title = media.title || '';
     iframe.loading = 'lazy';
+    // This is a passive visual embed, not a live page — the source
+    // document is full of real "View ->" product links, a mailto, an
+    // Instagram follow link, all pointed at the actual client site.
+    // pointer-events:none makes the iframe untargetable for clicks/hovers
+    // entirely (nothing inside it is reachable), while leaving wheel/touch
+    // scroll on the ancestor .cs-full-bleed-scroll-frame unaffected —
+    // pointer-events only governs hit-testing for pointer interactions,
+    // not scroll.
+    iframe.style.pointerEvents = 'none';
+    iframe.tabIndex = -1;
     iframe.addEventListener('load', () => {
       try {
         const doc = iframe.contentDocument;
