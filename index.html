@@ -286,8 +286,12 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    focusTileQuietly()'s own comment for why this exists. Needs the extra
    class for specificity to actually win over the rule it's overriding. */
 .project-tile.suppress-focus-mark:focus-visible .grease-mark--hover{opacity:0}
-.project-frame{aspect-ratio:3/4}
-.project-frame .cover-slide{position:relative;width:100%;height:100%}
+/* overflow:hidden on both — belt-and-suspenders alongside the
+   pointer-events:none below: the image is never supposed to be able to
+   visually extend past its own cropped box in the first place, touch
+   drag or not. */
+.project-frame{aspect-ratio:3/4;overflow:hidden;touch-action:pan-x}
+.project-frame .cover-slide{position:relative;width:100%;height:100%;overflow:hidden}
 /* pointer-events:none + the drag/callout/select resets stop the cover
    image from being independently touch-dragged inside its own box (iOS
    Safari's native image-lift/pan behavior) — surfaced once the tile
@@ -404,26 +408,24 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
   .cs-frame-grid{grid-template-columns:repeat(3,1fr)}
 }
 @media (max-width:599px){
-  /* Master grid becomes a full-height, one-at-a-time carousel on phones —
-     Instagram-post style, not a peeking multi-column grid. Two earlier
-     attempts (a flush single pane, then an 84%-width peek) both still let
-     a diagonal touch drag read as ambiguous: the browser would sometimes
-     interpret it as panning the image inside its own box rather than
-     scrolling the carousel or the page, which is what read as "moving the
-     thumbnails around." touch-action:pan-x is the actual fix — it tells
-     the browser this element only ever consumes horizontal gestures,
-     handing anything with a vertical component straight to the page's own
-     scroll instead of leaving the browser to guess mid-gesture.
+  /* Master grid becomes a one-at-a-time carousel on phones — Instagram-
+     post style, not a peeking multi-column grid.
+     The actual cause of "the thumbnail moves around inside its box": per
+     the CSS Overflow spec, setting only overflow-x (auto) and leaving
+     overflow-y at its default (visible) doesn't actually keep overflow-y
+     as visible — a lone non-visible axis forces the other to compute as
+     auto too, so .project-grid was quietly ALSO a vertical scroll
+     container. Any sub-pixel height mismatch between the grid and its
+     tile gave it just enough vertical scroll range for a touch drag to
+     rubber-band the whole row up/down within its own box. overflow-y:
+     hidden below removes that scroll axis entirely — touch-action:pan-x
+     is additionally kept as a second guard on the gesture itself.
      scroll-snap-stop:always plus 100%-width slides (no peek) means a
-     single swipe always lands on exactly the next project, never more
-     than one and never a partial position. Native scrollbar hidden. */
-  .project-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:0;touch-action:pan-x;scrollbar-width:none}
+     single swipe always lands on exactly the next project. Native
+     scrollbar hidden. */
+  .project-grid{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:0;touch-action:pan-x;scrollbar-width:none}
   .project-grid::-webkit-scrollbar{display:none}
   .project-tile{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always}
-  /* aspect-ratio:auto overrides the 3:4 desktop/tablet ratio — full height
-     instead, so the photo fills the screen the way an Instagram carousel
-     slide does rather than leaving dead space below a small cropped box. */
-  .project-frame{aspect-ratio:auto;height:70vh}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
 }
 
