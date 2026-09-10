@@ -1178,19 +1178,34 @@ function closeGallery() {
 function focusTileQuietly(tile) {
   if (!tile) return;
   tile.classList.add('suppress-focus-mark');
-  // mousemove matters as much as pointerdown/keydown here — the tile
-  // keeps real browser focus after this (only the VISUAL reveal is
-  // suppressed, not focus itself), so simply hovering it afterward, with
-  // no click at all, still matches :focus-visible. Without clearing on
-  // mousemove too, that hover would have found the suppression still
-  // active and shown no mark at all instead of the normal hover reveal —
-  // mousemove fires before the cursor actually reaches the tile, so the
-  // suppression is already gone by the time :hover itself applies.
-  const clear = () => tile.classList.remove('suppress-focus-mark');
-  document.addEventListener('pointerdown', clear, { once: true });
-  document.addEventListener('keydown', clear, { once: true });
-  document.addEventListener('mousemove', clear, { once: true });
   tile.focus({ preventScroll: true });
+  let done = false;
+  function finish(isKeyboard) {
+    if (done) return;
+    done = true;
+    tile.classList.remove('suppress-focus-mark');
+    // The tile still holds real focus at this point — suppress-focus-mark
+    // only ever hid the visual reveal, it never released it. Left as-is,
+    // the very next hover would clear the suppression and then keep
+    // matching :focus-visible on its own, independent of :hover — the
+    // mark would show correctly on mouseenter but then never hide again
+    // on mouseleave, since real focus (not hover) was the thing actually
+    // keeping it lit. Mouse-driven interaction resuming means that
+    // lingering focus has no purpose any more, so blur it — :hover alone
+    // then governs the mark exactly like any other tile. Genuine keyboard
+    // interaction (isKeyboard) is the one case that keeps focus/
+    // :focus-visible as-is, since that's real Tab-navigation and the mark
+    // SHOULD track it.
+    if (!isKeyboard && document.activeElement === tile) tile.blur();
+    document.removeEventListener('pointerdown', onPointer);
+    document.removeEventListener('mousemove', onPointer);
+    document.removeEventListener('keydown', onKey);
+  }
+  const onPointer = () => finish(false);
+  const onKey = () => finish(true);
+  document.addEventListener('pointerdown', onPointer);
+  document.addEventListener('mousemove', onPointer);
+  document.addEventListener('keydown', onKey);
 }
 
 function expandProject(id) {
