@@ -404,18 +404,26 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
   .cs-frame-grid{grid-template-columns:repeat(3,1fr)}
 }
 @media (max-width:599px){
-  /* Master grid becomes a carousel on phones — each project sized under
-     100% so the next one peeks in from the right edge (same flex/
-     scroll-snap idiom as blocks.js's .cs-gallery mobile carousel), swiped
-     between, rather than a dense multi-column grid of small tiles or a
-     flush edge-to-edge single pane. Native scrollbar hidden in favor of
-     the snap/peek affordance itself indicating there's more to swipe to.
-     Tapping a tile with real photos skips straight to the one-at-a-time
-     viewer now anyway (see handleTileActivate()), so the grid's only job
-     here is browsing between PROJECTS, not between photos within one. */
-  .project-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;scrollbar-width:none}
+  /* Master grid becomes a full-height, one-at-a-time carousel on phones —
+     Instagram-post style, not a peeking multi-column grid. Two earlier
+     attempts (a flush single pane, then an 84%-width peek) both still let
+     a diagonal touch drag read as ambiguous: the browser would sometimes
+     interpret it as panning the image inside its own box rather than
+     scrolling the carousel or the page, which is what read as "moving the
+     thumbnails around." touch-action:pan-x is the actual fix — it tells
+     the browser this element only ever consumes horizontal gestures,
+     handing anything with a vertical component straight to the page's own
+     scroll instead of leaving the browser to guess mid-gesture.
+     scroll-snap-stop:always plus 100%-width slides (no peek) means a
+     single swipe always lands on exactly the next project, never more
+     than one and never a partial position. Native scrollbar hidden. */
+  .project-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:0;touch-action:pan-x;scrollbar-width:none}
   .project-grid::-webkit-scrollbar{display:none}
-  .project-tile{flex:0 0 84%;scroll-snap-align:start}
+  .project-tile{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always}
+  /* aspect-ratio:auto overrides the 3:4 desktop/tablet ratio — full height
+     instead, so the photo fills the screen the way an Instagram carousel
+     slide does rather than leaving dead space below a small cropped box. */
+  .project-frame{aspect-ratio:auto;height:70vh}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
 }
 
