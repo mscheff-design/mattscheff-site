@@ -287,30 +287,28 @@ export function mountCrayonTrails(hero, {
   // have "drawn" to begin with). Still respects prefers-reduced-motion.
   if (isTouchDevice && !motion.matches) requestAnimationFrame(drawProceduralFlourish);
 
-  // A loose, confident underline-style flourish anchored in the bottom
-  // corner of whatever's currently visible — an open margin on most
-  // layouts, away from the card itself, echoing where a hand-drawn
-  // signature flourish would actually sit. Deterministic per mount (drawn
-  // from the same seeded `random()` every other stamp on this canvas
-  // uses), not per frame — it's meant to look considered, not jittery.
-  function generateFlourishPath() {
-    const visibleH = surface.clientHeight || height;
-    // A dense, continuous chain of loose, overlapping loops drifting
-    // across a horizontal band — Cy Twombly's scribble drawings (the
-    // blackboard pieces especially) rather than a handful of clean
-    // discrete shapes: tight, energetic, cursive-like, elongated
-    // ellipses, wobbling instead of tracing perfect curves, with each
-    // loop's size and rhythm varying irregularly rather than shrinking on
-    // a clean progression. Everything randomized below comes from the
-    // same seeded random() every other stamp on this canvas already
-    // uses, so it's consistent per mount, not per frame.
-    const bandW = Math.min(340, width * 0.66);
-    const bandH = Math.min(150, visibleH * 0.2);
-    let cx = width - bandW * 0.92;
-    const baseY = visibleH - bandH * 1.15;
-    let cy = baseY;
+  // One scribble cluster (a dense, continuous chain of loose, overlapping,
+  // wobbling loops — Cy Twombly's scribble drawings rather than a clean
+  // discrete shape) centered at (cx, cy), sized by `scale`. Returns
+  // STAMPS already resampled at even arc-length spacing along the whole
+  // generated curve — this is where the previous version actually broke:
+  // it placed every stamp for a given raw segment at that segment's own
+  // endpoint instead of walking along it, so a segment longer than one
+  // stamp's spacing produced a tight cluster of stamps sitting on top of
+  // each other at that one point, then a bare gap until the next point —
+  // reading as scattered dots instead of a continuous line. The `posAlong`
+  // walk below is the standard fix: step evenly along each segment,
+  // carrying any leftover distance into the next one, so spacing stays
+  // constant across the whole path regardless of how coarse the
+  // underlying raw points are.
+  function generateScribbleCluster(cx, cy, scale) {
+    const bandW = 260 * scale;
+    const bandH = 130 * scale;
+    let px = cx + bandW * 0.4;
+    const baseY = cy;
+    let py = baseY;
     let angle = random() * Math.PI * 2;
-    const loopCount = 12 + Math.floor(random() * 6);
+    const loopCount = 10 + Math.floor(random() * 5);
     const raw = [];
     for (let loop = 0; loop < loopCount; loop++) {
       const dir = random() < 0.5 ? 1 : -1;
@@ -320,31 +318,34 @@ export function mountCrayonTrails(hero, {
       // a loop and a half, so successive loops overlap unevenly instead
       // of stacking in a tidy repeating rhythm.
       const sweep = Math.PI * 2 * (0.6 + random() * 0.7);
-      const steps = 24;
+      const steps = 28;
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const a = angle + dir * sweep * t;
         // A real scribbling hand never traces a perfectly smooth curve —
         // small per-step wobble on top of the ellipse itself.
         const wobble = (random() - 0.5) * radiusX * 0.08;
-        raw.push({ x: cx + Math.cos(a) * (radiusX + wobble), y: cy + Math.sin(a) * (radiusY + wobble) });
+        raw.push({ x: px + Math.cos(a) * (radiusX + wobble), y: py + Math.sin(a) * (radiusY + wobble) });
       }
       angle += dir * sweep + (random() - 0.5) * 0.7;
-      // Drifts generally leftward across the band, like a line of loose
-      // cursive writing, while wandering vertically within it — this
-      // sweep is what makes it read as one gestural pass instead of
-      // loops piling up in one spot.
-      cx -= (bandW / loopCount) * (0.6 + random() * 0.9);
-      cy = baseY + (random() - 0.5) * bandH * 0.55;
+      // Drifts generally leftward, like a line of loose cursive writing,
+      // while wandering vertically — this sweep is what makes it read as
+      // one gestural pass instead of loops piling up in one spot.
+      px -= (bandW / loopCount) * (0.6 + random() * 0.9);
+      py = baseY + (random() - 0.5) * bandH * 0.55;
     }
     // Same tangent-angle-from-consecutive-points approach move() uses for
     // real strokes, just walking a generated array instead of live
-    // pointer history.
+    // pointer history — plus the even-arc-length resampling described
+    // above, which move() gets for free from real pointer events arriving
+    // at roughly steady spacing already.
     const spacing = Math.max(1.4, cfg.width * 0.1);
     const stamped = [];
-    let traveled = 0, smoothAngle = null;
+    let smoothAngle = null, distanceToNext = 0;
     for (let i = 1; i < raw.length; i++) {
       const a = raw[i - 1], b = raw[i];
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+      if (segLen < 0.0001) continue;
       let rawAngle = Math.atan2(b.y - a.y, b.x - a.x);
       if (smoothAngle === null) smoothAngle = rawAngle;
       else {
@@ -352,29 +353,43 @@ export function mountCrayonTrails(hero, {
         diff = ((diff + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
         smoothAngle += diff * 0.5;
       }
-      traveled += Math.hypot(b.x - a.x, b.y - a.y);
       const t = i / raw.length;
-      while (traveled >= spacing) {
-        traveled -= spacing;
+      let posAlong = distanceToNext;
+      while (posAlong <= segLen) {
+        const frac = posAlong / segLen;
         stamped.push({
-          x: b.x, y: b.y, angle: smoothAngle + (random() - 0.5) * 0.05,
-          size: cfg.width * (0.85 + 0.15 * Math.sin(t * 10)),
+          x: a.x + (b.x - a.x) * frac, y: a.y + (b.y - a.y) * frac,
+          angle: smoothAngle + (random() - 0.5) * 0.05,
+          size: cfg.width * scale * (0.85 + 0.15 * Math.sin(t * 10)),
           alpha: cfg.opacity
         });
+        posAlong += spacing;
       }
+      distanceToNext = posAlong - segLen;
     }
     return stamped;
   }
 
   function drawProceduralFlourish() {
     if (disposed) return;
-    const path = generateFlourishPath();
+    const visibleH = surface.clientHeight || height;
+    // Spread loosely around the card rather than confined to one corner
+    // — echoes the desktop version's own sprawling, haphazard scatter,
+    // translated into the portrait layout: a big cluster low and to the
+    // side (roughly where the résumé toggle's own open space already
+    // is), a second, smaller one higher up on the opposite side, so marks
+    // read as surrounding the card instead of one decoration tucked away.
+    const path = [
+      ...generateScribbleCluster(width * 0.18, visibleH * 0.8, 1.3),
+      ...generateScribbleCluster(width * 0.82, visibleH * 0.3, 0.85)
+    ];
     let i = 0;
     (function step() {
       if (disposed) return;
-      // A couple of stamps per frame — quick enough to settle in well
-      // under 2s, still visibly progressive rather than popping in whole.
-      for (let n = 0; n < 3 && i < path.length; n++, i++) {
+      // A handful of stamps per frame — quick enough to settle in well
+      // under 2-3s even with two clusters, still visibly progressive
+      // rather than popping in whole.
+      for (let n = 0; n < 5 && i < path.length; n++, i++) {
         const p = path[i];
         stamps.push({ x: p.x, y: p.y, time: performance.now(), angle: p.angle, size: p.size, alpha: p.alpha, brush: Math.floor(random() * brushes.length) });
       }
