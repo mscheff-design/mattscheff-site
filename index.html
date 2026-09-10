@@ -950,18 +950,18 @@ document.getElementById('card3d').addEventListener('resume-job-click', (e) => {
      2. Run assets/generate-manifests.sh to create manifest.json + thumbs/.
      3. Add one entry below. Nothing else needs to change. */
 
-// statement: DRAFT PLACEHOLDER COPY on every entry below — plausible,
-// specific-in-tone text so the "Statement" toggle (see renderExpandedSheet)
-// has something real to expand rather than lorem ipsum, not the user's
-// actual words. Swap each one for the real statement whenever it's ready;
-// nothing else about the toggle/layout needs to change when that happens.
+// statement: real artist-statement text for Motherland and Heliographs
+// (provided 2026-09-10). His Father's Castle, His Mother's Glory still
+// carries draft placeholder copy — swap it for the real statement
+// whenever it's ready; nothing else about the excerpt/Read-more layout
+// (see renderExpandedSheet) needs to change when that happens.
 const PROJECTS = [
   { projectCode: 'JPAN', year: '2018', title: 'Japan', folderPath: 'assets/japan (2018)/', selectedIndex: 0 },
   { projectCode: 'EURP', year: '2019', title: 'Europe', folderPath: 'assets/europe (2019)/', selectedIndex: 0 },
   { projectCode: 'MLND', year: '2017', title: 'Motherland', folderPath: 'assets/motherland (2017)/', selectedIndex: 0,
-    statement: `A return to a place I mostly knew secondhand — through my mother's own stories, not my own memory of it. I wasn't trying to document what was actually there. I was trying to see what she carried with her when she left it.` },
+    statement: `Ildiko Bulter Gallery, New York City<br>April 25th - May 7th 2018<br><br>“In returning to China for the first time since my adoption, these photographs serve as placeholders for a life I might have had; memories of what could have been. In navigating through this world for the first time, locations, peoples, and objects seem to imbue themselves with a secret, unknown significance. Having grown up in the U.S. nearly all my life, these pictures are impressions of a nation that I never knew. Using photography as a personal interface for both recollection and location, this is an attempt to piece together elements of an unconscious memory that have seemingly been lost forever. These images are my way of reconciling with the struggle for identity. Of feeling one way and being perceived as another. Of understanding my roots and planting others. Of discovering who I could have been and who I am today.”` },
   { projectCode: 'HELO', year: '2018', title: 'Heliographs', folderPath: 'assets/heliographs/', selectedIndex: 0,
-    statement: `Made only in direct sun, printed the same day each was shot. The name is the old word for photography, before it had a name of its own — an attempt to work at the speed light actually moves, instead of the speed we're used to processing it at.` },
+    statement: `January 2018<br><br>These images were captured from the window of an airplane during sunset (somewhere over the Arctic Circle). Using long exposure and physical gestures, a glowing sliver of daylight is transfigured into a sequence of fluid forms. Individually, these images are ephemeral and gossamer, but when viewed as a grid, a kind of celestial symbology appears. The viewer may interpret this sequence as a “cosmic alphabet”, calling attention to humankind’s tendency to attach visual significance to the randomness and chaos of our natural world.` },
   { projectCode: 'FCMG', year: '2020', title: "His Father's Castle, His Mother's Glory", folderPath: 'assets/his fathers castle his mothers glory (2020)/', selectedIndex: 0,
     statement: `A phrase that stayed with me long before I understood where it came from. This series is about the parts of inheritance nobody hands down on purpose.` }
 ];
