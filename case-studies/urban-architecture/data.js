@@ -1,7 +1,9 @@
 // Case-study block config for Urban Architecture Inc.
 //
-// REAL COPY (Overview provided 2026-09-04; The challenge → Short-form
-// provided 2026-09-05) — this is the user's own narrative. Media is still
+// REAL COPY — user-provided narrative. Overview/Challenge/Approach modules
+// provided 2026-09-04/05; a full-page draft (Overview, Identity, Storefront,
+// Voice, Email, Video, Operations, Status) provided 2026-09-09 and used as
+// the authoritative source for those sections below. Media is still
 // placeholder() SVGs — swap those for real assets under
 // /assets/case-studies/urban-architecture/ when available; each label notes
 // what it stands in for.
@@ -21,7 +23,7 @@ export const CASE_STUDY = {
     {
       type: 'hero',
       props: {
-        summary: `Building the digital operation for America’s first authorized Memphis Milano dealer, while preserving the relationships, history, and point of view that built it.`,
+        summary: `Digital strategy and infrastructure for America’s first authorized Memphis Milano dealer.`,
         // Third-party image (not the user's own asset) — a styled Memphis
         // Milano furniture/lighting collection, chosen for the hero
         // because it captures the exact postmodern design world this
@@ -52,14 +54,13 @@ export const CASE_STUDY = {
         heading: `Overview`,
         chapter: true,
         chapterLabel: `Overview`,
-        lede: `Building the digital operation for America’s first authorized Memphis Milano dealer — without losing what made it worth dealing with in the first place.`,
+        lede: `Urban Architecture is a New York gallery specializing in Memphis Milano furniture, lighting, and objects — built entirely offline, with virtually no online presence before this engagement.`,
         bullets: [
-          `Urban Architecture is a New York gallery led by Keith Johnson, “The Merchant of Memphis” — present at Memphis’s first Milan exhibition in 1981, and its first authorized U.S. dealer ever since.`,
-          `More than 40 years of relationships with designers, collectors, and institutions, built entirely offline — in conversation, printed ephemera, and Keith’s own memory.`,
-          `The task: translate four decades of history into a digital presence without flattening what made it special.`,
-          `Four years in: a custom Shopify storefront, editorial voice, email program, catalog infrastructure, and ongoing content strategy — built to feel personal and specific, not like conventional e-commerce.`
-        ],
-        closing: `The goal was never to look like an online store. It was to feel like Keith’s gallery, on the internet.`
+          `Over 40 years in business in person and by phone, owner Keith Johnson built a high-profile network of clients and collectors who valued discretion, boutique service, and his cultural authority.`,
+          `Keith’s relationships with the designers, and his firsthand knowledge of their work, are central to the buying experience.`,
+          `The challenge: retain that intimacy and white-glove service while introducing the business to a digital audience of prospective buyers.`,
+          `Scope: the website, visual identity, product catalog, and a coordinated editorial, email, and social media strategy — each needed to reflect Keith’s expertise and accommodate the way he worked.`
+        ]
       }
     },
     {
@@ -119,7 +120,7 @@ export const CASE_STUDY = {
         heading: `A new identity system`,
         chapter: true,
         chapterLabel: `Identity`,
-        body: `The identity began with a piece of paper: old gallery letterhead Keith had kept for decades, unused — a red silhouette border and a hand-drawn logotype, credited to Christoph Radl and Ettore Sottsass, Jr. of Sottsass Associati, Milano. Sottsass founded Memphis; Radl was its art director.<br><br>Recovery, not invention: the sheet was scanned and rebuilt as vectors, the logotype redrawn letter by letter to preserve its triangular A, arched U, and interrupted C at any size, then decomposed into a modular SVG system — full sheets, square social frames, and the narrow strip that now divides sections on the site.`,
+        body: `The visual identity was developed from original gallery letterhead, credited to Christoph Radl and Ettore Sottsass, Jr. — its hand-drawn logotype and red border a direct connection to the gallery’s history.<br><br>I redrew the lettering and adapted the border for use across the website, email, print, and social media, giving the existing identity a consistent application across the business’s new digital presence.`,
         media: { type: 'image', src: '/assets/case-studies/urban-architecture/letterhead-scan.jpg', alt: 'The original Urban Architecture Inc. letterhead, with its red silhouette border and boxed hand-drawn logotype' },
         orientation: 'right',
         thumbnail: true
@@ -137,13 +138,12 @@ export const CASE_STUDY = {
     {
       type: 'text',
       props: {
-        heading: `A custom Shopify storefront`,
+        heading: `The storefront`,
         chapter: true,
-        chapterLabel: `Website`,
+        chapterLabel: `Storefront`,
         body: [
-          `Shopify became scaffolding for a custom Liquid theme built around inquiry-based conversion — not a cart.`,
-          `The homepage reads as one continuous editorial document, not a stack of modules, moving between collections, inventory, the trade program, press, and email signup. Each product page carries a sticky gallery, provenance and specs, Keith’s own note on the piece, and an inquiry form beneath the call to action.`,
-          `The biggest call: removing the cart entirely. A rare cabinet isn’t bought like an ordinary product — these sales run on conversation about condition, provenance, shipping, and trust. Inquiry-only keeps the site closer to how a gallery actually sells, while pricing and availability stay simple for the team to manage day to day.`
+          `The website was designed and built on Shopify, with a searchable catalog, available inventory, and a dedicated trade section. Product pages combine photographs, specifications, provenance, and Keith’s own notes on each piece.`,
+          `Purchases are handled through direct inquiry. This allows Keith to discuss condition, delivery, and placement with prospective buyers, retaining the personal service his clients expect, while pricing and availability stay simple for the team to update through Shopify.`
         ]
       }
     },
@@ -186,17 +186,18 @@ export const CASE_STUDY = {
         chapter: true,
         chapterLabel: `Voice`,
         body: [
-          `Every line on the site — product copy, email, Instagram captions, press — is written as Keith: informed, conversational, opinionated, dry. The test for any sentence is whether he’d actually say it to a friend over dinner.`,
-          `Every product page carries Keith’s note: his own case for why a piece matters beyond its dimensions and date. For buyers arriving through culture rather than design history, it’s often the most valuable thing on the page.`,
-          `A twelve-part editorial series, led by <em>The Room in Milan</em> — Keith’s own account of the first Memphis exhibition — works first as narrative, second as a way for new audiences to find the dealership through search.`
+          `The writing draws on Keith’s knowledge of the products, their designers, and how they’re made. Product descriptions, social captions, email, and press materials all follow his conversational, opinionated style.`,
+          `The editorial strategy puts that expertise to work, giving buyers researching Memphis design real context.`
         ]
       }
     },
     {
       type: 'textMedia',
       props: {
-        heading: `Catalog and pricing systems`,
-        body: `Prices arrive from Europe in euros, on spreadsheets and printed reference books — getting them onto the site correctly is the least visible work here, and among the most consequential.<br><br>A Python and Google Sheets pipeline converts the European catalog into Shopify-ready data: euro pricing, margin logic, compare-at pricing, consistent rounding, full or partial catalog updates. An audit step flags anomalies before anything publishes — it’s already caught pricing errors that would’ve gone live otherwise.<br><br>In a provenance-driven business, the details have to be right.`,
+        heading: `Operations`,
+        chapter: true,
+        chapterLabel: `Operations`,
+        body: `A catalog workflow converts European supplier pricing into Shopify-ready data and flags discrepancies for review. This has caught pricing errors before publication and simplifies updates across the collection.<br><br>The broader workflow keeps Keith’s involvement manageable through brief approvals, photographs, and scheduled filming sessions. Production and publication are coordinated around those contributions.`,
         media: { type: 'image', src: placeholder('PRICING PIPELINE — TERMINAL / SHEET CAPTURE') },
         orientation: 'left'
       }
@@ -204,8 +205,8 @@ export const CASE_STUDY = {
     {
       type: 'textMedia',
       props: {
-        heading: `Email as a form of access`,
-        body: `The email program runs in three concentric circles: public editorial introduces the brand’s history and point of view; a digital dispatch reaches a curated list of collectors, designers, and press, sent only when there’s something worth sharing; a physical dispatch — a large-format letter with the Sottsass border, mailed with Keith’s signature — is more personal still.<br><br>The digital template mirrors the site’s own visual language and reads nothing like a marketing email. A personalization layer lets Keith open with a recipient’s firm, prior conversation, or interests while the dispatch itself stays intact — not simulating familiarity, just making the real kind operable at scale.`,
+        heading: `Email`,
+        body: `The email program was designed around the gallery’s existing relationships with collectors, designers, and press. A private digital dispatch shares selected objects and commentary, with personalized introductions based on prior correspondence and known interests.<br><br>The design extends to a printed letter using the original gallery border — both formats retain the personal tone of Keith’s client correspondence.`,
         media: { type: 'image', src: placeholder('DISPATCH — EMAIL TEMPLATE + PHYSICAL MAILER') },
         orientation: 'right'
       }
@@ -215,8 +216,8 @@ export const CASE_STUDY = {
       props: {
         heading: `From the Shelf`,
         chapter: true,
-        chapterLabel: `Social`,
-        body: `Keith is more compelling on camera than he thinks. “From the Shelf” is a short-form video series built to capture that — no formal intro, no music, no fast cuts, just his knowledge, humor, and cadence starting mid-thought.<br><br>Several episodes are filmed in a single session and released from a rolling bank, so the series runs on Keith’s availability instead of demanding he perform for the platform every week.`,
+        chapterLabel: `Video`,
+        body: `“From the Shelf” was developed as a recurring video series featuring Keith discussing pieces from the collection. My role covers direction, production, and editing, with an emphasis on his knowledge, humor, and natural delivery.<br><br>Several episodes can be recorded in one session, allowing for regular publication around his availability.`,
         media: { type: 'image', src: placeholder('FROM THE SHELF — REEL, MUTED AUTOPLAY') },
         orientation: 'left'
       }
@@ -224,22 +225,12 @@ export const CASE_STUDY = {
     {
       type: 'text',
       props: {
-        heading: `Designing around a real person`,
-        body: [
-          `The real challenge here was operational, not visual. Keith works through instinct and relationships, most effective in person — so his participation was reduced to single actions: one photo sent, one caption approved, one afternoon given. Everything else is built around those moments.`,
-          `A system shouldn’t require someone to become a different kind of person to use it. This one works because it fits how the business actually operates, while giving it a far larger digital life.`
-        ]
-      }
-    },
-    {
-      type: 'text',
-      props: {
-        heading: `Where it stands`,
+        heading: `Status`,
         chapter: true,
-        chapterLabel: `Today`,
+        chapterLabel: `Status`,
         body: [
-          `The site is live. The catalog is priced, searchable, and maintainable. The identity carries across website, email, print, editorial, and video — the email program is built and waiting on Keith’s go-ahead for its first send.`,
-          `To a visitor, it reads as a clear, considered gallery. Behind it: European price lists, printed archives, product data, personal correspondence, video, and one man’s memory, all connected.`
+          `The site is live, with a searchable catalog and direct inquiry process. The identity has been adapted for web, email, print, and video.`,
+          `The first digital dispatch is awaiting Keith’s approval of the mailing list.`
         ]
       }
     },
