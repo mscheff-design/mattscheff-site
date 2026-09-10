@@ -371,7 +371,14 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
   .cs-frame-grid{grid-template-columns:repeat(3,1fr)}
 }
 @media (max-width:599px){
-  .project-grid{grid-template-columns:repeat(2,1fr)}
+  /* Master grid becomes a single-pane horizontal slider on phones — one
+     project fully visible at a time, swiped between, rather than a dense
+     multi-column grid of small tiles. Tapping a tile with real photos
+     skips straight to the one-at-a-time viewer now anyway (see
+     handleTileActivate()), so the grid's only job here is browsing
+     between PROJECTS, not between photos within one. */
+  .project-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:0}
+  .project-tile{flex:0 0 100%;scroll-snap-align:start}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
 }
 
@@ -655,6 +662,10 @@ applyStoredTheme();
 initThemeSwitcher(document.getElementById('themeSwitcher'));
 
 initRadioWidget(document.getElementById('navRadio'));
+
+// Same (pointer: coarse) convention as card.js/crayonTrails.js/blocks.js —
+// one device per session, evaluated once at module load.
+const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
 
 /* ---------- top-level section collapse: Work, Education, Skills, and
    Photography all use the same button+panel pattern (see .section-header/
@@ -983,9 +994,9 @@ const projectTiles = new Map();
   tile.addEventListener('mouseenter', () => {
     markImage.setAttribute('href', assignedGreaseMark(projectIdx));
   });
-  tile.addEventListener('click', () => toggleProject(project.id));
+  tile.addEventListener('click', () => handleTileActivate(project.id, tile));
   tile.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleProject(project.id); }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTileActivate(project.id, tile); }
   });
   projectTiles.set(project.id, tile);
   projectGrid.appendChild(tile);
@@ -1124,6 +1135,36 @@ function updateTileStates() {
 function toggleProject(id) {
   if (activeProject && activeProject.id === id) collapseProject();
   else expandProject(id);
+}
+
+// Mobile-only entry point: skip the contact-sheet grid (level 2) entirely
+// and go straight to the one-at-a-time viewer (level 3) — on a phone,
+// swipe-between-photos IS the browsing interaction, so the intermediate
+// grid tap added a step for no benefit. Falls back to the normal
+// toggleProject()/mode-grid flow for a project with no real photos yet
+// (PLACEHOLDER_ROW has nothing to swipe through). See closeViewer()'s own
+// isTouchDevice check for the other half of this — since mode-grid is
+// never entered here, closing the viewer on mobile closes the whole sheet
+// instead of falling back to a grid that was never opened.
+function handleTileActivate(id, triggerEl) {
+  const project = PROJECTS.find(p => p.id === id);
+  if (isTouchDevice && project && project.photos.length > 0) {
+    openViewerDirect(project, triggerEl);
+  } else {
+    toggleProject(id);
+  }
+}
+
+function openViewerDirect(project, triggerEl) {
+  activeProject = project;
+  updateTileStates();
+  galleryTrigger = triggerEl || null;
+  scrollYBeforeViewer = window.scrollY;
+  sheetBackdrop.classList.add('open');
+  sheetBackdrop.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  card.setPaused(true);
+  openViewer(project.selectedIndex || 0, triggerEl);
 }
 
 // openGallery/closeGallery own the shared sheetBackdrop/sheetPanel shell
@@ -1314,6 +1355,11 @@ function openViewer(index, triggerEl) {
 
 function closeViewer() {
   disposeLoupe();
+  // Mobile only ever reaches the viewer via openViewerDirect() (see its own
+  // comment) — mode-grid was never entered, so there's nothing to fall
+  // back to. closeGallery() already handles its own focus-return via
+  // galleryTrigger, so nothing else here needs to run.
+  if (isTouchDevice) { closeGallery(); return; }
   sheetBackdrop.classList.remove('mode-viewer');
   sheetBackdrop.classList.add('mode-grid');
   sheetPanel.className = 'sheet-panel mode-grid';
