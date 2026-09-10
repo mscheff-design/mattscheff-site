@@ -21,10 +21,16 @@
 // pending the user's call on those open items.
 //
 // Block order keeps this case study's existing shape: it opens straight
-// into a full-bleed image right after the hero (no lead-in text block
+// into the glance block right after the hero (no lead-in text block
 // first), since the story is about photography-driven paid social — a
 // bold visual open fits it better than the text-first opens used in
 // urban-architecture/bernard-figueroa-studio.
+//
+// The branded color-wheel shot originally sat as a full-bleed block right
+// after the (landscape) hero — moved 2026-09-10 into the closing gallery
+// instead, since a portrait image immediately full-bleed under a landscape
+// hero read as an awkward jump. The closing gallery already mixes a
+// portrait crop in with square ones, so it's a more natural home.
 
 export const CASE_STUDY = {
   id: 'statmask',
@@ -34,14 +40,6 @@ export const CASE_STUDY = {
       props: {
         summary: 'Product imagery, ad systems, and paid growth for a Brooklyn apparel startup.',
         media: { type: 'image', src: '/assets/case-studies/statmask/hero-lifestyle-flatlay.webp', alt: 'STATMASK masks styled alongside an iPhone, AirPods, and a magazine spread' }
-      }
-    },
-    {
-      type: 'fullBleedMedia',
-      props: {
-        maxHeight: '760px',
-        media: { type: 'image', src: '/assets/case-studies/statmask/color-wheel-full-range.webp', alt: 'The full STATMASK color range, arranged in a ring' },
-        caption: 'The full color range, shot once and reused across storefront, ad, and social.'
       }
     },
     {
@@ -148,6 +146,7 @@ export const CASE_STUDY = {
       type: 'gallery',
       props: {
         images: [
+          { src: '/assets/case-studies/statmask/color-wheel-full-range.webp', alt: 'The full STATMASK color range, arranged in a ring' },
           { src: '/assets/case-studies/statmask/desert-magazine-square.webp', alt: 'STATMASK masks styled on a magazine spread, cropped square' },
           { src: '/assets/case-studies/statmask/desert-magazine-vertical.webp', alt: 'The same shoot, cropped vertical for story placements' },
           { src: '/assets/case-studies/statmask/streetwear-flatlay-square.webp', alt: 'STATMASK masks styled alongside sneakers and a Supreme cap' }
