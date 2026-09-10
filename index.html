@@ -670,6 +670,31 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
 .lv3-loupe-toggle:hover{border-color:rgba(var(--ink-light-rgb),0.75);transform:scale(1.08)}
 .lv3-loupe-toggle.is-active{border-color:var(--accent);box-shadow:0 0 7px rgba(var(--accent-rgb),0.5)}
 .lv3-loupe-toggle:focus-visible{border-color:var(--accent);box-shadow:0 0 7px rgba(var(--accent-rgb),0.5)}
+
+/* Mobile-only counterpart to the loupe toggle above — same corner "circle
+   button" slot (the two are mutually exclusive via isTouchDevice, see
+   renderCoverflow(), so there's no actual conflict reusing the position).
+   Mobile skips level 2's contact-sheet header entirely (see
+   handleTileActivate()'s own comment) and goes straight from tile tap to
+   this single-photo viewer, which meant there was no way to ever read a
+   project's statement text on a phone at all — this is that path back in,
+   without giving up the swipe-through viewer itself. Italic serif "i",
+   not a graphic icon, to match the site's own typographic voice rather
+   than adding a new icon style. */
+.lv3-info-toggle{all:unset;position:absolute;right:30px;bottom:26px;z-index:5;width:30px;height:30px;border-radius:50%;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-light-rgb),0.4);color:rgba(var(--ink-light-rgb),0.6);font-family:var(--font-serif);font-style:italic;font-size:13px;display:flex;align-items:center;justify-content:center;transition:border-color 0.25s ease,color 0.25s ease,box-shadow 0.25s ease}
+.lv3-info-toggle.is-active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 7px rgba(var(--accent-rgb),0.5)}
+.lv3-info-toggle:focus-visible{border-color:var(--accent);box-shadow:0 0 7px rgba(var(--accent-rgb),0.5)}
+/* Bottom sheet, not a full modal — stays anchored to this same viewer so
+   swiping to the next/prev photo still works underneath/around it rather
+   than needing its own close-then-reopen cycle. transform:translateY
+   (not display/opacity) so the existing slide-up motion is a real
+   transition, matching the site's general preference for direction-
+   conveying motion over plain fades (see navigate()'s own history). */
+.lv3-info-panel{position:absolute;left:0;right:0;bottom:0;z-index:4;max-height:60%;background:rgba(8,6,3,0.96);transform:translateY(100%);transition:transform 0.3s cubic-bezier(.22,1,.36,1);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:24px 28px 28px;box-sizing:border-box;border-top:0.5px solid rgba(var(--ink-light-rgb),0.15)}
+.lv3-info-panel.is-open{transform:translateY(0)}
+.lv3-info-title{font-family:var(--font-display);font-weight:700;font-size:20px;color:rgba(var(--ink-light-rgb),0.92);margin:0 0 4px}
+.lv3-info-meta{font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-light-rgb),0.4);margin-bottom:14px}
+.lv3-info-text{font-family:var(--font-serif);font-size:15px;line-height:1.65;color:rgba(var(--ink-light-rgb),0.75);margin:0}
 </style>
 </head>
 <body>
@@ -1691,6 +1716,14 @@ function renderCoverflow() {
     <div class="lv3-label" id="cfLabel"></div>
     <div class="lv3-count" id="cfCount"></div>
     ${isTouchDevice ? '' : '<button class="lv3-loupe-toggle" id="lv3LoupeToggle" aria-pressed="false" aria-label="Toggle loupe"></button>'}
+    ${isTouchDevice && activeProject.statement ? `
+    <button class="lv3-info-toggle" id="lv3InfoToggle" aria-pressed="false" aria-expanded="false" aria-controls="lv3InfoPanel" aria-label="Show project info">i</button>
+    <div class="lv3-info-panel" id="lv3InfoPanel">
+      <h3 class="lv3-info-title">${activeProject.title}</h3>
+      <div class="lv3-info-meta">${activeProject.code || activeProject.id.toUpperCase()} / ${activeProject.year}</div>
+      <p class="lv3-info-text">${activeProject.statement}</p>
+    </div>
+    ` : ''}
   `;
 
   cfEdgePrevEl = document.getElementById('cfEdgePrev');
@@ -1725,8 +1758,27 @@ function renderCoverflow() {
     });
   }
 
+  const infoToggle = document.getElementById('lv3InfoToggle');
+  if (infoToggle) infoToggle.addEventListener('click', () => toggleInfoPanel());
+
   bindSwipe(document.getElementById('cfStage'));
   updateStage();
+}
+
+// Shared by the toggle button itself and the tap-on-photo-to-dismiss
+// handling in sheetPanel's own click listener (see its own comment) —
+// closing this way rather than the whole viewer is what makes tapping the
+// photo to dismiss the panel feel forgiving instead of accidentally
+// backing all the way out.
+function toggleInfoPanel(forceOpen) {
+  const infoToggle = document.getElementById('lv3InfoToggle');
+  const infoPanel = document.getElementById('lv3InfoPanel');
+  if (!infoToggle || !infoPanel) return;
+  const open = forceOpen !== undefined ? forceOpen : !infoPanel.classList.contains('is-open');
+  infoPanel.classList.toggle('is-open', open);
+  infoToggle.classList.toggle('is-active', open);
+  infoToggle.setAttribute('aria-pressed', String(open));
+  infoToggle.setAttribute('aria-expanded', String(open));
 }
 
 // Sets everything BUT the main image — used both for the initial render
@@ -1887,6 +1939,15 @@ sheetPanel.addEventListener('click', (e) => {
   // closes while just moving the mouse between photos.
   if (!sheetPanel.classList.contains('mode-viewer')) return;
   if (e.target === sheetPanel || e.target.id === 'cfStage' || e.target.classList.contains('lv3-main')) {
+    // A tap on the photo while the mobile info panel is open dismisses
+    // just the panel, not the whole viewer — otherwise a visitor reading
+    // the statement who taps to put it away would unexpectedly back all
+    // the way out instead.
+    const infoPanel = document.getElementById('lv3InfoPanel');
+    if (infoPanel && infoPanel.classList.contains('is-open')) {
+      toggleInfoPanel(false);
+      return;
+    }
     closeViewer();
   }
 });
