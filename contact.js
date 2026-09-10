@@ -583,7 +583,7 @@ function buildFormDOM(fallbackEmail) {
       fieldsEl.hidden = true;
       resultEl.hidden = false;
       resultEl.className = 'cf-result is-success';
-      resultEl.textContent = 'Thanks — got it. I’ll get back to you soon.';
+      resultEl.textContent = 'Thank you for reaching out. Your message has been received, and I’ll respond shortly.';
     } else if (next === 'error') {
       submitBtn.disabled = false;
       submitLabel.textContent = 'Try again →';
