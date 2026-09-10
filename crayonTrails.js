@@ -287,52 +287,55 @@ export function mountCrayonTrails(hero, {
   // have "drawn" to begin with). Still respects prefers-reduced-motion.
   if (isTouchDevice && !motion.matches) requestAnimationFrame(drawProceduralFlourish);
 
-  // One scribble cluster (a dense, continuous chain of loose, overlapping,
-  // wobbling loops — Cy Twombly's scribble drawings rather than a clean
-  // discrete shape) centered at (cx, cy), sized by `scale`. Returns
-  // STAMPS already resampled at even arc-length spacing along the whole
-  // generated curve — this is where the previous version actually broke:
-  // it placed every stamp for a given raw segment at that segment's own
-  // endpoint instead of walking along it, so a segment longer than one
-  // stamp's spacing produced a tight cluster of stamps sitting on top of
-  // each other at that one point, then a bare gap until the next point —
-  // reading as scattered dots instead of a continuous line. The `posAlong`
-  // walk below is the standard fix: step evenly along each segment,
-  // carrying any leftover distance into the next one, so spacing stays
-  // constant across the whole path regardless of how coarse the
-  // underlying raw points are.
-  function generateScribbleCluster(cx, cy, scale) {
-    const bandW = 260 * scale;
-    const bandH = 130 * scale;
-    let px = cx + bandW * 0.4;
-    const baseY = cy;
-    let py = baseY;
+  // One continuous scribble that actually travels between a chain of
+  // waypoints (a dense chain of loose, wobbling loops along the way — Cy
+  // Twombly's scribble drawings, not a clean discrete shape) rather than
+  // sitting in place — two fixed anchor points previously read as
+  // clustering around a couple of random spots instead of roaming.
+  // Returns STAMPS already resampled at even arc-length spacing along the
+  // whole generated curve — walking evenly along each raw segment
+  // (carrying leftover distance into the next) is what keeps spacing
+  // constant regardless of how coarse the underlying raw points are; an
+  // earlier version placed every stamp for a long segment at that
+  // segment's own endpoint instead, which is what read as scattered dots
+  // rather than a line.
+  function generateWanderingScribble(waypoints, scale) {
+    // Smaller relative to the travel distance between waypoints than the
+    // old fixed clusters were — loops that don't loop back over
+    // themselves nearly as much read as open and airy rather than a
+    // tangled knot.
+    const loopRadius = 34 * scale;
     let angle = random() * Math.PI * 2;
-    const loopCount = 10 + Math.floor(random() * 5);
     const raw = [];
-    for (let loop = 0; loop < loopCount; loop++) {
-      const dir = random() < 0.5 ? 1 : -1;
-      const radiusX = bandH * (0.3 + random() * 0.32);
-      const radiusY = radiusX * (0.5 + random() * 0.25);
-      // Not a clean full circle — anywhere from a bit over half a loop to
-      // a loop and a half, so successive loops overlap unevenly instead
-      // of stacking in a tidy repeating rhythm.
-      const sweep = Math.PI * 2 * (0.6 + random() * 0.7);
-      const steps = 28;
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const a = angle + dir * sweep * t;
-        // A real scribbling hand never traces a perfectly smooth curve —
-        // small per-step wobble on top of the ellipse itself.
-        const wobble = (random() - 0.5) * radiusX * 0.08;
-        raw.push({ x: px + Math.cos(a) * (radiusX + wobble), y: py + Math.sin(a) * (radiusY + wobble) });
+    const loopsPerLeg = 4;
+    for (let leg = 0; leg < waypoints.length - 1; leg++) {
+      const [sx, sy] = waypoints[leg];
+      const [ex, ey] = waypoints[leg + 1];
+      for (let li = 0; li < loopsPerLeg; li++) {
+        // The loop's own CENTER travels along the leg — this, not the
+        // loop shape itself, is what makes the scribble move across the
+        // window instead of wobbling in place around one fixed point.
+        const t = li / loopsPerLeg;
+        const travelX = sx + (ex - sx) * t;
+        const travelY = sy + (ey - sy) * t;
+        const dir = random() < 0.5 ? 1 : -1;
+        const radiusX = loopRadius * (0.65 + random() * 0.4);
+        const radiusY = radiusX * (0.55 + random() * 0.25);
+        // Not a clean full circle — anywhere from a bit over half a loop
+        // to a loop and a half, so successive loops overlap unevenly
+        // instead of stacking in a tidy repeating rhythm.
+        const sweep = Math.PI * 2 * (0.55 + random() * 0.55);
+        const steps = 26;
+        for (let i = 0; i <= steps; i++) {
+          const u = i / steps;
+          const a = angle + dir * sweep * u;
+          // A real scribbling hand never traces a perfectly smooth curve
+          // — small per-step wobble on top of the ellipse itself.
+          const wobble = (random() - 0.5) * radiusX * 0.08;
+          raw.push({ x: travelX + Math.cos(a) * (radiusX + wobble), y: travelY + Math.sin(a) * (radiusY + wobble) });
+        }
+        angle += dir * sweep + (random() - 0.5) * 0.7;
       }
-      angle += dir * sweep + (random() - 0.5) * 0.7;
-      // Drifts generally leftward, like a line of loose cursive writing,
-      // while wandering vertically — this sweep is what makes it read as
-      // one gestural pass instead of loops piling up in one spot.
-      px -= (bandW / loopCount) * (0.6 + random() * 0.9);
-      py = baseY + (random() - 0.5) * bandH * 0.55;
     }
     // Same tangent-angle-from-consecutive-points approach move() uses for
     // real strokes, just walking a generated array instead of live
@@ -360,7 +363,10 @@ export function mountCrayonTrails(hero, {
         stamped.push({
           x: a.x + (b.x - a.x) * frac, y: a.y + (b.y - a.y) * frac,
           angle: smoothAngle + (random() - 0.5) * 0.05,
-          size: cfg.width * scale * (0.85 + 0.15 * Math.sin(t * 10)),
+          // Noticeably thinner than the interactive marks — a fraction of
+          // cfg.width, not cfg.width itself, since this is meant to read
+          // as a light, open sketch rather than a bold wax stroke.
+          size: cfg.width * 0.4 * scale * (0.85 + 0.15 * Math.sin(t * 10)),
           alpha: cfg.opacity
         });
         posAlong += spacing;
@@ -373,16 +379,20 @@ export function mountCrayonTrails(hero, {
   function drawProceduralFlourish() {
     if (disposed) return;
     const visibleH = surface.clientHeight || height;
-    // Spread loosely around the card rather than confined to one corner
-    // — echoes the desktop version's own sprawling, haphazard scatter,
-    // translated into the portrait layout: a big cluster low and to the
-    // side (roughly where the résumé toggle's own open space already
-    // is), a second, smaller one higher up on the opposite side, so marks
-    // read as surrounding the card instead of one decoration tucked away.
-    const path = [
-      ...generateScribbleCluster(width * 0.18, visibleH * 0.8, 1.3),
-      ...generateScribbleCluster(width * 0.82, visibleH * 0.3, 0.85)
+    // A wandering path through 5 waypoints spanning most of the visible
+    // width/height — behind the card where it crosses that area (marks
+    // already draw behind the card in z-order everywhere on this canvas),
+    // in front of/around it elsewhere. Randomized per mount within each
+    // quadrant so it's not the exact same route every visit, but always
+    // actually crosses the window rather than staying near one spot.
+    const waypoints = [
+      [width * (0.1 + random() * 0.15), visibleH * (0.08 + random() * 0.1)],
+      [width * (0.75 + random() * 0.15), visibleH * (0.22 + random() * 0.12)],
+      [width * (0.15 + random() * 0.15), visibleH * (0.55 + random() * 0.1)],
+      [width * (0.7 + random() * 0.2), visibleH * (0.75 + random() * 0.1)],
+      [width * (0.2 + random() * 0.2), visibleH * (0.92 + random() * 0.06)]
     ];
+    const path = generateWanderingScribble(waypoints, 1);
     let i = 0;
     (function step() {
       if (disposed) return;
