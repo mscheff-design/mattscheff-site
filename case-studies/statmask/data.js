@@ -1,8 +1,9 @@
 // Case-study block config for STATMASK.
 //
-// REAL COPY — user-provided narrative, provided 2026-09-09. Images are
-// still placeholder() SVGs — swap for real assets under
-// /assets/case-studies/statmask/ when available.
+// REAL COPY — user-provided narrative, provided 2026-09-09. Real product/
+// lifestyle photography and ad-creative assets added 2026-09-10, under
+// /assets/case-studies/statmask/. A few placeholder() SVGs remain where no
+// matching asset was provided (Storefront has no PDP screenshot yet).
 //
 // The user's draft included a "NOTES FOR MATT, not for publication" section
 // flagging open questions (the specific mechanism behind the Q3 2021
@@ -35,14 +36,15 @@ export const CASE_STUDY = {
       type: 'hero',
       props: {
         summary: 'Product imagery, ad systems, and paid growth for a Brooklyn apparel startup.',
-        media: { type: 'image', src: placeholder('HERO IMAGE — 1600x900', 1600, 900), alt: 'STATMASK hero placeholder' }
+        media: { type: 'image', src: '/assets/case-studies/statmask/hero-lifestyle-flatlay.webp', alt: 'STATMASK masks styled alongside an iPhone, AirPods, and a magazine spread' }
       }
     },
     {
       type: 'fullBleedMedia',
       props: {
-        media: { type: 'image', src: placeholder('PRODUCT PHOTOGRAPHY — 1920x1080', 1920, 1080) },
-        caption: 'Product photography built to work as storefront hero imagery and paid social creative from day one.'
+        maxHeight: '760px',
+        media: { type: 'image', src: '/assets/case-studies/statmask/color-wheel-full-range.webp', alt: 'The full STATMASK color range, arranged in a ring' },
+        caption: 'The full color range, shot once and reused across storefront, ad, and social.'
       }
     },
     {
@@ -71,15 +73,14 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'text',
+      type: 'textMedia',
       props: {
         heading: 'Photography',
         chapter: true,
         chapterLabel: 'Photography',
-        body: [
-          'I directed and produced all product and campaign imagery: studio product for the storefront, styled and on-model work for advertising, and lifestyle imagery for social.',
-          'Catalog photography was kept rigid. Consistent lighting, scale, and color across a product line where differences between items were small, so a customer comparing two items sees a difference in the product. Campaign photography allowed more variation in styling and context, which is what keeps an audience from recognizing the same ad twice.'
-        ]
+        body: 'I directed and produced all product and campaign imagery: studio product for the storefront, styled and on-model work for advertising, and lifestyle imagery for social.<br><br>Catalog photography was kept rigid. Consistent lighting, scale, and color across a product line where differences between items were small, so a customer comparing two items sees a difference in the product. Campaign photography allowed more variation in styling and context, which is what keeps an audience from recognizing the same ad twice.',
+        media: { type: 'image', src: '/assets/case-studies/statmask/hand-held-ppe-context.webp', alt: 'A STATMASK held by hand alongside a face shield and no-touch thermometer' },
+        orientation: 'right'
       }
     },
     {
@@ -96,15 +97,23 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'text',
+      type: 'gallery',
+      props: {
+        images: [
+          { src: '/assets/case-studies/statmask/sneaker-flatlay-square.webp', alt: 'A styled flatlay shoot, cropped square for grid and feed placements' },
+          { src: '/assets/case-studies/statmask/sneaker-flatlay-vertical.webp', alt: 'The same shoot, cropped vertical for story placements' }
+        ]
+      }
+    },
+    {
+      type: 'textMedia',
       props: {
         heading: 'Campaigns',
         chapter: true,
         chapterLabel: 'Campaigns',
-        body: [
-          'I managed Meta campaign strategy through the ads portal: audience construction and refinement with Facebook Audiences, interest and lookalike layering, budget allocation, and the testing schedule.',
-          'Testing was structured around one variable at a time, usually image style, offer framing, or copy angle, so results could be attributed. Winning variants moved into the primary set and losing ones informed the next production block.'
-        ]
+        body: 'I managed Meta campaign strategy through the ads portal: audience construction and refinement with Facebook Audiences, interest and lookalike layering, budget allocation, and the testing schedule.<br><br>Testing was structured around one variable at a time, usually image style, offer framing, or copy angle, so results could be attributed. Winning variants moved into the primary set and losing ones informed the next production block.',
+        media: { type: 'image', src: '/assets/case-studies/statmask/black-friday-ad-creative.webp', alt: 'A Black Friday Meta ad creative built from the modular asset system' },
+        orientation: 'left'
       }
     },
     {
@@ -154,9 +163,9 @@ export const CASE_STUDY = {
       type: 'gallery',
       props: {
         images: [
-          { src: placeholder('PRODUCT SHOT', 600, 600), alt: 'Product shot' },
-          { src: placeholder('AD CREATIVE VARIANT', 600, 600), alt: 'Ad creative variant' },
-          { src: placeholder('STOREFRONT PDP', 600, 600), alt: 'Storefront product detail page' }
+          { src: '/assets/case-studies/statmask/desert-magazine-square.webp', alt: 'STATMASK masks styled on a magazine spread, cropped square' },
+          { src: '/assets/case-studies/statmask/desert-magazine-vertical.webp', alt: 'The same shoot, cropped vertical for story placements' },
+          { src: '/assets/case-studies/statmask/streetwear-flatlay-square.webp', alt: 'STATMASK masks styled alongside sneakers and a Supreme cap' }
         ]
       }
     },
