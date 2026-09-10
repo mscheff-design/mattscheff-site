@@ -342,14 +342,12 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 /* Touch has no hover to reveal this with at all — rather than losing the
    motif on mobile entirely, the mark on each project tile (assigned up
    front instead of on mouseenter; see the tile-creation loop in
-   initLevel1()) is just always on there. Also overrides .grease-mark's
-   shared -15%/130% overflow sizing above (kept as-is for desktop hover and
-   for level-2's more dramatic off-register look) to wrap the tile's own
-   box exactly instead, so it matches the bigger mobile carousel tile's own
-   2:3 proportions rather than the desktop mark's overflow look. */
+   initLevel1()) is just always on there. Sizing stays the shared
+   -15%/130% overscan above — percentage-based, so it already scales with
+   .project-tile's own actual size, the bigger mobile carousel tile
+   included, with no override needed. */
 @media (pointer:coarse){
   .project-tile .grease-mark--hover{opacity:1}
-  .project-tile .grease-mark{inset:0;width:100%;height:100%}
 }
 
 /* level 2 — cursor-following glass loupe, see loupe.js */
