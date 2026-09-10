@@ -478,6 +478,15 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
 }
 
+/* Contact section — a plain restatement of the 3D card's own CONTACT/
+   SOCIAL_LINKS data (see card.js), for the nav's "Contact" link to
+   actually land on something rather than just the thin footer strip.
+   Dark like .photo-section above and footer below, so the run from
+   Photography through the footer stays visually continuous. */
+.contact-section{position:relative;z-index:1;background:var(--bg-dark);padding:80px 48px;border-top:0.5px solid rgba(var(--ink-light-rgb),0.08);display:flex;flex-direction:column;align-items:center;text-align:center;gap:18px}
+.contact-label{font-family:var(--font-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(var(--ink-light-rgb),0.35)}
+.contact-email{font-family:var(--font-display);font-size:clamp(24px,4vw,40px);font-weight:700;letter-spacing:-0.01em;color:rgba(var(--ink-light-rgb),0.92);text-decoration:none;transition:color 0.2s}
+.contact-email:hover{color:var(--accent)}
 footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;border-top:0.5px solid rgba(var(--ink-light-rgb),0.08);display:flex;justify-content:space-between;align-items:center}
 .footer-left{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-light-rgb),0.2);letter-spacing:0.08em}
 .footer-links{display:flex;gap:24px}
@@ -772,7 +781,16 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
   </div>
 </section>
 
-<footer id="contact">
+<section class="contact-section" id="contact">
+  <span class="contact-label">Contact</span>
+  <a class="contact-email" href="mailto:hello@mattscheff.com">hello@mattscheff.com</a>
+  <div class="footer-links">
+    <a href="https://instagram.com/matt_scheff" target="_blank">Instagram</a>
+    <a href="https://linkedin.com/mattscheffler" target="_blank">LinkedIn</a>
+  </div>
+</section>
+
+<footer id="siteFooter">
   <span class="footer-left">© 2026 Matthew Scheffler</span>
   <div class="footer-links">
     <a href="https://instagram.com/matt_scheff" target="_blank">Instagram</a>
@@ -882,13 +900,13 @@ initCollapsibleSection('photographyHeader', 'photographyPanel');
 // read as a faint smudge against solid black. Swapping to --ink-light-rgb
 // whenever any such section currently occupies the nav's own height band at
 // the top of the viewport keeps it legible without touching the section
-// itself. Two full-bleed dark sections now (Photography and the footer),
-// so this checks both rather than just one. rAF-throttled scroll/resize —
-// same idiom theme.js's own reactive-text system already uses for the
-// same reason.
+// itself. Three full-bleed dark sections now (Photography, the contact
+// section, and the footer itself), so this checks all three rather than
+// just one. rAF-throttled scroll/resize — same idiom theme.js's own
+// reactive-text system already uses for the same reason.
 {
   const navEl = document.querySelector('nav');
-  const darkSections = [document.getElementById('photography'), document.getElementById('contact')].filter(Boolean);
+  const darkSections = [document.getElementById('photography'), document.getElementById('contact'), document.getElementById('siteFooter')].filter(Boolean);
   if (navEl && darkSections.length) {
     let navDarkTicking = false;
     const updateNavDark = () => {
