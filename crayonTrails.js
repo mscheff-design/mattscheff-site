@@ -276,137 +276,130 @@ export function mountCrayonTrails(hero, {
   intersection.observe(hero);
   resize();updateToggle();
   // Touch has no hover to draw the interactive marks with at all (see
-  // `enabled`'s own fine/motion check above), so instead of nothing, one
-  // procedural flourish animates itself in shortly after mount — a
-  // generated curve, not a recorded gesture, fed through the exact same
-  // stamp/paint/hold-fade pipeline real strokes use, so it reads as one
-  // more crayon mark, not a different visual system. One-time and
-  // deliberately independent of the `enabled` toggle above (that toggle
-  // is about a mouse user turning the interactive feature off — there's
-  // no ongoing cost here to turn off, and nothing for a touch visitor to
-  // have "drawn" to begin with). Still respects prefers-reduced-motion.
-  if (isTouchDevice && !motion.matches) requestAnimationFrame(drawProceduralFlourish);
+  // `enabled`'s own fine/motion check above), so instead of nothing, a
+  // procedural "ghost hand" keeps doodling on its own — a generated
+  // curve, not a recorded gesture, fed through the exact same stamp/
+  // paint/hold-fade pipeline real strokes use, so it reads as the same
+  // kind of mark, not a different visual system. Ongoing, not one-time:
+  // it keeps adding new loops for as long as the hero is visible, at a
+  // slow, unhurried pace, while the EXISTING hold/fade lifecycle
+  // (cfg.holdSeconds/fadeSeconds — unchanged, the same ones a real
+  // continuous stroke ages out on) fades the oldest part of the trail as
+  // new parts get drawn — the same bounded "how much is visible at once"
+  // desktop's own interactive marks already have for a long continuous
+  // doodle, rather than one flourish that draws in once and then sits
+  // there statically. Deliberately independent of the `enabled` toggle
+  // above (that's about a mouse user turning the interactive feature
+  // off — there's nothing here for a touch visitor to have "drawn" to
+  // begin with). Still respects prefers-reduced-motion.
+  if (isTouchDevice && !motion.matches) requestAnimationFrame(startGhostDoodle);
 
-  // One continuous scribble that actually travels between a chain of
-  // waypoints (a dense chain of loose, wobbling loops along the way — Cy
-  // Twombly's scribble drawings, not a clean discrete shape) rather than
-  // sitting in place — two fixed anchor points previously read as
-  // clustering around a couple of random spots instead of roaming.
-  // Returns STAMPS already resampled at even arc-length spacing along the
-  // whole generated curve — walking evenly along each raw segment
-  // (carrying leftover distance into the next) is what keeps spacing
-  // constant regardless of how coarse the underlying raw points are; an
-  // earlier version placed every stamp for a long segment at that
-  // segment's own endpoint instead, which is what read as scattered dots
-  // rather than a line.
-  function generateWanderingScribble(waypoints, scale) {
-    // Smaller relative to the travel distance between waypoints than the
-    // old fixed clusters were — loops that don't loop back over
-    // themselves nearly as much read as open and airy rather than a
-    // tangled knot.
-    const loopRadius = 34 * scale;
-    let angle = random() * Math.PI * 2;
-    const raw = [];
-    const loopsPerLeg = 4;
-    for (let leg = 0; leg < waypoints.length - 1; leg++) {
-      const [sx, sy] = waypoints[leg];
-      const [ex, ey] = waypoints[leg + 1];
-      for (let li = 0; li < loopsPerLeg; li++) {
-        // The loop's own CENTER travels along the leg — this, not the
-        // loop shape itself, is what makes the scribble move across the
-        // window instead of wobbling in place around one fixed point.
-        const t = li / loopsPerLeg;
-        const travelX = sx + (ex - sx) * t;
-        const travelY = sy + (ey - sy) * t;
-        const dir = random() < 0.5 ? 1 : -1;
-        const radiusX = loopRadius * (0.65 + random() * 0.4);
-        const radiusY = radiusX * (0.55 + random() * 0.25);
-        // Not a clean full circle — anywhere from a bit over half a loop
-        // to a loop and a half, so successive loops overlap unevenly
-        // instead of stacking in a tidy repeating rhythm.
-        const sweep = Math.PI * 2 * (0.55 + random() * 0.55);
-        const steps = 26;
-        for (let i = 0; i <= steps; i++) {
-          const u = i / steps;
-          const a = angle + dir * sweep * u;
-          // A real scribbling hand never traces a perfectly smooth curve
-          // — small per-step wobble on top of the ellipse itself.
-          const wobble = (random() - 0.5) * radiusX * 0.08;
-          raw.push({ x: travelX + Math.cos(a) * (radiusX + wobble), y: travelY + Math.sin(a) * (radiusY + wobble) });
-        }
-        angle += dir * sweep + (random() - 0.5) * 0.7;
-      }
-    }
-    // Same tangent-angle-from-consecutive-points approach move() uses for
-    // real strokes, just walking a generated array instead of live
-    // pointer history — plus the even-arc-length resampling described
-    // above, which move() gets for free from real pointer events arriving
-    // at roughly steady spacing already.
-    const spacing = Math.max(1.4, cfg.width * 0.1);
-    const stamped = [];
-    let smoothAngle = null, distanceToNext = 0;
-    for (let i = 1; i < raw.length; i++) {
-      const a = raw[i - 1], b = raw[i];
-      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
-      if (segLen < 0.0001) continue;
-      let rawAngle = Math.atan2(b.y - a.y, b.x - a.x);
-      if (smoothAngle === null) smoothAngle = rawAngle;
-      else {
-        let diff = rawAngle - smoothAngle;
-        diff = ((diff + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-        smoothAngle += diff * 0.5;
-      }
-      const t = i / raw.length;
-      let posAlong = distanceToNext;
-      while (posAlong <= segLen) {
-        const frac = posAlong / segLen;
-        stamped.push({
-          x: a.x + (b.x - a.x) * frac, y: a.y + (b.y - a.y) * frac,
-          angle: smoothAngle + (random() - 0.5) * 0.05,
-          // Noticeably thinner than the interactive marks — a fraction of
-          // cfg.width, not cfg.width itself, since this is meant to read
-          // as a light, open sketch rather than a bold wax stroke.
-          size: cfg.width * 0.4 * scale * (0.85 + 0.15 * Math.sin(t * 10)),
-          alpha: cfg.opacity
-        });
-        posAlong += spacing;
-      }
-      distanceToNext = posAlong - segLen;
-    }
-    return stamped;
-  }
-
-  function drawProceduralFlourish() {
+  function startGhostDoodle() {
     if (disposed) return;
-    const visibleH = surface.clientHeight || height;
-    // A wandering path through 5 waypoints spanning most of the visible
-    // width/height — behind the card where it crosses that area (marks
-    // already draw behind the card in z-order everywhere on this canvas),
-    // in front of/around it elsewhere. Randomized per mount within each
-    // quadrant so it's not the exact same route every visit, but always
-    // actually crosses the window rather than staying near one spot.
-    const waypoints = [
-      [width * (0.1 + random() * 0.15), visibleH * (0.08 + random() * 0.1)],
-      [width * (0.75 + random() * 0.15), visibleH * (0.22 + random() * 0.12)],
-      [width * (0.15 + random() * 0.15), visibleH * (0.55 + random() * 0.1)],
-      [width * (0.7 + random() * 0.2), visibleH * (0.75 + random() * 0.1)],
-      [width * (0.2 + random() * 0.2), visibleH * (0.92 + random() * 0.06)]
-    ];
-    const path = generateWanderingScribble(waypoints, 1);
-    let i = 0;
-    (function step() {
-      if (disposed) return;
-      // A handful of stamps per frame — quick enough to settle in well
-      // under 2-3s even with two clusters, still visibly progressive
-      // rather than popping in whole.
-      for (let n = 0; n < 5 && i < path.length; n++, i++) {
-        const p = path[i];
-        stamps.push({ x: p.x, y: p.y, time: performance.now(), angle: p.angle, size: p.size, alpha: p.alpha, brush: Math.floor(random() * brushes.length) });
+    const spacing = Math.max(1.4, cfg.width * 0.1);
+    // How fast the virtual pen moves, in px/sec — slow and unhurried,
+    // like an idle doodle rather than a rushed reveal.
+    const drawSpeedPxPerSec = 20;
+    let px = width * (0.2 + random() * 0.6);
+    let py = (surface.clientHeight || height) * (0.2 + random() * 0.6);
+    let angle = random() * Math.PI * 2;
+    let queue = [];
+    let stampBudget = 0;
+    let lastTime = performance.now();
+
+    // One loop's worth of stamps, continuing from wherever the pen
+    // currently is (not restarting somewhere random each time) — this
+    // continuity, not the loop shape itself, is what makes it read as
+    // one hand wandering around rather than repeated separate marks.
+    function generateNextLoop() {
+      const visibleH = surface.clientHeight || height;
+      // Softly steers back toward the middle of the visible area once
+      // the pen drifts too close to an edge, instead of a hard bounce —
+      // keeps the doodle roaming broadly without ever fully wandering
+      // off-canvas.
+      const marginX = width * 0.12, marginY = visibleH * 0.12;
+      let biasAngle = null;
+      if (px < marginX || px > width - marginX || py < marginY || py > visibleH - marginY) {
+        biasAngle = Math.atan2(visibleH / 2 - py, width / 2 - px);
       }
-      paint();
-      if (i < path.length) requestAnimationFrame(step);
-      else schedule();
-    })();
+      const dir = random() < 0.5 ? 1 : -1;
+      const radius = 34 * (0.65 + random() * 0.4);
+      const radiusY = radius * (0.55 + random() * 0.25);
+      const sweep = Math.PI * 2 * (0.55 + random() * 0.55);
+      const loopAngle = biasAngle !== null ? biasAngle + (random() - 0.5) * 0.8 : angle;
+      const raw = [];
+      const steps = 26;
+      for (let i = 0; i <= steps; i++) {
+        const u = i / steps;
+        const a = loopAngle + dir * sweep * u;
+        // A real scribbling hand never traces a perfectly smooth curve —
+        // small per-step wobble on top of the ellipse itself.
+        const wobble = (random() - 0.5) * radius * 0.08;
+        raw.push({ x: px + Math.cos(a) * (radius + wobble), y: py + Math.sin(a) * (radiusY + wobble) });
+      }
+      angle = loopAngle + dir * sweep + (random() - 0.5) * 0.7;
+      px = raw[raw.length - 1].x;
+      py = raw[raw.length - 1].y;
+      // Same tangent-angle-from-consecutive-points approach move() uses
+      // for real strokes, plus even-arc-length resampling (walk each
+      // segment, carry leftover distance into the next) so spacing stays
+      // constant regardless of how coarse the raw points are — placing
+      // every stamp for a segment at its own endpoint instead, like an
+      // earlier version of this did, is what reads as scattered dots
+      // rather than a line.
+      let smoothAngle = null, distanceToNext = 0;
+      for (let i = 1; i < raw.length; i++) {
+        const a = raw[i - 1], b = raw[i];
+        const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+        if (segLen < 0.0001) continue;
+        let rawAngle = Math.atan2(b.y - a.y, b.x - a.x);
+        if (smoothAngle === null) smoothAngle = rawAngle;
+        else {
+          let diff = rawAngle - smoothAngle;
+          diff = ((diff + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+          smoothAngle += diff * 0.5;
+        }
+        const t = i / raw.length;
+        let posAlong = distanceToNext;
+        while (posAlong <= segLen) {
+          const frac = posAlong / segLen;
+          queue.push({
+            x: a.x + (b.x - a.x) * frac, y: a.y + (b.y - a.y) * frac,
+            angle: smoothAngle + (random() - 0.5) * 0.05,
+            size: cfg.width * (0.85 + 0.15 * Math.sin(t * 10)),
+            alpha: cfg.opacity
+          });
+          posAlong += spacing;
+        }
+        distanceToNext = posAlong - segLen;
+      }
+    }
+
+    (function tick(now) {
+      if (disposed) return;
+      const dt = Math.min(0.1, (now - lastTime) / 1000);
+      lastTime = now;
+      if (visible && !document.hidden) {
+        if (queue.length < 40) generateNextLoop();
+        stampBudget += (drawSpeedPxPerSec * dt) / spacing;
+        while (stampBudget >= 1 && queue.length) {
+          stampBudget -= 1;
+          const p = queue.shift();
+          stamps.push({ x: p.x, y: p.y, time: now, angle: p.angle, size: p.size, alpha: p.alpha, brush: Math.floor(random() * brushes.length) });
+        }
+        paint();
+        // paint()'s own tail (see its definition above) schedules a
+        // fadeTimer->schedule() continuation any time stamps exist,
+        // meant for the interactive marks' own "keep fading after the
+        // cursor stops moving" case — redundant here since this rAF loop
+        // already owns redrawing every frame on its own. Clearing it
+        // stops that second, independent scheduling path from also
+        // calling paint() again a moment later.
+        clearTimeout(fadeTimer);
+        fadeTimer = 0;
+      }
+      requestAnimationFrame(tick);
+    })(lastTime);
   }
 
   return {
