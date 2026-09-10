@@ -1048,6 +1048,13 @@ const GREASE_MARKS = [
   'assets/grease-mark-5.svg'
 ];
 
+// Mobile carousel's own independent draw (see its own comment further
+// down) pulls from this instead of GREASE_MARKS directly — grease-mark.svg
+// (fill:#9a3737, a dark red) read wrong framing the mobile one-photo
+// shadowbox specifically, at the user's request. Left in GREASE_MARKS
+// itself so the level 1/2 desktop hover marks are unaffected.
+const CAROUSEL_GREASE_MARKS = GREASE_MARKS.filter((m) => m !== 'assets/grease-mark.svg');
+
 function shuffle(arr) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -1276,7 +1283,7 @@ const projectTiles = new Map();
   // pattern. A plain independent pick here can't touch that bag.
   const contactSheet = document.querySelector('.contact-sheet');
   if (contactSheet) {
-    const carouselMark = GREASE_MARKS[Math.floor(Math.random() * GREASE_MARKS.length)];
+    const carouselMark = CAROUSEL_GREASE_MARKS[Math.floor(Math.random() * CAROUSEL_GREASE_MARKS.length)];
     contactSheet.insertAdjacentHTML('beforeend', carouselGreaseMarkSVG(carouselMark));
   }
 })();
