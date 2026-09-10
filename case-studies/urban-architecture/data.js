@@ -61,34 +61,31 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'module',
+      type: 'text',
       props: {
         heading: `The challenge`,
         chapter: true,
         chapterLabel: `Challenge`,
-        lede: `Retain the intimacy of a white-glove business while projecting Keith’s authority to an audience that actually converts.`,
-        bullets: [
-          `This was never a traffic problem. The audience — collectors, interior designers, architects, curators — is small, informed, and highly selective.`,
-          `The site didn’t need to speak to everyone. It needed to feel immediately credible to the few visitors who mattered.`,
-          `Most of the business existed in forms that don’t translate to the internet: knowledge in conversation, relationships in a Rolodex, prices in European spreadsheets and printed reference books, sales through direct inquiry.`,
-          `The work wasn’t digitization — it was deciding what each of those things should become online, and what should stay personal.`,
-          `A parallel constraint: build a social media and visibility strategy alongside the e-commerce build, without either one compromising the other.`
+        body: [
+          `Urban Architecture’s audience is small, informed, and selective: collectors, interior designers, architects, and curators. Reaching more people was never the objective. The site had to be immediately credible to the few visitors who mattered.`,
+          `Most of the business existed in forms that do not translate directly to the internet. Knowledge held in conversation. Relationships held in a Rolodex. Prices held in European spreadsheets and printed reference books. Sales conducted through direct inquiry.`,
+          `Each of those required a decision about what it should become online and what should stay personal. The e-commerce build and the visibility strategy also had to be developed in parallel, without either compromising the other.`
         ]
       }
     },
     {
-      type: 'module',
+      type: 'text',
       props: {
         heading: `The approach`,
         chapter: true,
         chapterLabel: `Approach`,
-        lede: `The strategy came down to four words: micro, targeted, intentional, authentic.`,
-        bullets: [
-          `<strong>Put the dealer at the center.</strong> The brand is built around Keith as “The Merchant of Memphis” — his authority comes from having been there since the beginning.`,
-          `<strong>Treat restraint as a signal.</strong> A quiet, editorial visual system that gives the objects room and assumes intelligence in the visitor, rather than over-explaining or pushing a sale.`,
-          `<strong>Build from what is already true.</strong> In a small, taste-conscious market, anything manufactured reads as false fast — every part of the system extends real knowledge and real relationships instead of imitating them.`
-        ],
-        closing: `Rather than pursuing reach, the focus was building the conditions for a small number of meaningful, high-value relationships.`
+        body: [
+          `Four words governed the strategy: micro, targeted, intentional, authentic.`,
+          `Keith sits at the center. The brand is built around him as The Merchant of Memphis, with authority that comes from having been there since the beginning.`,
+          `The visual system is quiet and editorial. It gives the objects room and assumes intelligence in the visitor, avoiding over-explanation and sales language. In this market, restraint carries a signal of its own.`,
+          `Every part of the system extends something already true. A small, taste-conscious audience recognizes anything manufactured quickly, so the work builds on existing knowledge and existing relationships rather than imitating them.`,
+          `The objective throughout is a small number of high-value relationships rather than reach.`
+        ]
       }
     },
     {
@@ -98,7 +95,7 @@ export const CASE_STUDY = {
         body: [
           `Each part of the work began with something that already existed offline.`,
           `Keith’s stories became product notes, editorial, and video. His relationships became a structured private dispatch. A physical inventory became a searchable catalog with documented provenance. European price lists and printed reference books became a pricing and audit system. A sales process built on conversation became an inquiry-only storefront.`,
-          `None of these were exact conversions. A dinner cannot become a newsletter, and a Rolodex cannot become a mailing list, without losing something. The work was identifying which part mattered, then building the digital form capable of carrying it.`
+          `None of these are exact conversions. A dinner does not become a newsletter and a Rolodex does not become a mailing list without something being lost. The work in each case was identifying the part that mattered, then building the digital form capable of carrying it.`
         ]
       }
     },
