@@ -137,7 +137,14 @@ export function textMediaBlock(props) {
 }
 
 export function textBlock(props) {
-  const wrap = el('div', 'cs-block cs-text');
+  // compact: true halves this block's own top/bottom padding — for a run
+  // of short, closely-related text blocks (e.g. STATMASK's Analytics/
+  // Collateral/Results) where the default .cs-block padding (64px, so
+  // 128px between two adjacent blocks) reads as far more separation than
+  // one short paragraph per stop actually calls for. Opt-in and scoped to
+  // whichever blocks set it, rather than changing the shared .cs-block
+  // padding everywhere.
+  const wrap = el('div', 'cs-block cs-text' + (props.compact ? ' cs-text--compact' : ''));
   if (props.heading) wrap.appendChild(el('h2', 'cs-text-heading', props.heading));
   const paragraphs = Array.isArray(props.body) ? props.body : [props.body];
   paragraphs.filter(Boolean).forEach((p) => wrap.appendChild(el('p', 'cs-text-body', p)));
@@ -567,6 +574,8 @@ function injectStyles() {
     .cs-text-heading{font-family:var(--font-serif);font-weight:400;font-size:clamp(24px,3vw,32px);color:var(--ink);margin-bottom:16px}
     .cs-text-body{font-family:var(--font-serif);font-size:17px;line-height:1.65;color:rgba(var(--ink-rgb),0.75);max-width:62ch;margin-bottom:20px}
     .cs-text-body:last-child{margin-bottom:0}
+    /* see textBlock()'s own comment on props.compact */
+    .cs-text--compact{padding:24px 0}
 
     /* two text columns side by side (e.g. Challenge next to Approach) —
        wider than .cs-block's normal 880px cap, since two ~62ch measures

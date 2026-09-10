@@ -114,6 +114,7 @@ export const CASE_STUDY = {
         heading: 'Analytics',
         chapter: true,
         chapterLabel: 'Analytics',
+        compact: true,
         body: [
           'Shopify sales data, Google Analytics traffic metrics, and Meta placement performance were read together. Traffic source against conversion rate against creative variant, closing back into the next shoot list.'
         ]
@@ -123,6 +124,7 @@ export const CASE_STUDY = {
       type: 'text',
       props: {
         heading: 'Collateral',
+        compact: true,
         body: [
           'Branded sales assets and promotional materials were produced to the same standard as the advertising, keeping the storefront, the ad account, and the social feed consistent.'
         ]
@@ -134,6 +136,7 @@ export const CASE_STUDY = {
         heading: 'Results',
         chapter: true,
         chapterLabel: 'Results',
+        compact: true,
         body: [
           'Revenue grew 150% in Q3 2021, driven by targeted placement supported by a creative library deep enough to sustain it. The asset system built here has carried into every engagement since.'
         ]
