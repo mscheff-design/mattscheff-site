@@ -419,18 +419,21 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .ps-close:hover{color:var(--accent);border-color:var(--accent)}
 .ps-close:focus-visible{outline:1.5px solid var(--accent);outline-offset:3px}
 
-/* same quiet mono-link treatment as .ps-close, kept as its own class
-   since the two sit side by side in .ps-meta and can each carry their
-   own label/state independently */
-.ps-statement-toggle{all:unset;cursor:pointer;font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-light-rgb),0.45);border-bottom:0.5px solid rgba(var(--ink-light-rgb),0.3);padding-bottom:2px;transition:color 0.2s,border-color 0.2s}
+/* Same quiet mono-link treatment as .ps-close, kept as its own class since
+   its state/label differ. Sits under the excerpt itself now, not in
+   .ps-meta — see renderExpandedSheet(), which only inserts this toggle at
+   all when the statement is actually long enough to be clamped. */
+.ps-statement-toggle{all:unset;cursor:pointer;display:inline-block;margin-top:2px;font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-light-rgb),0.45);border-bottom:0.5px solid rgba(var(--ink-light-rgb),0.3);padding-bottom:2px;transition:color 0.2s,border-color 0.2s}
 .ps-statement-toggle:hover{color:var(--accent);border-color:var(--accent)}
 .ps-statement-toggle:focus-visible{outline:1.5px solid var(--accent);outline-offset:3px}
-/* Reuses .collapsible-panel's own grid-template-rows animation (see its
-   definition further up) — margin-top only, not margin-bottom, so a
-   closed (0fr) panel doesn't leave a visible gap of its own; the text's
-   own padding-bottom supplies breathing room before the grid once open. */
-.ps-statement{margin-top:4px}
-.ps-statement-text{font-family:var(--font-serif);font-size:15px;line-height:1.65;color:rgba(var(--ink-light-rgb),0.7);max-width:62ch;padding-bottom:20px}
+/* Shown immediately (no click required) as a 3-line excerpt, clamped by
+   max-height rather than -webkit-line-clamp so it can transition smoothly
+   open. 74px ≈ 3 lines at this font-size/line-height; is-expanded's much
+   larger max-height comfortably clears any statement length in practice
+   without needing an exact measurement. */
+.ps-statement{margin-top:4px;padding-bottom:20px}
+.ps-statement-text{font-family:var(--font-serif);font-size:15px;line-height:1.65;color:rgba(var(--ink-light-rgb),0.7);max-width:62ch;max-height:74px;overflow:hidden;transition:max-height 0.35s ease}
+.ps-statement.is-expanded .ps-statement-text{max-height:600px}
 
 /* is-active marks whichever master tile's gallery is currently open — just
    the label underline now. The grease mark used to also force-show here,
@@ -1480,31 +1483,6 @@ function renderExpandedSheet(project) {
       <span>${project.year} / SELECTED FRAMES</span>
     </div>
   `;
-  // Quiet, opt-in — only shown when a project actually has one (not every
-  // entry needs to yet; see PROJECTS' own statement fields). Reuses
-  // .collapsible-panel/.collapsible-panel-inner (same grid-template-rows
-  // trick as the Work/Education/Skills section panels) for the open/close
-  // animation rather than a bespoke one.
-  let statementWrap = null;
-  if (project.statement) {
-    const statementToggle = document.createElement('button');
-    statementToggle.type = 'button';
-    statementToggle.className = 'ps-statement-toggle';
-    statementToggle.textContent = 'Statement';
-    statementToggle.setAttribute('aria-expanded', 'false');
-    heading.querySelector('.ps-meta').appendChild(statementToggle);
-
-    statementWrap = document.createElement('div');
-    statementWrap.className = 'ps-statement collapsible-panel';
-    statementWrap.innerHTML = `<div class="collapsible-panel-inner"><p class="ps-statement-text">${project.statement}</p></div>`;
-    statementToggle.addEventListener('click', () => {
-      const open = !statementWrap.classList.contains('is-open');
-      statementWrap.classList.toggle('is-open', open);
-      statementToggle.setAttribute('aria-expanded', String(open));
-      statementToggle.textContent = open ? 'Hide statement' : 'Statement';
-    });
-  }
-
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
   closeButton.className = 'ps-close';
@@ -1512,7 +1490,34 @@ function renderExpandedSheet(project) {
   closeButton.addEventListener('click', () => collapseProject());
   heading.querySelector('.ps-meta').appendChild(closeButton);
   sheetPanel.appendChild(heading);
-  if (statementWrap) sheetPanel.appendChild(statementWrap);
+
+  // Shown as a 3-line excerpt right away, not gated behind a click — see
+  // PROJECTS' own statement fields (opt-in; not every entry has one yet).
+  // "Read more" only gets added once the text is actually in the DOM and
+  // measurably taller than the collapsed max-height above, so a short
+  // statement that already fits never grows a dead toggle.
+  if (project.statement) {
+    const statementWrap = document.createElement('div');
+    statementWrap.className = 'ps-statement';
+    statementWrap.innerHTML = `<p class="ps-statement-text">${project.statement}</p>`;
+    sheetPanel.appendChild(statementWrap);
+
+    const textEl = statementWrap.querySelector('.ps-statement-text');
+    if (textEl.scrollHeight > textEl.clientHeight + 1) {
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'ps-statement-toggle';
+      toggle.textContent = 'Read more';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.addEventListener('click', () => {
+        const open = !statementWrap.classList.contains('is-expanded');
+        statementWrap.classList.toggle('is-expanded', open);
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.textContent = open ? 'Read less' : 'Read more';
+      });
+      statementWrap.appendChild(toggle);
+    }
+  }
 
   const sheetEl = createContactSheet({
     projectCode: code,
