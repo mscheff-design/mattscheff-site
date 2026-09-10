@@ -448,10 +448,20 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
   .project-grid{grid-template-columns:repeat(3,1fr)}
   .cs-frame-grid{grid-template-columns:repeat(3,1fr)}
 }
+/* Hidden by default — only ever shown inside the 599px carousel breakpoint
+   below, where .project-grid actually becomes swipeable. Plain markup
+   order (after .contact-sheet, before the panel closes) rather than a
+   JS-inserted node since, unlike the peek-width edge cue, it's static text
+   with nothing to sync to scroll position. */
+.carousel-hint{display:none}
+
 @media (max-width:599px){
   /* Master grid becomes a one-at-a-time carousel on phones, each project
      sized under 100% so the next one peeks in from the right edge —
      signals there's more to swipe to without extra dot-indicator chrome.
+     The text hint below is a second, more explicit nudge at the same
+     idea — quiet mono caption, same treatment as the rest of the film-strip
+     chrome (.rebate-text etc.), not a callout.
      The actual cause of the earlier "thumbnail moves around inside its
      box" bug: per the CSS Overflow spec, setting only overflow-x (auto)
      and leaving overflow-y at its default (visible) doesn't actually keep
@@ -479,6 +489,7 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
      away with the content. */
   .contact-sheet{position:relative}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
+  .carousel-hint{display:block;margin:10px 0 0;text-align:center;font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-light-rgb),0.35)}
 }
 
 /* Contact section — a plain restatement of the 3D card's own CONTACT/
@@ -558,7 +569,17 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
    (the level 1/2 grids, the filmstrip below); one instance is cheap
    regardless of browser, and this is also the moment a visitor is
    looking closest, where the effect matters most. */
-.lv3-main img{width:100%;height:100%;object-fit:contain;display:block;filter:url(#chromaticAberrationSubtle) grayscale(15%) contrast(1.08) brightness(0.92) saturate(0.9)}
+/* -webkit-user-drag/-touch-callout/user-select resets — same reason as
+   .project-frame .cs-img's own comment above: without them, a swipe that
+   starts on the <img> itself gets captured by iOS Safari's native
+   image-lift/drag/callout handling instead of reaching bindSwipe()'s
+   touchstart/touchend listeners, which is exactly the mobile-only
+   swipe-navigation gesture this stage exists for. No pointer-events:none
+   here (unlike .cs-img) — sheetPanel's click-to-close only matches taps
+   that land on .lv3-main itself (empty space around a letterboxed image),
+   and routing the image's own hit-testing to its parent would make a tap
+   on the visible photo closeViewer() too, which isn't the intent. */
+.lv3-main img{width:100%;height:100%;object-fit:contain;display:block;filter:url(#chromaticAberrationSubtle) grayscale(15%) contrast(1.08) brightness(0.92) saturate(0.9);-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
 
 /* height matches .lv3-main's own (see its comment) — same value in both
    places so the edge previews stay vertically aligned with the main
@@ -567,7 +588,12 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
 .lv3-edge:hover{opacity:0.65}
 .lv3-edge--prev{left:0}
 .lv3-edge--next{right:0}
-.lv3-edge img{width:8vw;height:80vh;object-fit:cover;display:block;filter:grayscale(20%) contrast(1.08) brightness(0.7) saturate(0.85)}
+/* pointer-events:none + the drag/callout/select resets — same pattern as
+   .project-frame .cs-img (see its own comment): the click listener lives
+   on the wrapping #cfEdgePrev/#cfEdgeNext div, not this img, so routing
+   hit-testing to the parent is safe here (unlike .lv3-main img above) and
+   stops iOS from capturing an edge-frame swipe as a native image drag. */
+.lv3-edge img{width:8vw;height:80vh;object-fit:cover;display:block;filter:grayscale(20%) contrast(1.08) brightness(0.7) saturate(0.85);pointer-events:none;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
 .lv3-edge--prev img{object-position:100% 50%}
 .lv3-edge--next img{object-position:0% 50%}
 
@@ -787,6 +813,7 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
     <div class="contact-sheet">
       <div class="project-grid" id="projectGrid"></div>
     </div>
+    <p class="carousel-hint">Swipe to browse</p>
 
     </div>
     </div>
@@ -1730,6 +1757,17 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight') cfNext();
     if (e.key === 'ArrowLeft') cfPrev();
   }
+});
+
+// Light deterrent against casual right-click-save of gallery photos — every
+// <img> on this page (level 1 cover tiles, level 2 contact-sheet frames,
+// level 3 viewer) is covered by one delegated listener rather than wiring
+// each creation site individually. Not real protection (dev tools bypass
+// it instantly, and CSS-side drag/callout/select resets already cover the
+// touch equivalent — see .cs-img and .lv3-main/.lv3-edge img's own
+// comments), just removes the everyday path.
+document.addEventListener('contextmenu', (e) => {
+  if (e.target.tagName === 'IMG') e.preventDefault();
 });
 </script>
 

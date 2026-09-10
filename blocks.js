@@ -34,6 +34,15 @@ function mediaEl(media, { eager = false } = {}) {
     video.autoplay = true;
     if (media.poster) video.poster = media.poster;
     video.dataset.src = media.src;
+    // These tiles never expose native controls (custom hover/tap-to-unmute
+    // instead — see videoTriptychBlock/videoPanelBlock), so there's no
+    // control-bar download button to begin with; set anyway in case a
+    // future block ever turns .controls on. disablePictureInPicture blocks
+    // the other native route to an easy save (PiP's own window can still
+    // be right-clicked/screenshotted, but removes the one-tap version).
+    video.setAttribute('controlsList', 'nodownload');
+    video.disablePictureInPicture = true;
+    video.addEventListener('contextmenu', (e) => e.preventDefault());
     return video;
   }
   if (media.type === 'html') {
@@ -77,6 +86,7 @@ function mediaEl(media, { eager = false } = {}) {
   img.src = media.src;
   img.alt = media.alt || '';
   img.loading = eager ? 'eager' : 'lazy';
+  img.addEventListener('contextmenu', (e) => e.preventDefault());
   return img;
 }
 
@@ -559,6 +569,14 @@ function injectStyles() {
   const style = document.createElement('style');
   style.id = 'case-study-blocks-styles';
   style.textContent = `
+    /* Applies regardless of which block context an image/video/iframe sits
+       in (see mediaEl() in this file, the single factory for all of them) —
+       a light deterrent against casual right-click-save/drag-out of
+       portfolio media. Not real protection (dev tools bypass it instantly),
+       just removes the everyday path. contextmenu is blocked in JS instead
+       of here, since CSS has no equivalent hook. */
+    .cs-media-el{-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
+
     .cs-block{max-width:min(880px, 100% - 96px);margin:0 auto;padding:64px 0}
 
     /* hero */
