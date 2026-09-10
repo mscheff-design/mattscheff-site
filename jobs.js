@@ -21,10 +21,10 @@ export const JOBS = [
   },
   {
     id: 'bernard-figueroa-studio',
-    role: 'Social Media Coordinator & Studio Assistant',
-    name: 'Bernard Figueroa Studio',
+    role: 'Studio Assistant & Digital Manager',
+    name: 'Bernard Figueroa Lights',
     dates: '2025 – Present',
-    tags: ['PHOTOGRAPHY', 'SOCIAL', 'EMAIL'],
+    tags: ['PORTFOLIO WEBSITE', 'DOCUMENTATION', 'FABRICATION'],
     caseStudyUrl: '/case-studies/bernard-figueroa-studio/'
   },
   {

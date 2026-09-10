@@ -1,15 +1,25 @@
-// Case-study block config for Bernard Figueroa Studio.
+// Case-study block config for Bernard Figueroa Lights (folder/id kept as
+// bernard-figueroa-studio to avoid changing the live URL — see jobs.js for
+// the corrected display name).
 //
-// DRAFT PLACEHOLDER COPY — plausible-sounding filler, not the real project
-// story. Swap for real content/images (under
-// /assets/case-studies/bernard-figueroa-studio/) whenever the real
-// material is ready.
+// REAL COPY — user-provided narrative, provided 2026-09-09. It replaces an
+// earlier draft that had guessed at the wrong kind of business entirely
+// (a general photography/social-content studio, not a sculptor and
+// lighting designer) — the old statRow numbers and pull-quote were
+// fabricated placeholder and are gone along with it. Images are still
+// placeholder() SVGs — swap for real assets under
+// /assets/case-studies/bernard-figueroa-studio/ when available.
 //
-// Block order is deliberately different from urban-architecture's (the
-// pull-quote sits between Overview and the Challenge module rather than
-// after it, no dark full-bleed band, gallery captions read as shoot
-// notes) to demonstrate that each case study doesn't have to follow the
-// same template shape.
+// The user's draft included a "NOTES FOR MATT, not for publication"
+// section flagging open questions: the Website section is deliberately
+// short pending platform/design details (it should be the longest section,
+// since the site was the original brief); "bronze and glass" is an
+// assumption from the foundry/glassblower relationships, not a confirmed
+// material range; "gallery liaison" (mentioned once in Overview) could
+// become its own section given which galleries and what the coordination
+// involves; email cadence/list size and specific exhibitions are unstated;
+// and Status currently ends on "ongoing work" rather than a named outcome
+// (placement, commission, or press) — none of that is guessed at here.
 
 function placeholder(label, w = 1200, h = 800, bg = 'd8cfc0', fg = '1c140a') {
   const escapedLabel = String(label).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -26,8 +36,8 @@ export const CASE_STUDY = {
     {
       type: 'hero',
       props: {
-        summary: 'Bernard Figueroa Studio needed a photography and content system that could keep pace with a weekly social and email cadence, not a shoot every few months. Since 2025 we’ve run their photography direction, social content, and email program as one connected pipeline.',
-        media: { type: 'image', src: placeholder('HERO IMAGE — 1600x900', 1600, 900), alt: 'Bernard Figueroa Studio hero placeholder' }
+        summary: 'Digital presence and studio support for a sculptor and lighting designer working between New Jersey and France.',
+        media: { type: 'image', src: placeholder('HERO IMAGE — 1600x900', 1600, 900), alt: 'Bernard Figueroa Lights hero placeholder' }
       }
     },
     {
@@ -36,86 +46,131 @@ export const CASE_STUDY = {
         heading: 'At a glance',
         caseId: 'BFS — 02',
         items: [
-          { label: 'Client', value: 'Bernard Figueroa Studio' },
-          { label: 'Role', value: 'Social Media Coordinator & Studio Assistant' },
-          { label: 'Engagement', value: '2025–Present' }
+          { label: 'Client', value: 'Bernard Figueroa Lights' },
+          { label: 'Role', value: 'Studio Assistant & Digital Manager' }
         ],
-        scope: 'Photography direction · Social content · Email program'
+        scope: 'Portfolio website, short-form video, photography and documentation, archive management, spec sheets, fabrication coordination, email, and social media.'
       }
     },
     {
-      type: 'module',
+      type: 'text',
       props: {
         heading: 'Overview',
         chapter: true,
         chapterLabel: 'Overview',
-        lede: 'A weekly social and email cadence needed photography that could actually keep up with it — not a shoot every few months.',
-        bullets: [
-          'Campaigns were leaning on stock imagery or shots months past their moment.',
-          'Since 2025, photography direction, social content, and the email program run as one connected pipeline.',
-          'Every shoot is planned to serve both channels from day one, not repurposed after the fact.'
+        body: [
+          'Bernard Figueroa designs and produces sculptural lighting in bronze, glass, and mixed materials. The studio operates across two locations, New Jersey and Montpellier, and the work is made in collaboration with foundries and artisan glassblowers rather than in volume production.',
+          'I was hired to develop the portfolio website. The role expanded into studio assistant, content producer, and gallery liaison as it became clear that the site depended on material the studio did not yet have in an organized form.',
+          'The work is sold to collectors, decorators, and design professionals who are buying a hand-made object. Everything produced for the studio has to reflect that, and has to fit around a production schedule set by material and fabrication rather than by a content calendar.'
         ]
       }
     },
     {
-      type: 'quote',
+      type: 'text',
       props: {
-        text: 'Every email and post finally looks like it came from the same studio. That wasn’t true before.',
-        attribution: 'STUDIO MANAGER, BERNARD FIGUEROA STUDIO'
-      }
-    },
-    {
-      type: 'module',
-      props: {
-        heading: 'The challenge',
+        heading: 'Website',
         chapter: true,
-        chapterLabel: 'Challenge',
-        lede: 'Social and email were run separately from the studio’s own photography — and it showed.',
-        bullets: [
-          'Campaigns leaned on stock imagery or shots months past their moment.',
-          'No shot list, no consistent color grade.',
-          'Email design changed voice with every send.'
+        chapterLabel: 'Website',
+        body: [
+          'The portfolio site presents the work by piece, with images, materials, and specifications. I manage the site and its content, adding new work as it is completed and documented.'
         ]
       }
     },
     {
-      type: 'statRow',
+      type: 'text',
       props: {
-        stats: [
-          { value: '2.1x', label: 'EMAIL OPEN RATE' },
-          { value: '5.8x', label: 'SOCIAL ENGAGEMENT' },
-          { value: 'WEEKLY', label: 'SHOOT CADENCE' }
+        heading: 'Documentation',
+        chapter: true,
+        chapterLabel: 'Documentation',
+        body: [
+          'I photograph incoming materials, work in progress, and finished pieces, producing edited assets for the website, social media, email, and the studio archive.',
+          'Lighting is documented twice. Once as an object, lit so form, material, and finish read clearly. Once as a light source, exposed for what the piece does to the space around it. Buyers need both, and neither image is sufficient alone.',
+          'Capture is continuous and publication is selective. Documentation is folded into days the studio is already working, which keeps the public presence regular without asking Bernard to produce anything for it.'
         ]
       }
     },
     {
       type: 'fullBleedMedia',
       props: {
-        media: { type: 'image', src: placeholder('SHOOT DAY — 1920x1080', 1920, 1080) },
-        caption: 'A single day’s shoot, styled and shot to run across email, social, and the studio’s own site.'
+        media: { type: 'image', src: placeholder('LIGHTING DOCUMENTATION — OBJECT + LIGHT SOURCE, 1920x1080', 1920, 1080) },
+        caption: 'Each piece documented twice — once as an object, once as the light it produces.'
       }
     },
     {
-      type: 'module',
+      type: 'text',
       props: {
-        heading: 'The approach',
+        heading: 'Archive',
         chapter: true,
-        chapterLabel: 'Approach',
-        lede: 'A repeatable shoot framework, built once and reused every week.',
-        bullets: [
-          'Same lighting setup, same color grade, same shot-list structure — planned once, cut for email, social, and print.',
-          'Email templates and social formats redesigned around that same visual system.'
-        ],
-        closing: 'A send and a post finally read as the same studio.'
+        chapterLabel: 'Archive',
+        body: [
+          'I maintain the studio archive across both locations. Image assets, production documentation, and the record of each piece are held in one structure, so material photographed in France and material photographed in New Jersey are filed the same way.',
+          'The archive supports the website, sales materials, and gallery submissions, and serves as the studio’s permanent record of the work.'
+        ]
+      }
+    },
+    {
+      type: 'text',
+      props: {
+        heading: 'Video',
+        chapter: true,
+        chapterLabel: 'Video',
+        body: [
+          'Short-form video is the studio’s primary social content. I develop, shoot, and edit it, working directly with Bernard to build a production style around his practice. The emphasis is on process, material, and the making itself.'
+        ]
+      }
+    },
+    {
+      type: 'text',
+      props: {
+        heading: 'Production',
+        chapter: true,
+        chapterLabel: 'Production',
+        body: [
+          'I represent the studio in procurement and fabrication relationships with bronze foundries and artisan glassblowers, communicating specifications, tracking lead times, and following up on deliveries. I also coordinate material sourcing and production timelines between the two locations.',
+          'The work is conducted in English and French depending on the vendor.'
+        ]
+      }
+    },
+    {
+      type: 'text',
+      props: {
+        heading: 'Sales materials',
+        chapter: true,
+        chapterLabel: 'Sales materials',
+        body: [
+          'I design spec sheets for prospective buyers, covering dimensions, materials, finishes, and editions, with the images needed to support a purchase decision. These are the documents a decorator forwards to a client, so they have to hold up on their own.'
+        ]
+      }
+    },
+    {
+      type: 'text',
+      props: {
+        heading: 'Email and social',
+        chapter: true,
+        chapterLabel: 'Email & social',
+        body: [
+          'Mailchimp campaigns go to a list of collectors, decorators, and design professionals, covering new work, studio activity, and exhibitions. Instagram is fed from the ongoing documentation, so the feed reads as a record of a studio at work.'
+        ]
+      }
+    },
+    {
+      type: 'text',
+      props: {
+        heading: 'Status',
+        chapter: true,
+        chapterLabel: 'Status',
+        body: [
+          'The website is live and maintained. Documentation and archiving are ongoing across both locations, video is in regular production, and email and social run from the same body of material.'
+        ]
       }
     },
     {
       type: 'gallery',
       props: {
         images: [
-          { src: placeholder('SHOOT DAY', 600, 600), alt: 'Shoot day' },
-          { src: placeholder('EMAIL TEMPLATE', 600, 600), alt: 'Email template' },
-          { src: placeholder('SOCIAL GRID', 600, 600), alt: 'Social grid' }
+          { src: placeholder('PORTFOLIO SITE — PIECE DETAIL', 600, 600), alt: 'Portfolio site piece detail page' },
+          { src: placeholder('SPEC SHEET', 600, 600), alt: 'Spec sheet for a finished piece' },
+          { src: placeholder('STUDIO ARCHIVE', 600, 600), alt: 'Studio archive structure' }
         ]
       }
     },
