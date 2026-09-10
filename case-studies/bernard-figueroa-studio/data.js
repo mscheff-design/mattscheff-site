@@ -6,9 +6,7 @@
 // earlier draft that had guessed at the wrong kind of business entirely
 // (a general photography/social-content studio, not a sculptor and
 // lighting designer) — the old statRow numbers and pull-quote were
-// fabricated placeholder and are gone along with it. Images are still
-// placeholder() SVGs — swap for real assets under
-// /assets/case-studies/bernard-figueroa-studio/ when available.
+// fabricated placeholder and are gone along with it.
 //
 // The user's draft included a "NOTES FOR MATT, not for publication"
 // section flagging open questions: the Website section is deliberately
@@ -22,15 +20,6 @@
 // than a named outcome) was removed 2026-09-10 per request, along with
 // the placeholder lighting-documentation image, and Production/Sales
 // materials/Email and social were condensed into one combined section.
-
-function placeholder(label, w = 1200, h = 800, bg = 'd8cfc0', fg = '1c140a') {
-  const escapedLabel = String(label).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'>
-    <rect width='100%' height='100%' fill='#${bg}'/>
-    <text x='50%' y='50%' font-family='monospace' font-size='20' fill='#${fg}' fill-opacity='0.5' text-anchor='middle' dominant-baseline='middle'>${escapedLabel}</text>
-  </svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
 
 export const CASE_STUDY = {
   id: 'bernard-figueroa-studio',
@@ -122,6 +111,16 @@ export const CASE_STUDY = {
       }
     },
     {
+      type: 'videoTriptych',
+      props: {
+        videos: [
+          { src: '/assets/case-studies/bernard-figueroa-studio/video/lapse.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/lapse-poster.webp' },
+          { src: '/assets/case-studies/bernard-figueroa-studio/video/old.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/old-poster.webp' },
+          { src: '/assets/case-studies/bernard-figueroa-studio/video/quick.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/quick-poster.webp' }
+        ]
+      }
+    },
+    {
       type: 'text',
       props: {
         heading: 'Production, sales & outreach',
@@ -130,16 +129,6 @@ export const CASE_STUDY = {
         body: [
           'I represent the studio in procurement and fabrication relationships with bronze foundries and artisan glassblowers — communicating specifications, tracking lead times, and coordinating material sourcing and production timelines between the two locations, in English or French depending on the vendor.',
           'I also design spec sheets for prospective buyers, and run the studio’s email and social channels: Mailchimp campaigns to a list of collectors, decorators, and press, and an Instagram feed drawn from the ongoing documentation.'
-        ]
-      }
-    },
-    {
-      type: 'gallery',
-      props: {
-        images: [
-          { src: placeholder('PORTFOLIO SITE — PIECE DETAIL', 600, 600), alt: 'Portfolio site piece detail page' },
-          { src: placeholder('SPEC SHEET', 600, 600), alt: 'Spec sheet for a finished piece' },
-          { src: placeholder('STUDIO ARCHIVE', 600, 600), alt: 'Studio archive structure' }
         ]
       }
     },
