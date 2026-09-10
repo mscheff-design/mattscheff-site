@@ -91,6 +91,19 @@ nav::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1
 .radio-volume::-webkit-slider-thumb{-webkit-appearance:none;width:7px;height:7px;border-radius:50%;background:rgba(var(--ink-rgb),0.5);cursor:pointer}
 .radio-volume::-moz-range-thumb{width:7px;height:7px;border:none;border-radius:50%;background:rgba(var(--ink-rgb),0.5);cursor:pointer}
 @media (max-width:640px){.radio-now,.radio-volume{display:none}}
+/* Below 599px there isn't room for both the full radio widget (icon +
+   visualizer + station name) and all four nav links without clipping —
+   CONTACT was getting pushed off the right edge of the viewport. Rather
+   than a hamburger menu (which would hide the links behind an extra tap),
+   the radio widget collapses to just its play/pause icon — still fully
+   functional, just without the visualizer/station-name chrome — and nav's
+   own padding/link gap tighten up to match. Station switching stays a
+   desktop-only affordance; reachable via the full widget there. */
+@media (max-width:599px){
+  nav{padding:16px 20px}
+  .nav-links{gap:16px}
+  .radio-viz,.radio-station{display:none}
+}
 
 /* nav.is-on-dark — toggled by JS below whenever the Photography section is
    currently underneath the fixed nav; swaps nav text/icons from the normal
