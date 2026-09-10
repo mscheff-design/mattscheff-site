@@ -163,7 +163,13 @@
  *                   key-handling hierarchy.
  */
 
-const CONTACT_ENDPOINT = '/api/contact';
+// Web3Forms: a form-backend service built specifically to be called
+// directly from client-side JS like this — the access key is meant to be
+// public (it identifies where submissions get emailed, it isn't a secret),
+// which is what makes it workable here: this is a static site with no
+// server of its own to keep a real API key on.
+const CONTACT_ENDPOINT = 'https://api.web3forms.com/submit';
+const WEB3FORMS_ACCESS_KEY = '2ef65b32-f53e-45f8-93b5-e717b0a673aa';
 
 export function initContactForm(opts) {
   const {
@@ -271,22 +277,26 @@ export function initContactForm(opts) {
     try {
       const res = await fetch(CONTACT_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({
+          access_key: WEB3FORMS_ACCESS_KEY,
+          subject: 'New message from mattscheff.com',
           name: els.name.value.trim(),
           email: els.email.value.trim(),
           message: els.message.value.trim()
         })
       });
 
-      if (!res.ok) {
-        let message = 'Something went wrong sending that.';
-        try {
-          const data = await res.json();
-          if (data && data.message) message = data.message;
-        } catch (_) { /* non-JSON error body — keep the default message */ }
+      // Web3Forms' own success flag, not just res.ok — it can return a
+      // non-2xx with a JSON body explaining why (a bad/missing access key,
+      // a field it rejected), and that explanation is worth surfacing
+      // instead of the generic fallback message.
+      let data = null;
+      try { data = await res.json(); } catch (_) { /* non-JSON body */ }
+
+      if (!res.ok || !data || !data.success) {
         state = 'error';
-        setState('error', message);
+        setState('error', (data && data.message) || 'Something went wrong sending that.');
         return;
       }
 
