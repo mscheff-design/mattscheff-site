@@ -339,15 +339,16 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .grease-mark--hover{transition:opacity 0.18s ease}
 .project-tile:hover .grease-mark--hover{opacity:1}
 .cs-frame-cell:hover .grease-mark--hover{opacity:1}
-/* Touch has no hover to reveal this with at all — rather than losing the
-   motif on mobile entirely, the mark on each project tile (assigned up
-   front instead of on mouseenter; see the tile-creation loop in
-   initLevel1()) is just always on there. Sizing stays the shared
-   -15%/130% overscan above — percentage-based, so it already scales with
-   .project-tile's own actual size, the bigger mobile carousel tile
-   included, with no override needed. */
-@media (pointer:coarse){
-  .project-tile .grease-mark--hover{opacity:1}
+/* Mobile has no per-tile hover to reveal these with, and swiping through
+   5 individually-marked tiles read as noisy anyway — one mark for the
+   whole carousel box instead keeps the motif present without it
+   following every tile. Hidden by default; the @media(max-width:599px)
+   rule above turns it on, sized to overscan .contact-sheet the same way
+   .grease-mark overscans a project-tile. */
+.carousel-grease-mark{display:none;position:absolute;inset:-8%;width:116%;height:116%;pointer-events:none;z-index:25;overflow:visible}
+.carousel-grease-mark image{overflow:visible}
+@media (max-width:599px){
+  .carousel-grease-mark{display:block}
 }
 
 /* level 2 — cursor-following glass loupe, see loupe.js */
@@ -467,6 +468,13 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
      a lot of dead black space above/below it in the section; a taller
      frame at a wider tile width fills more of that. */
   .project-frame{aspect-ratio:2/3}
+  /* One grease mark framing the whole carousel box, not one per tile (see
+     .carousel-grease-mark below and its insertion in initLevel1()) —
+     .contact-sheet is the static frame around #projectGrid's own
+     overflow-x:auto scroller, so anchoring the mark here keeps it in
+     place as the user swipes tiles underneath it rather than scrolling
+     away with the content. */
+  .contact-sheet{position:relative}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
 }
 
@@ -1012,6 +1020,14 @@ function greaseMarkSVG(modifierClass) {
   `;
 }
 
+function carouselGreaseMarkSVG(href) {
+  return `
+    <svg class="carousel-grease-mark" overflow="visible">
+      <image href="${href}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="xMidYMid meet"/>
+    </svg>
+  `;
+}
+
 const LEVEL2_GREASE_MARK = 'assets/level-2-grease-mark.svg';
 function level2GreaseMarkSVG() {
   return `
@@ -1149,19 +1165,9 @@ const projectTiles = new Map();
   tile.appendChild(frame);
   tile.insertAdjacentHTML('beforeend', greaseMarkSVG('grease-mark--hover'));
   const markImage = tile.querySelector('.grease-mark image');
-  if (isTouchDevice) {
-    // Touch has no hover to reveal the mark with at all, which meant the
-    // desktop-only grease-mark motif — one of the site's more distinctive
-    // recurring details — never showed up on mobile. Assigning it up
-    // front (rather than waiting for a mouseenter that will never fire)
-    // and forcing it visible via the @media(pointer:coarse) rule above
-    // makes it a static, permanent mark instead of a hover reveal.
+  tile.addEventListener('mouseenter', () => {
     markImage.setAttribute('href', assignedGreaseMark(projectIdx));
-  } else {
-    tile.addEventListener('mouseenter', () => {
-      markImage.setAttribute('href', assignedGreaseMark(projectIdx));
-    });
-  }
+  });
   tile.addEventListener('click', () => handleTileActivate(project.id, tile));
   tile.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTileActivate(project.id, tile); }
@@ -1198,6 +1204,14 @@ const projectTiles = new Map();
     }, 2400);
   }
   });
+
+  // One random mark framing the whole mobile carousel box (CSS keeps it
+  // hidden above 599px) — see .carousel-grease-mark and the .contact-sheet
+  // it's anchored to.
+  const contactSheet = document.querySelector('.contact-sheet');
+  if (contactSheet) {
+    contactSheet.insertAdjacentHTML('beforeend', carouselGreaseMarkSVG(nextGreaseMark()));
+  }
 })();
 
 /* ---------- selected work: rows generated from JOBS (shared with the
