@@ -294,7 +294,7 @@ const CONTACT = {
 // address is already shown above and the edge-drag swipe already sends one
 const SOCIAL_LINKS = [
   { icon: 'instagram', handle: '@matt_scheff', href: 'https://instagram.com/matt_scheff' },
-  { icon: 'linkedin', handle: 'mattscheffler', href: 'https://linkedin.com/mattscheffler' }
+  { icon: 'linkedin', handle: 'mattscheffler', href: 'https://www.linkedin.com/in/mattscheffler/' }
 ];
 
 const RESUME_PDF_PATH = 'assets/matthew-scheffler-resume.pdf';

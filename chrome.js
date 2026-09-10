@@ -37,7 +37,7 @@ export function renderSiteFooter(mountEl) {
       <span class="footer-left">© 2026 Matthew Scheffler</span>
       <div class="footer-links">
         <a href="https://instagram.com/matt_scheff" target="_blank">Instagram</a>
-        <a href="https://linkedin.com/mattscheffler" target="_blank">LinkedIn</a>
+        <a href="https://www.linkedin.com/in/mattscheffler/" target="_blank">LinkedIn</a>
         <a href="mailto:hello@mattscheff.com">Email</a>
       </div>
     </footer>
