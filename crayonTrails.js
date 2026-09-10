@@ -2,7 +2,7 @@
 // Separate from the `fine`/`motion` media queries checked per-instance
 // below — those gate the INTERACTIVE hover-drawing feature (which
 // genuinely doesn't apply on touch), whereas this gates the one-time
-// procedural flourish (see drawProceduralFlourish) that exists BECAUSE
+// authored doodle that exists BECAUSE
 // touch has no hover to draw with. Same (pointer: coarse) convention
 // card.js/blocks.js already use elsewhere in this codebase.
 const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
@@ -29,76 +29,24 @@ export function opacityAt(age, hold, fade) {
   return age <= hold ? 1 : Math.max(0, 1 - (age-hold)/fade);
 }
 
-// Ghost-only geometry, in the same CSS-pixel coordinates as its stamps.
-// A small inset makes travel along an exclusion edge legal while still
-// rejecting segments that cut across a corner. No stamps are discarded.
-function ghostSegmentHitsRect(a, b, rect) {
-  if (!rect) return false;
-  let enter = 0, leave = 1;
-  for (const [axis, low, high] of [['x', rect.left + 0.001, rect.right - 0.001], ['y', rect.top + 0.001, rect.bottom - 0.001]]) {
-    if (low >= high) return false;
-    const delta = b[axis] - a[axis];
-    if (Math.abs(delta) < 1e-9) {
-      if (a[axis] < low || a[axis] > high) return false;
-    } else {
-      const t0 = (low - a[axis]) / delta, t1 = (high - a[axis]) / delta;
-      enter = Math.max(enter, Math.min(t0, t1));
-      leave = Math.min(leave, Math.max(t0, t1));
-      if (enter > leave) return false;
-    }
-  }
-  return enter <= leave;
-}
-
-function ghostSafePoint(point, area, obstacle) {
-  const p = { x: Math.max(area.left, Math.min(area.right, point.x)), y: Math.max(area.top, Math.min(area.bottom, point.y)) };
-  if (!obstacle || !ghostSegmentHitsRect(p, p, obstacle)) return p;
-  const exits = [
-    { x: obstacle.left, y: p.y }, { x: obstacle.right, y: p.y },
-    { x: p.x, y: obstacle.top }, { x: p.x, y: obstacle.bottom }
-  ].filter(q => q.x >= area.left && q.x <= area.right && q.y >= area.top && q.y <= area.bottom);
-  exits.sort((a, b) => Math.hypot(a.x-p.x, a.y-p.y) - Math.hypot(b.x-p.x, b.y-p.y));
-  return exits[0] || null; // A fully covered surface has nowhere to draw.
-}
-
-function ghostRouteSegment(from, target, area, obstacle) {
-  const start = ghostSafePoint(from, area, obstacle);
-  const end = ghostSafePoint(target, area, obstacle);
-  if (!start || !end) return [];
-  // If a resize/tab expansion covers the current pen, leave continuously
-  // through the nearest available edge, rather than teleporting the pen.
-  const prefix = [from];
-  if (start.x !== from.x || start.y !== from.y) prefix.push(start);
-  if (!ghostSegmentHitsRect(start, end, obstacle)) return [...prefix, end];
-  const corners = [
-    { x: obstacle.left, y: obstacle.top }, { x: obstacle.right, y: obstacle.top },
-    { x: obstacle.right, y: obstacle.bottom }, { x: obstacle.left, y: obstacle.bottom }
-  ].filter(p => p.x >= area.left && p.x <= area.right && p.y >= area.top && p.y <= area.bottom);
-  // At most six nodes. Find the shortest continuous route around the box;
-  // normal loops take the direct fast path above and retain their shape.
-  const nodes = [start, end, ...corners];
-  const distances = nodes.map(() => Infinity), parents = nodes.map(() => -1), done = new Set();
-  distances[0] = 0;
-  for (let step = 0; step < nodes.length; step++) {
-    let current = -1;
-    for (let i = 0; i < nodes.length; i++) {
-      if (!done.has(i) && (current < 0 || distances[i] < distances[current])) current = i;
-    }
-    if (current < 0 || !Number.isFinite(distances[current])) break;
-    if (current === 1) {
-      const route = [];
-      for (let i = 1; i !== 0; i = parents[i]) route.unshift(nodes[i]);
-      return [...prefix, ...route];
-    }
-    done.add(current);
-    for (let i = 0; i < nodes.length; i++) {
-      if (done.has(i) || ghostSegmentHitsRect(nodes[current], nodes[i], obstacle)) continue;
-      const next = distances[current] + Math.hypot(nodes[i].x-nodes[current].x, nodes[i].y-nodes[current].y);
-      if (next < distances[i]) { distances[i] = next; parents[i] = current; }
-    }
-  }
-  return prefix; // No visible corridor: stay on this side of the card.
-}
+// A single authored gesture, in a unit square whose middle half is the
+// card. Broad sweeps and three unequal loops; open at both ends. Control
+// points adapt to the available margins, not to a random walk.
+const MOBILE_DOODLE_START = [0.56, 0.13];
+const MOBILE_DOODLE_CURVES = [
+  [0.46,0.11, 0.25,0.13, 0.22,0.14],
+  [0.14,0.16, 0.29,0.04, 0.32,0.12],
+  [0.35,0.21, 0.18,0.18, 0.17,0.28],
+  [0.08,0.38, 0.23,0.40, 0.16,0.51],
+  [0.22,0.62, 0.07,0.70, 0.17,0.82],
+  [0.32,0.96, 0.42,0.80, 0.25,0.81],
+  [0.09,0.81, 0.28,0.96, 0.34,0.90],
+  [0.39,0.79, 0.40,0.98, 0.48,0.92],
+  [0.60,0.83, 0.73,0.80, 0.80,0.83],
+  [0.95,0.90, 0.65,0.97, 0.73,0.86],
+  [0.83,0.77, 0.94,0.66, 0.86,0.54],
+  [0.78,0.42, 0.94,0.39, 0.85,0.29]
+];
 
 export function mountCrayonTrails(hero, {
   surface = hero, toggle = null, color = null, seed = Math.floor(Math.random()*4294967295),
@@ -121,6 +69,10 @@ export function mountCrayonTrails(hero, {
   let width = 1, height = 1, dpr = 1, raf = 0, fadeTimer = 0;
   let previous = null, smooth = null, traveled = 0, phase = 0, smoothAngle = null;
   let stamps = [], density = new Map();
+  const doodle = isTouchDevice ? {
+    path: null, emitted: 0, progress: 0, elapsed: 0, lastTime: null,
+    frame: 0, complete: false, dismissed: false, measuredWidth: 0
+  } : null;
   const brushes = Array.from({length: 7}, () => {
     const brush = document.createElement('canvas'); brush.width = brush.height = 64;
     const ink = brush.getContext('2d');
@@ -155,8 +107,8 @@ export function mountCrayonTrails(hero, {
     toggle.setAttribute('aria-label', `Crayon trails ${enabled ? 'on' : 'off'}`);
     toggle.style.setProperty('--crayon-color', chosenColor);
   }
-  function cancelWork() { cancelAnimationFrame(raf); clearTimeout(fadeTimer); raf=0; fadeTimer=0; }
-  function clear() { stamps=[]; density.clear(); breakStroke(); cancelWork(); ctx.clearRect(0,0,width,height); }
+  function cancelWork() { cancelAnimationFrame(raf); clearTimeout(fadeTimer); raf=0; fadeTimer=0; stopDoodle(); }
+  function clear() { if (doodle) doodle.dismissed=true; stamps=[]; density.clear(); breakStroke(); cancelWork(); ctx.clearRect(0,0,width,height); }
   function setEnabled(value) {
     enabled=Boolean(value); breakStroke(); if (!enabled) clear(); updateToggle();
   }
@@ -169,10 +121,10 @@ export function mountCrayonTrails(hero, {
     raf=0;
     const now=performance.now();
     const life=(cfg.holdSeconds+cfg.fadeSeconds)*1000;
-    stamps=stamps.filter(s=>now-s.time<life);
+    stamps=stamps.filter(s=>s.persistent || now-s.time<life);
     ctx.clearRect(0,0,width,height);
     for (const s of stamps) {
-      const fade=opacityAt((now-s.time)/1000,cfg.holdSeconds,cfg.fadeSeconds);
+      const fade=s.persistent ? 1 : opacityAt((now-s.time)/1000,cfg.holdSeconds,cfg.fadeSeconds);
       ctx.globalAlpha=s.alpha*fade;
       // Absolute CSS px, not a fraction of width/height — a stamp's
       // position stays put if the canvas later resizes (e.g. the backdrop
@@ -187,7 +139,7 @@ export function mountCrayonTrails(hero, {
       ctx.globalCompositeOperation='destination-out';ctx.fillStyle=toothPattern;
       ctx.fillRect(0,0,width,height);ctx.globalCompositeOperation='source-over';
     }
-    if (stamps.length && visible && !document.hidden) fadeTimer=setTimeout(schedule,150);
+    if (stamps.some(s=>!s.persistent) && visible && !document.hidden) fadeTimer=setTimeout(schedule,150);
   }
   function resize() {
     const nextWidth=surface.clientWidth, nextHeight=surface.clientHeight;
@@ -218,7 +170,12 @@ export function mountCrayonTrails(hero, {
     canvas.style.height=height+'px';
     ctx.setTransform(dpr,0,0,dpr,0,0);
     breakStroke();
+    // Height-only changes (resume reveal / browser chrome) leave the ink
+    // on the paper. A changed width reflows the same gesture immediately,
+    // preserving reveal progress; it never plays the entrance again.
+    if (doodle && !doodle.dismissed && (!doodle.path || doodle.measuredWidth !== width)) composeDoodle();
     paint();
+    wakeDoodle();
   }
   function move(event) {
     if (!enabled || !visible || paused || document.hidden || event.pointerType==='touch' || event.buttons || isBusy()) {breakStroke();return;}
@@ -324,8 +281,11 @@ export function mountCrayonTrails(hero, {
     schedule();
   }
   const toggleClick=()=>setEnabled(!enabled);
-  const preferences=()=>{setEnabled(fine.matches&&!motion.matches);};
-  const visibility=()=>{breakStroke();if(document.hidden)cancelWork();else schedule();};
+  const preferences=()=>{
+    if (doodle) { if (motion.matches) finishDoodle(); else wakeDoodle(); }
+    else setEnabled(fine.matches&&!motion.matches);
+  };
+  const visibility=()=>{breakStroke();if(document.hidden)cancelWork();else {schedule();wakeDoodle();}};
   const scroll=()=>breakStroke();
   // window/documentElement, not hero — nav is a DOM SIBLING of hero, not a
   // descendant, so a listener on hero itself never sees pointer events
@@ -343,222 +303,133 @@ export function mountCrayonTrails(hero, {
   motion.addEventListener('change',preferences); fine.addEventListener('change',preferences);
   toggle?.addEventListener('click',toggleClick);
   const sizeObserver=new ResizeObserver(resize); sizeObserver.observe(surface);
-  const intersection=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible)schedule();else{cancelWork();breakStroke();}});
+  const intersection=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible){schedule();wakeDoodle();}else{cancelWork();breakStroke();}});
   intersection.observe(hero);
   resize();updateToggle();
-  // Touch has no hover to draw the interactive marks with at all (see
-  // `enabled`'s own fine/motion check above), so instead of nothing, a
-  // procedural "ghost hand" keeps doodling on its own — a generated
-  // curve, not a recorded gesture, fed through the exact same stamp/
-  // paint/hold-fade pipeline real strokes use, so it reads as the same
-  // kind of mark, not a different visual system. Ongoing, not one-time:
-  // it keeps adding new loops for as long as the hero is visible, at a
-  // slow, unhurried pace, while the EXISTING hold/fade lifecycle
-  // (cfg.holdSeconds/fadeSeconds — unchanged, the same ones a real
-  // continuous stroke ages out on) fades the oldest part of the trail as
-  // new parts get drawn — the same bounded "how much is visible at once"
-  // desktop's own interactive marks already have for a long continuous
-  // doodle, rather than one flourish that draws in once and then sits
-  // there statically. Deliberately independent of the `enabled` toggle
-  // above (that's about a mouse user turning the interactive feature
-  // off — there's nothing here for a touch visitor to have "drawn" to
-  // begin with). Still respects prefers-reduced-motion.
-  if (isTouchDevice && !motion.matches) requestAnimationFrame(startGhostDoodle);
+  // Draw once on first visibility, then stop all doodle scheduling. The
+  // persistent stamps share the desktop brush but not its fade lifecycle.
+  wakeDoodle();
 
-  function startGhostDoodle() {
-    if (disposed) return;
-    const spacing = Math.max(1.4, cfg.width * 0.1);
-    // How fast the virtual pen moves, in px/sec — unhurried, but with
-    // enough pace that the doodle visibly progresses rather than crawling.
-    const drawSpeedPxPerSec = 34;
-    let px = width * (0.2 + random() * 0.6);
-    let py = (surface.clientHeight || height) * (0.2 + random() * 0.6);
-    let angle = random() * Math.PI * 2;
-    let queue = [];
-    let stampBudget = 0;
-    let lastTime = performance.now();
-    let lastDrawn = null;
-    let environment = null;
-    let wanderTarget = null;
-
-    function readEnvironment() {
-      const surfaceRect = surface.getBoundingClientRect();
-      const visibleH = surface.clientHeight || height;
-      const nib = cfg.width * 0.6;
-      const area = { left: nib, top: nib, right: Math.max(nib, width - nib), bottom: Math.max(nib, visibleH - nib) };
-      const screen = getCardScreenRect();
-      let obstacle = null;
-      if (screen && surfaceRect.width > 0 && surfaceRect.height > 0) {
-        const sx = width / surfaceRect.width, sy = visibleH / surfaceRect.height;
-        // Extra clearance keeps the wax edge visible and gives gentle idle
-        // motion some room. Both rectangles use viewport coordinates, so
-        // subtracting them also handles scrolling and the sibling backdrop.
-        const clearance = nib + 10;
-        obstacle = {
-          left: (screen.left - surfaceRect.left) * sx - clearance,
-          right: (screen.right - surfaceRect.left) * sx + clearance,
-          top: (screen.top - surfaceRect.top) * sy - clearance,
-          bottom: (screen.bottom - surfaceRect.top) * sy + clearance
-        };
-        if (!Object.values(obstacle).every(Number.isFinite) || obstacle.right < area.left || obstacle.left > area.right || obstacle.bottom < area.top || obstacle.top > area.bottom) obstacle = null;
+  function composeDoodle() {
+    if (!doodle || doodle.dismissed) return false;
+    const rect = surface.getBoundingClientRect();
+    const card = getCardScreenRect();
+    const visibleH = surface.clientHeight || height;
+    if (!card || !rect.width || !rect.height || !width || !visibleH) return false;
+    const sx = width / rect.width, sy = visibleH / rect.height;
+    const inkInset = cfg.width * 0.5 + 2;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const left = clamp((card.left-rect.left)*sx - inkInset, inkInset, width-inkInset);
+    const right = clamp((card.right-rect.left)*sx + inkInset, left, width-inkInset);
+    const top = clamp((card.top-rect.top)*sy - inkInset, inkInset, visibleH-inkInset);
+    const bottom = clamp((card.bottom-rect.top)*sy + inkInset, top, visibleH-inkInset);
+    const mapAxis = (v, a, b, extent) => v < 0.25
+      ? inkInset + (a-inkInset)*v/0.25
+      : v > 0.75 ? b + (extent-inkInset-b)*(v-0.75)/0.25
+      : a + (b-a)*(v-0.25)/0.5;
+    const map = (x,y) => ({ x: mapAxis(x,left,right,width), y: mapAxis(y,top,bottom,visibleH) });
+    let previous = map(...MOBILE_DOODLE_START);
+    const raw = [previous];
+    for (const curve of MOBILE_DOODLE_CURVES) {
+      const a=previous, b=map(curve[0],curve[1]), c=map(curve[2],curve[3]), d=map(curve[4],curve[5]);
+      const length = Math.hypot(b.x-a.x,b.y-a.y)+Math.hypot(c.x-b.x,c.y-b.y)+Math.hypot(d.x-c.x,d.y-c.y);
+      const steps = Math.max(20, Math.ceil(length/4));
+      for (let i=1; i<=steps; i++) {
+        const t=i/steps, u=1-t;
+        raw.push({ x:u*u*u*a.x+3*u*u*t*b.x+3*u*t*t*c.x+t*t*t*d.x,
+          y:u*u*u*a.y+3*u*u*t*b.y+3*u*t*t*c.y+t*t*t*d.y });
       }
-      return { area, obstacle, visibleH };
+      previous=d;
     }
-
-    function refreshEnvironment() {
-      const next = readEnvironment();
-      if (!environment) {
-        // Choose an initial visible position once. Later changes continue
-        // from the last emitted stamp, not the unconsumed queue's endpoint.
-        const initial = ghostSafePoint({ x: px, y: py }, next.area, next.obstacle);
-        if (initial) { px = initial.x; py = initial.y; }
-      } else {
-        const sizeChanged = next.area.right !== environment.area.right || next.area.bottom !== environment.area.bottom;
-        // Plan with ten pixels of breathing room, but replan only when
-        // queued travel threatens the brush clearance itself. Rebuilding
-        // on every small bounds change would interrupt loops during the
-        // card's normal idle breathing/tilt.
-        const guard = next.obstacle && {
-          left: next.obstacle.left + 8, right: next.obstacle.right - 8,
-          top: next.obstacle.top + 8, bottom: next.obstacle.bottom - 8
-        };
-        let previousPoint = lastDrawn;
-        const threatened = guard && queue.some(p => {
-          const crosses = ghostSegmentHitsRect(previousPoint || p, p, guard);
-          previousPoint = p;
-          return crosses;
-        });
-        if (sizeChanged || threatened) {
-          queue = [];
-          wanderTarget = null;
-          if (lastDrawn) { px = lastDrawn.x; py = lastDrawn.y; angle = lastDrawn.angle; }
-        }
+    // Resample by distance, carrying the leftover between segments. Never
+    // stamp just the segment endpoints (the earlier disconnected-dot bug).
+    const path=[], spacing=Math.max(1.4,cfg.width*0.085);
+    const textureRandom=makeRandom(0x5c71bb1e);
+    let distanceToNext=0, travelled=0;
+    for (let i=1;i<raw.length;i++) {
+      const a=raw[i-1], b=raw[i], length=Math.hypot(b.x-a.x,b.y-a.y);
+      if (length<0.0001) continue;
+      let along=distanceToNext;
+      while (along<=length) {
+        const t=along/length;
+        path.push({ x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t,
+          distance:travelled+along, angle:Math.atan2(b.y-a.y,b.x-a.x)+(textureRandom()-.5)*.04,
+          brush:Math.floor(textureRandom()*brushes.length) });
+        along+=spacing;
       }
-      environment = next;
+      distanceToNext=along-length; travelled+=length;
     }
-
-    // One loop's worth of stamps, continuing from wherever the pen
-    // currently is (not restarting somewhere random each time) — this
-    // continuity, not the loop shape itself, is what makes it read as
-    // one hand wandering around rather than repeated separate marks.
-    function generateNextLoop() {
-      const { area, obstacle } = environment;
-      // Give the hand somewhere farther away to wander. Local avoidance
-      // alone traps small loops between the card and the screen edge,
-      // building a dense knot instead of the reference's open scribble.
-      if (!wanderTarget || Math.hypot(wanderTarget.x-px, wanderTarget.y-py) < 45) {
-        let farthest = 0;
-        for (let i = 0; i < 8; i++) {
-          const candidate = ghostSafePoint({
-            x: area.left + random() * (area.right-area.left),
-            y: area.top + random() * (area.bottom-area.top)
-          }, area, obstacle);
-          if (!candidate) continue;
-          const distance = Math.hypot(candidate.x-px, candidate.y-py);
-          const route = ghostRouteSegment({ x: px, y: py }, candidate, area, obstacle);
-          const end = route[route.length-1];
-          if (end && end.x === candidate.x && end.y === candidate.y && distance > farthest) {
-            farthest = distance; wanderTarget = candidate;
-          }
-        }
-      }
-      const travelRoute = wanderTarget ? ghostRouteSegment({ x: px, y: py }, wanderTarget, area, obstacle) : [];
-      const guide = travelRoute.find(p => Math.hypot(p.x-px, p.y-py) > 0.1);
-      const biasAngle = guide ? Math.atan2(guide.y-py, guide.x-px) : null;
-      const dir = random() < 0.5 ? 1 : -1;
-      const radius = 34 * (0.65 + random() * 0.4);
-      const radiusY = radius * (0.55 + random() * 0.25);
-      const sweep = Math.PI * 2 * (0.55 + random() * 0.55);
-      const loopAngle = biasAngle !== null ? biasAngle + (random() - 0.5) * 0.8 : angle;
-      // Include the previous endpoint: never jump to the first point on
-      // the next ellipse. All connecting segments use the same resampler.
-      const raw = [{ x: px, y: py }];
-      const travelAngle = biasAngle === null ? angle : biasAngle;
-      const drift = radius * 1.5;
-      const steps = 26;
-      for (let i = 0; i <= steps; i++) {
-        const u = i / steps;
-        const a = loopAngle + dir * sweep * u;
-        // A real scribbling hand never traces a perfectly smooth curve —
-        // small per-step wobble on top of the ellipse itself.
-        const wobble = (random() - 0.5) * radius * 0.08;
-        const target = {
-          x: px + Math.cos(a) * (radius + wobble) + Math.cos(travelAngle) * drift * u,
-          y: py + Math.sin(a) * (radiusY + wobble) + Math.sin(travelAngle) * drift * u
-        };
-        const route = ghostRouteSegment(raw[raw.length - 1], target, area, obstacle);
-        raw.push(...route.slice(1));
-      }
-      angle = loopAngle + dir * sweep + (random() - 0.5) * 0.7;
-      px = raw[raw.length - 1].x;
-      py = raw[raw.length - 1].y;
-      // Same tangent-angle-from-consecutive-points approach move() uses
-      // for real strokes, plus even-arc-length resampling (walk each
-      // segment, carry leftover distance into the next) so spacing stays
-      // constant regardless of how coarse the raw points are — placing
-      // every stamp for a segment at its own endpoint instead, like an
-      // earlier version of this did, is what reads as scattered dots
-      // rather than a line.
-      let smoothAngle = null, distanceToNext = 0;
-      for (let i = 1; i < raw.length; i++) {
-        const a = raw[i - 1], b = raw[i];
-        const segLen = Math.hypot(b.x - a.x, b.y - a.y);
-        if (segLen < 0.0001) continue;
-        let rawAngle = Math.atan2(b.y - a.y, b.x - a.x);
-        if (smoothAngle === null) smoothAngle = rawAngle;
-        else {
-          let diff = rawAngle - smoothAngle;
-          diff = ((diff + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-          smoothAngle += diff * 0.5;
-        }
-        const t = i / raw.length;
-        let posAlong = distanceToNext;
-        while (posAlong <= segLen) {
-          const frac = posAlong / segLen;
-          queue.push({
-            x: a.x + (b.x - a.x) * frac, y: a.y + (b.y - a.y) * frac,
-            angle: smoothAngle + (random() - 0.5) * 0.05,
-            size: cfg.width * (0.85 + 0.15 * Math.sin(t * 10)),
-            alpha: cfg.opacity
-          });
-          posAlong += spacing;
-        }
-        distanceToNext = posAlong - segLen;
-      }
+    for (const p of path) {
+      p.fraction=p.distance/Math.max(1,travelled);
+      // Subtle hand pressure and slightly lighter open ends. No animated
+      // noise: these values are fixed for the lifetime of the drawing.
+      const taper=Math.min(1,p.distance/16,(travelled-p.distance)/20);
+      p.size=cfg.width*(0.82+0.10*Math.sin(p.fraction*13+0.4)+0.035*Math.sin(p.fraction*39));
+      p.alpha=cfg.opacity*(0.65+0.35*Math.max(0,taper));
+      p.persistent=true;
     }
+    doodle.path=path;
+    doodle.measuredWidth=width;
+    doodle.emitted=0;
+    stamps=stamps.filter(s=>!s.persistent);
+    emitDoodle();
+    return true;
+  }
 
-    (function tick(now) {
-      if (disposed) return;
-      const dt = Math.min(0.1, (now - lastTime) / 1000);
-      lastTime = now;
-      if (visible && !document.hidden && !paused && !motion.matches) {
-        refreshEnvironment();
-        if (queue.length < 40) generateNextLoop();
-        stampBudget = queue.length ? stampBudget + (drawSpeedPxPerSec * dt) / spacing : 0;
-        while (stampBudget >= 1 && queue.length) {
-          stampBudget -= 1;
-          const p = queue.shift();
-          lastDrawn = p;
-          stamps.push({ x: p.x, y: p.y, time: now, angle: p.angle, size: p.size, alpha: p.alpha, brush: Math.floor(random() * brushes.length) });
-        }
-        paint();
-        // paint()'s own tail (see its definition above) schedules a
-        // fadeTimer->schedule() continuation any time stamps exist,
-        // meant for the interactive marks' own "keep fading after the
-        // cursor stops moving" case — redundant here since this rAF loop
-        // already owns redrawing every frame on its own. Clearing it
-        // stops that second, independent scheduling path from also
-        // calling paint() again a moment later.
-        clearTimeout(fadeTimer);
-        fadeTimer = 0;
-      }
-      requestAnimationFrame(tick);
-    })(lastTime);
+  function emitDoodle() {
+    if (!doodle?.path || (!doodle.complete && doodle.progress <= 0)) return;
+    const now=performance.now();
+    while (doodle.emitted<doodle.path.length && (doodle.complete || doodle.path[doodle.emitted].fraction<=doodle.progress)) {
+      stamps.push({ ...doodle.path[doodle.emitted++], time:now });
+    }
+  }
+
+  function stopDoodle() {
+    if (!doodle) return;
+    if (doodle.frame) cancelAnimationFrame(doodle.frame);
+    doodle.frame=0;
+    doodle.lastTime=null;
+  }
+
+  function finishDoodle() {
+    if (!doodle || doodle.dismissed || disposed) return;
+    stopDoodle();
+    if (!doodle.path && !composeDoodle()) return;
+    doodle.progress=1; doodle.complete=true;
+    emitDoodle(); paint();
+  }
+
+  function wakeDoodle() {
+    if (!doodle || doodle.dismissed || doodle.complete || doodle.frame || disposed || paused || !visible || document.hidden) return;
+    if (motion.matches) { finishDoodle(); return; }
+    doodle.frame=requestAnimationFrame(advanceDoodle);
+  }
+
+  function advanceDoodle(now) {
+    doodle.frame=0;
+    if (disposed || doodle.dismissed || doodle.complete || paused || !visible || document.hidden) { stopDoodle(); return; }
+    if (motion.matches) { finishDoodle(); return; }
+    const dt=doodle.lastTime===null ? 0 : Math.max(0,Math.min(50,now-doodle.lastTime));
+    doodle.lastTime=now;
+    doodle.elapsed+=dt;
+    if (!doodle.path && !composeDoodle()) {
+      // A missing card callback must not leave a permanent animation loop.
+      // A later resize/visibility event can retry when geometry is ready.
+      if (doodle.elapsed<2500) wakeDoodle();
+      else stopDoodle();
+      return;
+    }
+    const t=Math.max(0,Math.min(1,(doodle.elapsed-300)/1200));
+    // A quick hand-drawn reveal with small, monotonic changes in pace.
+    doodle.progress=t+0.025*Math.sin(t*Math.PI*2)-0.014*Math.sin(t*Math.PI*6);
+    if (t===1) { finishDoodle(); return; }
+    emitDoodle(); paint();
+    wakeDoodle();
   }
 
   return {
     canvas, color: chosenColor, clear, setEnabled,
-    pause(value=true) {paused=value;breakStroke();},
+    pause(value=true) {paused=value;breakStroke();if(paused)stopDoodle();else wakeDoodle();},
     get enabled(){return enabled;},
     get markCount(){return stamps.length;},
     destroy(){
