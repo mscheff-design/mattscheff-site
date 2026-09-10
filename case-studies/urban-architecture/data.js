@@ -42,24 +42,21 @@ export const CASE_STUDY = {
         items: [
           { label: 'Client', value: 'Urban Architecture Inc., New York' },
           { label: 'Principal', value: 'Keith Johnson, “The Merchant of Memphis”' },
-          { label: 'Role', value: 'Digital Consultant & Creative Director' },
-          { label: 'Engagement', value: '2022–Present' }
+          { label: 'Role', value: 'Digital Consultant & Creative Director' }
         ],
-        scope: `Brand strategy · Art direction · Shopify design & development · Copywriting · Editorial · Email · Catalog systems · Video · Press strategy`
+        scope: `Brand strategy · Art direction · Shopify development · Copywriting · Editorial · Email · Catalog systems · Video · Press strategy`
       }
     },
     {
-      type: 'module',
+      type: 'text',
       props: {
         heading: `Overview`,
         chapter: true,
         chapterLabel: `Overview`,
-        lede: `Urban Architecture is a New York gallery specializing in Memphis Milano furniture, lighting, and objects — built entirely offline, with virtually no online presence before this engagement.`,
-        bullets: [
-          `Over 40 years in business in person and by phone, owner Keith Johnson built a high-profile network of clients and collectors who valued discretion, boutique service, and his cultural authority.`,
-          `Keith’s relationships with the designers, and his firsthand knowledge of their work, are central to the buying experience.`,
-          `The challenge: retain that intimacy and white-glove service while introducing the business to a digital audience of prospective buyers.`,
-          `Scope: the website, visual identity, product catalog, and a coordinated editorial, email, and social media strategy — each needed to reflect Keith’s expertise and accommodate the way he worked.`
+        body: [
+          `Urban Architecture is a New York gallery specializing in Memphis Milano furniture, lighting, and objects. Prior to my joining, the business had virtually no online presence. Over forty years of conducting business in person and by phone, owner Keith Johnson had built a high-profile network of clients and collectors who valued discretion, boutique service, and his cultural authority.`,
+          `Keith’s relationships with the designers and firsthand knowledge of their work are central to the buying experience. The challenge was to retain that intimacy and white-glove service while introducing the business to a digital audience of prospective buyers.`,
+          `The scope included the website, visual identity, product catalog, and a coordinated editorial, email, and social media strategy. Each needed to reflect Keith’s expertise and accommodate the way he worked.`
         ]
       }
     },
@@ -120,7 +117,7 @@ export const CASE_STUDY = {
         heading: `A new identity system`,
         chapter: true,
         chapterLabel: `Identity`,
-        body: `The visual identity was developed from original gallery letterhead, credited to Christoph Radl and Ettore Sottsass, Jr. — its hand-drawn logotype and red border a direct connection to the gallery’s history.<br><br>I redrew the lettering and adapted the border for use across the website, email, print, and social media, giving the existing identity a consistent application across the business’s new digital presence.`,
+        body: `The visual identity was developed from original gallery letterhead credited to Christoph Radl and Ettore Sottsass Jr. Its hand-drawn logotype and red border provided a direct connection to the gallery’s history.<br><br>I redrew the lettering and adapted the border for use across the website, email, print, and social media. This gave the existing identity a consistent application across the business’s new digital presence.`,
         media: { type: 'image', src: '/assets/case-studies/urban-architecture/letterhead-scan.jpg', alt: 'The original Urban Architecture Inc. letterhead, with its red silhouette border and boxed hand-drawn logotype' },
         orientation: 'right',
         thumbnail: true
@@ -143,7 +140,7 @@ export const CASE_STUDY = {
         chapterLabel: `Storefront`,
         body: [
           `The website was designed and built on Shopify, with a searchable catalog, available inventory, and a dedicated trade section. Product pages combine photographs, specifications, provenance, and Keith’s own notes on each piece.`,
-          `Purchases are handled through direct inquiry. This allows Keith to discuss condition, delivery, and placement with prospective buyers, retaining the personal service his clients expect, while pricing and availability stay simple for the team to update through Shopify.`
+          `Purchases are handled through direct inquiry. This allows Keith to discuss condition, delivery, and placement with prospective buyers, retaining the personal service his clients expect. Pricing and availability can be updated by the team through Shopify.`
         ]
       }
     },
@@ -186,8 +183,8 @@ export const CASE_STUDY = {
         chapter: true,
         chapterLabel: `Voice`,
         body: [
-          `The writing draws on Keith’s knowledge of the products, their designers, and how they’re made. Product descriptions, social captions, email, and press materials all follow his conversational, opinionated style.`,
-          `The editorial strategy puts that expertise to work, giving buyers researching Memphis design real context.`
+          `The writing draws on Keith’s knowledge of the products, their designers, and how they are made. Product descriptions, social captions, email, and press materials follow his conversational, opinionated style.`,
+          `The editorial strategy uses that expertise to provide context for buyers researching Memphis design.`
         ]
       }
     },
@@ -206,7 +203,7 @@ export const CASE_STUDY = {
       type: 'textMedia',
       props: {
         heading: `Email`,
-        body: `The email program was designed around the gallery’s existing relationships with collectors, designers, and press. A private digital dispatch shares selected objects and commentary, with personalized introductions based on prior correspondence and known interests.<br><br>The design extends to a printed letter using the original gallery border — both formats retain the personal tone of Keith’s client correspondence.`,
+        body: `The email program was designed around the gallery’s existing relationships with collectors, designers, and press. A private digital dispatch shares selected objects and commentary, with personalized introductions based on prior correspondence and known interests.<br><br>The design extends to a printed letter using the original gallery border. Both formats retain the personal tone of Keith’s client correspondence.`,
         media: { type: 'image', src: placeholder('DISPATCH — EMAIL TEMPLATE + PHYSICAL MAILER') },
         orientation: 'right'
       }
@@ -217,7 +214,7 @@ export const CASE_STUDY = {
         heading: `From the Shelf`,
         chapter: true,
         chapterLabel: `Video`,
-        body: `“From the Shelf” was developed as a recurring video series featuring Keith discussing pieces from the collection. My role covers direction, production, and editing, with an emphasis on his knowledge, humor, and natural delivery.<br><br>Several episodes can be recorded in one session, allowing for regular publication around his availability.`,
+        body: `<em>From the Shelf</em> was developed as a recurring video series featuring Keith discussing pieces from the collection. My role covers direction, production, and editing, with an emphasis on his knowledge, humor, and natural delivery.<br><br>Several episodes can be recorded in one session, allowing for regular publication around his availability.`,
         media: { type: 'image', src: placeholder('FROM THE SHELF — REEL, MUTED AUTOPLAY') },
         orientation: 'left'
       }
@@ -229,8 +226,7 @@ export const CASE_STUDY = {
         chapter: true,
         chapterLabel: `Status`,
         body: [
-          `The site is live, with a searchable catalog and direct inquiry process. The identity has been adapted for web, email, print, and video.`,
-          `The first digital dispatch is awaiting Keith’s approval of the mailing list.`
+          `The site is live, with a searchable catalog and direct inquiry process. The identity has been adapted for web, email, print, and video. The first digital dispatch is awaiting Keith’s approval of the mailing list.`
         ]
       }
     },
