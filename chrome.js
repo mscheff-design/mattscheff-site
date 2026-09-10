@@ -55,10 +55,12 @@ function injectStyles() {
     /* inset highlight = a thin line of light catching the glass's top edge;
        the inset shadow beneath it is the glass's own bottom edge — a real
        physical boundary where the pane ends, not a fade into the page. */
-    /* Grid, not flex space-between — see index.html's own copy of this
-       comment for why (nav-links ends up genuinely centered across the
-       full bar, not pushed to the right edge). Keep in sync by hand. */
-    nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:20px 48px;mix-blend-mode:normal;box-shadow:0 2px 6px -3px rgba(var(--ink-rgb),0.22),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(var(--ink-rgb),0.16)}
+    /* minmax(0,1fr), not bare 1fr — see index.html's own copy of this
+       comment for why (a bare 1fr's content-based minimum was letting
+       column 1 shrink to nav-radio's own small width instead of matching
+       the empty column 3, leaving nav-links well left of true center).
+       Keep in sync by hand. */
+    nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;padding:20px 48px;mix-blend-mode:normal;box-shadow:0 2px 6px -3px rgba(var(--ink-rgb),0.22),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(var(--ink-rgb),0.16)}
     .nav-radio{justify-self:start}
     .nav-links{justify-self:center}
     /* Bounded exactly to nav's own box (bottom:0, no overhang/mask-fade) —
@@ -132,6 +134,7 @@ function injectStyles() {
     @media (max-width:599px){
       nav{padding:16px 18px}
       .nav-links{gap:14px}
+      .nav-links a{font-size:9px}
       .nav-radio{gap:7px}
       .radio-station{font-size:7.5px}
       .radio-viz{height:7px;gap:1.5px}
