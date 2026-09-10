@@ -126,6 +126,16 @@ export const CASE_STUDY = {
       }
     },
     {
+      type: 'videoTriptych',
+      props: {
+        videos: [
+          { src: '/assets/case-studies/bernard-figueroa-studio/video/lapse.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/lapse-poster.webp' },
+          { src: '/assets/case-studies/bernard-figueroa-studio/video/old.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/old-poster.webp' },
+          { src: '/assets/case-studies/bernard-figueroa-studio/video/quick.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/quick-poster.webp' }
+        ]
+      }
+    },
+    {
       type: 'text',
       props: {
         heading: 'Production',
