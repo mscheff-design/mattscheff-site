@@ -339,6 +339,18 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .grease-mark--hover{transition:opacity 0.18s ease}
 .project-tile:hover .grease-mark--hover{opacity:1}
 .cs-frame-cell:hover .grease-mark--hover{opacity:1}
+/* Touch has no hover to reveal this with at all — rather than losing the
+   motif on mobile entirely, the mark on each project tile (assigned up
+   front instead of on mouseenter; see the tile-creation loop in
+   initLevel1()) is just always on there. Also overrides .grease-mark's
+   shared -15%/130% overflow sizing above (kept as-is for desktop hover and
+   for level-2's more dramatic off-register look) to wrap the tile's own
+   box exactly instead, so it matches the bigger mobile carousel tile's own
+   2:3 proportions rather than the desktop mark's overflow look. */
+@media (pointer:coarse){
+  .project-tile .grease-mark--hover{opacity:1}
+  .project-tile .grease-mark{inset:0;width:100%;height:100%}
+}
 
 /* level 2 — cursor-following glass loupe, see loupe.js */
 .loupe-root{position:fixed;top:0;left:0;pointer-events:none;z-index:250;border-radius:50%;overflow:hidden;opacity:0;transition:opacity 0.25s cubic-bezier(.22,1,.36,1);filter:drop-shadow(0 10px 26px rgba(0,0,0,0.4))}
@@ -1139,9 +1151,19 @@ const projectTiles = new Map();
   tile.appendChild(frame);
   tile.insertAdjacentHTML('beforeend', greaseMarkSVG('grease-mark--hover'));
   const markImage = tile.querySelector('.grease-mark image');
-  tile.addEventListener('mouseenter', () => {
+  if (isTouchDevice) {
+    // Touch has no hover to reveal the mark with at all, which meant the
+    // desktop-only grease-mark motif — one of the site's more distinctive
+    // recurring details — never showed up on mobile. Assigning it up
+    // front (rather than waiting for a mouseenter that will never fire)
+    // and forcing it visible via the @media(pointer:coarse) rule above
+    // makes it a static, permanent mark instead of a hover reveal.
     markImage.setAttribute('href', assignedGreaseMark(projectIdx));
-  });
+  } else {
+    tile.addEventListener('mouseenter', () => {
+      markImage.setAttribute('href', assignedGreaseMark(projectIdx));
+    });
+  }
   tile.addEventListener('click', () => handleTileActivate(project.id, tile));
   tile.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTileActivate(project.id, tile); }
