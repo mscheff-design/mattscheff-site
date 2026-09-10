@@ -37,7 +37,7 @@ export const CASE_STUDY = {
       type: 'hero',
       props: {
         summary: 'Digital presence and studio support for a sculptor and lighting designer working between New Jersey and France.',
-        media: { type: 'image', src: placeholder('HERO IMAGE — 1600x900', 1600, 900), alt: 'Bernard Figueroa Lights hero placeholder' }
+        media: { type: 'image', src: '/assets/case-studies/bernard-figueroa-studio/homepage-screenshot.webp', alt: 'The Bernard Figueroa Lights homepage, a grid of sculptural lighting and sculpture pieces' }
       }
     },
     {
@@ -74,12 +74,6 @@ export const CASE_STUDY = {
         body: [
           'The portfolio site presents the work by piece, with images, materials, and specifications. I manage the site and its content, adding new work as it is completed and documented.'
         ]
-      }
-    },
-    {
-      type: 'fullBleedMedia',
-      props: {
-        media: { type: 'image', src: '/assets/case-studies/bernard-figueroa-studio/homepage-screenshot.webp', alt: 'The Bernard Figueroa Lights homepage, a grid of sculptural lighting and sculpture pieces' }
       }
     },
     {
