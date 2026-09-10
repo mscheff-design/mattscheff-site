@@ -287,7 +287,15 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .project-tile.suppress-focus-mark:focus-visible .grease-mark--hover{opacity:0}
 .project-frame{aspect-ratio:3/4}
 .project-frame .cover-slide{position:relative;width:100%;height:100%}
-.project-frame .cs-img,.project-frame .frame-placeholder{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(15%) contrast(1.08) brightness(0.85) saturate(0.9)}
+/* pointer-events:none + the drag/callout/select resets stop the cover
+   image from being independently touch-dragged inside its own box (iOS
+   Safari's native image-lift/pan behavior) — surfaced once the tile
+   itself became a horizontal swipe target (see the mobile carousel rules
+   below), where a touch starting on the image was being captured by the
+   image instead of handed to the scroll-snap container. The tile's own
+   click/keydown listeners (see handleTileActivate()) don't depend on the
+   image being the event target, so tap-to-open is unaffected. */
+.project-frame .cs-img,.project-frame .frame-placeholder{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(15%) contrast(1.08) brightness(0.85) saturate(0.9);pointer-events:none;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
 .project-frame .cs-img{transition:opacity 1s ease}
 .project-frame .frame-placeholder{background:linear-gradient(135deg,rgba(var(--ink-light-rgb),0.03) 0%,rgba(var(--ink-light-rgb),0.06) 100%)}
 .project-frame .frame-label{font-size:8px;letter-spacing:0.08em;text-transform:uppercase}
