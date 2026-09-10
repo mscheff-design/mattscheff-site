@@ -562,8 +562,16 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
    all rather than as a deliberate seam. */
 /* overflow:hidden added for navigate()'s own slide transition (see its
    comment) — two stacked, absolutely-positioned images pass through this
-   box's edges mid-slide and need to be clipped to it. */
-.lv3-main{position:relative;height:80vh;max-width:72vw;display:flex;align-items:center;justify-content:center;z-index:2;overflow:hidden}
+   box's edges mid-slide and need to be clipped to it. width:72vw (matching
+   max-width) was also added at the same time, and is load-bearing, not
+   redundant: .lv3-main is a flex item with no explicit width, so its size
+   used to come from shrink-to-fit around its <img> child's own intrinsic
+   size. Once that child became position:absolute (same change, see
+   .lv3-main img's own comment), it stopped participating in that
+   calculation entirely — auto-sizing had nothing left to measure and
+   .lv3-main collapsed to 0 width, taking the now-invisible photo with it.
+   An explicit width removes the dependency on content sizing altogether. */
+.lv3-main{position:relative;width:72vw;height:80vh;max-width:72vw;display:flex;align-items:center;justify-content:center;z-index:2;overflow:hidden}
 /* Restored here only, of the four places that used to carry the SVG
    chromatic-aberration filter — this is the single lightbox image, one
    instance at a time, not a whole grid. The Safari-specific cost was
