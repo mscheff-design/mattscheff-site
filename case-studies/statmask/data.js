@@ -27,10 +27,9 @@
 // urban-architecture/bernard-figueroa-studio.
 //
 // The branded color-wheel shot originally sat as a full-bleed block right
-// after the (landscape) hero — moved 2026-09-10 into the closing gallery
-// instead, since a portrait image immediately full-bleed under a landscape
-// hero read as an awkward jump. The closing gallery already mixes a
-// portrait crop in with square ones, so it's a more natural home.
+// after the (landscape) hero, then briefly in the closing gallery — moved
+// 2026-09-10 to pair with Overview instead (media on the left, breaking up
+// the page's first stretch of plain text), which is where it now lives.
 
 export const CASE_STUDY = {
   id: 'statmask',
@@ -51,20 +50,18 @@ export const CASE_STUDY = {
           { label: 'Client', value: 'STATMASK' },
           { label: 'Role', value: 'Social Media Manager, Product Photographer' }
         ],
-        scope: 'Product photography, short-form video, art direction, modular asset system, Meta campaign management, analytics, and sales collateral.'
+        scope: 'Product photography, short-form video, art direction, modular asset system, Meta campaign management, order fulfillment, analytics, and sales collateral.'
       }
     },
     {
-      type: 'text',
+      type: 'textMedia',
       props: {
         heading: 'Overview',
         chapter: true,
         chapterLabel: 'Overview',
-        body: [
-          'STATMASK was a Brooklyn apparel startup specializing in personal protective equipment, launched into a category that filled overnight in 2020. The product competed against legacy suppliers, apparel brands that had pivoted, and dropshippers, with no established search position and no existing audience.',
-          'Paid social carried the business. Nearly all revenue traced back to an individual piece of creative, and creative fatigues on a predictable schedule. The limiting factor was not budget or targeting but the rate at which usable assets could be produced.',
-          'I shot the product, built the system the ads were assembled from, and ran the campaigns.'
-        ]
+        body: 'STATMASK was a Brooklyn apparel startup specializing in personal protective equipment, launched into a category that filled overnight in 2020. The product competed against legacy suppliers, apparel brands that had pivoted, and dropshippers, with no established search position and no existing audience.<br><br>Paid social carried the business. Nearly all revenue traced back to an individual piece of creative, and creative fatigues on a predictable schedule. The limiting factor was not budget or targeting but the rate at which usable assets could be produced.<br><br>I shot the product, built the system the ads were assembled from, ran the campaigns, and managed order fulfillment. It was a small enough operation that the work didn’t stop at whatever the job title said.',
+        media: { type: 'image', src: '/assets/case-studies/statmask/color-wheel-full-range.webp', alt: 'The full STATMASK color range, arranged in a ring' },
+        orientation: 'left'
       }
     },
     {
@@ -146,7 +143,6 @@ export const CASE_STUDY = {
       type: 'gallery',
       props: {
         images: [
-          { src: '/assets/case-studies/statmask/color-wheel-full-range.webp', alt: 'The full STATMASK color range, arranged in a ring' },
           { src: '/assets/case-studies/statmask/desert-magazine-square.webp', alt: 'STATMASK masks styled on a magazine spread, cropped square' },
           { src: '/assets/case-studies/statmask/desert-magazine-vertical.webp', alt: 'The same shoot, cropped vertical for story placements' },
           { src: '/assets/case-studies/statmask/streetwear-flatlay-square.webp', alt: 'STATMASK masks styled alongside sneakers and a Supreme cap' }
