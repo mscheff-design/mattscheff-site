@@ -609,8 +609,15 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
    .project-frame .cs-img (see its own comment): the click listener lives
    on the wrapping #cfEdgePrev/#cfEdgeNext div, not this img, so routing
    hit-testing to the parent is safe here (unlike .lv3-main img above) and
-   stops iOS from capturing an edge-frame swipe as a native image drag. */
-.lv3-edge img{width:8vw;height:80vh;object-fit:cover;display:block;filter:grayscale(20%) contrast(1.08) brightness(0.7) saturate(0.85);pointer-events:none;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
+   stops iOS from capturing an edge-frame swipe as a native image drag.
+   position:absolute/inset:0 and transition:transform match .lv3-main img's
+   own treatment exactly (same duration/easing) — navigate() slides all
+   three boxes (main + both edges) together on the same rAF tick, so the
+   whole stage pans as one continuous motion instead of the edges just
+   popping to their new photo once the main image's own slide finishes.
+   .lv3-edge already has overflow:hidden, so no change needed there to
+   clip the pair mid-slide. */
+.lv3-edge img{position:absolute;inset:0;width:8vw;height:80vh;object-fit:cover;display:block;filter:grayscale(20%) contrast(1.08) brightness(0.7) saturate(0.85);pointer-events:none;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none;transition:transform 0.32s cubic-bezier(.22,1,.36,1)}
 .lv3-edge--prev img{object-position:100% 50%}
 .lv3-edge--next img{object-position:0% 50%}
 
@@ -1704,15 +1711,19 @@ function updateStage() {
 
 // The old crossfade (whole #cfStage, edges included, faded to 0 and back
 // over a 150ms setTimeout) read as a blackout-and-jump-cut rather than
-// motion between photos — this is what the user meant by "no fluid
-// motion." Replaced with a real directional slide of just the main image:
-// the incoming photo is stacked on top of the outgoing one inside
-// .lv3-main (both position:absolute/inset:0 — see that rule's own
-// comment) starting off-stage on the swipe's leading side, then both
-// slide across together over .lv3-main img's own transition:transform.
-// The edge previews and label/count still snap instantly once the slide
-// finishes (via the existing updateStage()) — they're small, already-dark
-// peek thumbnails, not worth animating in their own right.
+// motion between photos. The first fix replaced that with a real
+// directional slide of just the main image — but leaving the edge
+// previews snapping to their new photo only once the main slide finished
+// still broke the illusion: the edges visibly lagged a beat behind, like
+// the carousel had two different clocks. This version slides all three
+// boxes (main + both edges) together on the same rAF tick, so the whole
+// stage pans as one continuous motion — every box gets the same
+// double-buffered treatment (incoming photo stacked on top of the
+// outgoing one, both position:absolute/inset:0, starting off-stage on the
+// swipe's leading side) via the shared startSlide() helper below, all
+// using the same transition duration/easing (.lv3-main img and .lv3-edge
+// img's own rules) so they move in lockstep rather than at slightly
+// different rates.
 //
 // dir: 1 for next (content moves leftward, as in a swipe-left-to-advance
 // gesture), -1 for prev. cfAnimating guards against a second swipe/
@@ -1721,40 +1732,59 @@ function updateStage() {
 // laggy, and avoids the complexity of either queuing input or
 // interrupting an in-flight transform.
 let cfAnimating = false;
+
+// Stacks a new <img> (newSrc) on top of whatever <img> currently sits in
+// `container`, starting it off-stage at translateX(dir*100%) with
+// transitions disabled so the instant jump never paints. Returns the
+// {old, next} pair so the caller can kick off the actual slide (on a
+// shared rAF, so every box's motion starts on the exact same frame) and
+// settle it later.
+function startSlide(container, dir, newSrc, newAlt) {
+  const old = container.querySelector('img');
+  const next = document.createElement('img');
+  next.src = newSrc;
+  next.alt = newAlt;
+  next.style.transition = 'none';
+  next.style.transform = `translateX(${dir * 100}%)`;
+  container.appendChild(next);
+  // Forces layout so the browser commits the instant transform above
+  // before the transition is re-enabled below — without this the two
+  // style writes coalesce into one and there's nothing to animate from.
+  void next.offsetWidth;
+  next.style.transition = '';
+  return { old, next };
+}
+
 function navigate(dir) {
   if (cfAnimating || !activeProject) return;
   const total = activeProject.photos.length;
   const targetIndex = (cfIndex + dir + total) % total;
+  const newPrevI = (targetIndex - 1 + total) % total;
+  const newNextI = (targetIndex + 1) % total;
 
-  const oldImg = document.getElementById('cfMainImg');
-  const newImg = document.createElement('img');
-  newImg.src = fullSrc(activeProject, targetIndex);
-  newImg.alt = `${activeProject.title}, frame ${targetIndex + 1}`;
-  // No transition yet — this initial transform has to land instantly, off
-  // to the side the new photo is about to slide in from, before the
-  // element is even visible.
-  newImg.style.transition = 'none';
-  newImg.style.transform = `translateX(${dir * 100}%)`;
-  cfMainEl.appendChild(newImg);
+  const pairs = [
+    startSlide(cfMainEl, dir, fullSrc(activeProject, targetIndex), `${activeProject.title}, frame ${targetIndex + 1}`),
+    startSlide(cfEdgePrevEl, dir, fullSrc(activeProject, newPrevI), ''),
+    startSlide(cfEdgeNextEl, dir, fullSrc(activeProject, newNextI), '')
+  ];
 
   cfAnimating = true;
-  // Forces layout so the browser commits the instant transform above
-  // before the transition is re-enabled below — without this the two
-  // style writes coalesce into one and there's nothing to animate from.
-  void newImg.offsetWidth;
-  newImg.style.transition = '';
   requestAnimationFrame(() => {
-    oldImg.style.transform = `translateX(${-dir * 100}%)`;
-    newImg.style.transform = 'translateX(0)';
+    pairs.forEach(({ old, next }) => {
+      old.style.transform = `translateX(${-dir * 100}%)`;
+      next.style.transform = 'translateX(0)';
+    });
   });
 
   let done = false;
   function finish() {
     if (done) return;
     done = true;
-    oldImg.remove();
-    newImg.id = 'cfMainImg';
-    newImg.style.transform = '';
+    pairs.forEach(({ old, next }) => {
+      old.remove();
+      next.style.transform = '';
+    });
+    pairs[0].next.id = 'cfMainImg';
     cfIndex = targetIndex;
     updateStage();
     cfAnimating = false;
@@ -1763,8 +1793,11 @@ function navigate(dir) {
   // prefers-reduced-motion (a 0-duration transition doesn't reliably fire
   // transitionend in every browser) or any other case a transition just
   // doesn't run — without it cfAnimating could get stuck true and freeze
-  // navigation entirely.
-  newImg.addEventListener('transitionend', finish, { once: true });
+  // navigation entirely. Only the main image's own transitionend is
+  // listened for — all three run the same duration/easing and were
+  // started on the same frame, so it's a reliable proxy for "all three
+  // are done."
+  pairs[0].next.addEventListener('transitionend', finish, { once: true });
   setTimeout(finish, 400);
 }
 
