@@ -145,6 +145,13 @@ export const CASE_STUDY = {
     {
       type: 'fullBleedMedia',
       props: {
+        media: { type: 'image', src: '/assets/case-studies/urban-architecture/graves-dining-set.webp', alt: 'A Michael Graves dining table and chair set from the gallery’s inventory' },
+        caption: `A Michael Graves dining table and chair set, from the gallery’s inventory.`
+      }
+    },
+    {
+      type: 'fullBleedMedia',
+      props: {
         scrollable: true,
         maxHeight: '760px',
         scrollHint: `Scroll to explore the full homepage`,
