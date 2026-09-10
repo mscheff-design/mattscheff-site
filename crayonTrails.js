@@ -1,4 +1,11 @@
 /** Passive, bounded crayon marks. Mount underneath the existing card renderer. */
+// Separate from the `fine`/`motion` media queries checked per-instance
+// below — those gate the INTERACTIVE hover-drawing feature (which
+// genuinely doesn't apply on touch), whereas this gates the one-time
+// procedural flourish (see drawProceduralFlourish) that exists BECAUSE
+// touch has no hover to draw with. Same (pointer: coarse) convention
+// card.js/blocks.js already use elsewhere in this codebase.
+const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 export const CRAYON_COLORS = ['#df4931', '#2850ac', '#dcb719', '#1f7a54'];
 export const CRAYON_DEFAULTS = {
   width: 17, opacity: .46, gestureThreshold: 12, drawLength: 400, gapLength: 0,
@@ -268,6 +275,88 @@ export function mountCrayonTrails(hero, {
   const intersection=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible)schedule();else{cancelWork();breakStroke();}});
   intersection.observe(hero);
   resize();updateToggle();
+  // Touch has no hover to draw the interactive marks with at all (see
+  // `enabled`'s own fine/motion check above), so instead of nothing, one
+  // procedural flourish animates itself in shortly after mount — a
+  // generated curve, not a recorded gesture, fed through the exact same
+  // stamp/paint/hold-fade pipeline real strokes use, so it reads as one
+  // more crayon mark, not a different visual system. One-time and
+  // deliberately independent of the `enabled` toggle above (that toggle
+  // is about a mouse user turning the interactive feature off — there's
+  // no ongoing cost here to turn off, and nothing for a touch visitor to
+  // have "drawn" to begin with). Still respects prefers-reduced-motion.
+  if (isTouchDevice && !motion.matches) requestAnimationFrame(drawProceduralFlourish);
+
+  // A loose, confident underline-style flourish anchored in the bottom
+  // corner of whatever's currently visible — an open margin on most
+  // layouts, away from the card itself, echoing where a hand-drawn
+  // signature flourish would actually sit. Deterministic per mount (drawn
+  // from the same seeded `random()` every other stamp on this canvas
+  // uses), not per frame — it's meant to look considered, not jittery.
+  function generateFlourishPath() {
+    const visibleH = surface.clientHeight || height;
+    const marginX = Math.min(150, width * 0.32);
+    const marginY = Math.min(100, visibleH * 0.16);
+    const originX = width - marginX * 0.5;
+    const originY = visibleH - marginY * 0.6;
+    const spanX = marginX * 0.95;
+    const spanY = marginY * 0.7;
+    const raw = [];
+    const steps = 72;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      raw.push({
+        x: originX - spanX * t + Math.sin(t * Math.PI * 2.3) * (spanX * 0.16),
+        y: originY - Math.sin(t * Math.PI) * spanY + Math.sin(t * Math.PI * 4.1) * (spanY * 0.1)
+      });
+    }
+    // Same tangent-angle-from-consecutive-points approach move() uses for
+    // real strokes, just walking a generated array instead of live
+    // pointer history.
+    const spacing = Math.max(1.4, cfg.width * 0.1);
+    const stamped = [];
+    let traveled = 0, smoothAngle = null;
+    for (let i = 1; i < raw.length; i++) {
+      const a = raw[i - 1], b = raw[i];
+      let rawAngle = Math.atan2(b.y - a.y, b.x - a.x);
+      if (smoothAngle === null) smoothAngle = rawAngle;
+      else {
+        let diff = rawAngle - smoothAngle;
+        diff = ((diff + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+        smoothAngle += diff * 0.5;
+      }
+      traveled += Math.hypot(b.x - a.x, b.y - a.y);
+      const t = i / raw.length;
+      while (traveled >= spacing) {
+        traveled -= spacing;
+        stamped.push({
+          x: b.x, y: b.y, angle: smoothAngle + (random() - 0.5) * 0.05,
+          size: cfg.width * (0.85 + 0.15 * Math.sin(t * 10)),
+          alpha: cfg.opacity
+        });
+      }
+    }
+    return stamped;
+  }
+
+  function drawProceduralFlourish() {
+    if (disposed) return;
+    const path = generateFlourishPath();
+    let i = 0;
+    (function step() {
+      if (disposed) return;
+      // A couple of stamps per frame — quick enough to settle in well
+      // under 2s, still visibly progressive rather than popping in whole.
+      for (let n = 0; n < 3 && i < path.length; n++, i++) {
+        const p = path[i];
+        stamps.push({ x: p.x, y: p.y, time: performance.now(), angle: p.angle, size: p.size, alpha: p.alpha, brush: Math.floor(random() * brushes.length) });
+      }
+      paint();
+      if (i < path.length) requestAnimationFrame(step);
+      else schedule();
+    })();
+  }
+
   return {
     canvas, color: chosenColor, clear, setEnabled,
     pause(value=true) {paused=value;breakStroke();},

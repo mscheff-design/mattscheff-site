@@ -1193,19 +1193,34 @@ export function initCard(container) {
 
     drawToggleRow(ctx, w, bh, pad, 'RÉSUMÉ');
 
-    JOBS.forEach((job, i) => {
-      const rowTopF = ROWS_TOP_F + i * ROW_HEIGHT_F;
-
-      // Dates measured first (fixed size, right-aligned) so the role's own
-      // fit below reserves the actual room they take instead of the two
-      // just overlapping on a narrow portrait row.
+    // One shared size per column, not fit independently per row — each
+    // job's role/tags used to call fitTextSize/fitTrackedSize on its own
+    // text alone, so a short role like "Training Assistant" rendered at
+    // the full base size while longer ones ("Digital Consultant, Social
+    // Media Strategist") shrank hard to fit, reading as wildly
+    // inconsistent sizes down the column instead of one aligned list.
+    // Using the smallest size any row actually needs, for every row,
+    // fixes that — the tradeoff is a little spare width on shorter roles,
+    // which reads far better than mismatched sizes.
+    const rolePx = Math.min(...JOBS.map(job => {
+      // fitTextSize leaves ctx.font set to its own (display-font) result
+      // on the way out — reset to the mono dates font on every iteration,
+      // not just once before the loop, or each job after the first would
+      // measure its dates width in the previous job's role font instead.
       ctx.font = `400 ${Math.round(bh * 0.027)}px ${FONT_MONO}`;
       const datesWidthPx = ctx.measureText(job.dates).width;
       const roleMaxWidthPx = w - pad * 2 - datesWidthPx - bh * 0.02;
-      const rolePx = fitTextSize(
-        ctx, [job.role], roleMaxWidthPx, Math.round(bh * 0.052),
-        (px) => `500 ${px}px ${FONT_DISPLAY}`
-      );
+      return fitTextSize(ctx, [job.role], roleMaxWidthPx, Math.round(bh * 0.052), (px) => `500 ${px}px ${FONT_DISPLAY}`);
+    }));
+    const tagsPx = fitTrackedSize(
+      ctx, JOBS.map(job => `${job.name} · ${job.tags.join(' · ')}`),
+      w - pad * 2, Math.round(bh * 0.023), 1.1
+    );
+
+    JOBS.forEach((job, i) => {
+      const rowTopF = ROWS_TOP_F + i * ROW_HEIGHT_F;
+
+      ctx.font = `500 ${rolePx}px ${FONT_DISPLAY}`;
       ctx.fillStyle = ink(0.88);
       ctx.textAlign = 'left';
       ctx.fillText(job.role, pad, bh * (rowTopF + 0.075));
@@ -1220,7 +1235,6 @@ export function initCard(container) {
       // Company folded in here instead of drawn as its own big line —
       // the role above is the emphasized field now, see jobs.js.
       const tagsText = `${job.name} · ${job.tags.join(' · ')}`;
-      const tagsPx = fitTrackedSize(ctx, [tagsText], w - pad * 2, Math.round(bh * 0.023), 1.1);
       drawTracked(ctx, tagsText, pad, bh * (rowTopF + 0.11), tagsPx, ink(0.35), 1.1);
 
       ctx.save();
@@ -2059,13 +2073,22 @@ export function initCard(container) {
   });
 
   window.addEventListener('pointermove', (e) => {
-    // Mobile drops hover/touch-tilt, free-drag, and the hover guides
-    // entirely, by request — tap-to-flip (via handleCardClick, in
-    // pointerup below) is the only gesture left there. An earlier version
-    // tilted the card toward wherever it was being touched (reusing this
-    // same updateHoverTilt) — removed for being one more moving part on
-    // top of everything else being cut, not because it didn't work.
-    if (isTouchDevice) return;
+    // Mobile still drops free-drag and the hover guides, by request —
+    // tap-to-flip (via handleCardClick, in pointerup below) remains the
+    // only gesture besides this. Touch-tilt is back: reacts only while a
+    // touch that started on the card (pointerDownOnCard, set at
+    // pointerdown below — the same flag interactionRoot's own touch-
+    // action:none already gates on) is moving and hasn't crossed the drag
+    // threshold yet, mirroring desktop's own !dragging gate on the same
+    // updateHoverTilt call. touchAction is already 'none' for exactly
+    // this gesture, so this never fights page scroll. pointerup/
+    // pointercancel below reset the tilt target back to 0 on lift, since
+    // touch has no lingering "hover" the way a mouse does once contact
+    // ends — nothing else would ever zero it out again.
+    if (isTouchDevice) {
+      if (pointerDownOnCard && !dragging) updateHoverTilt(e.clientX, e.clientY);
+      return;
+    }
     lastPointerX = e.clientX;
     lastPointerY = e.clientY;
     if (!dragging) updateHoverTilt(e.clientX, e.clientY);
@@ -2115,6 +2138,11 @@ export function initCard(container) {
     document.body.style.userSelect = '';
     document.body.style.webkitUserSelect = '';
     interactionRoot.style.touchAction = 'auto';
+    // Touch has no lingering "hover" once contact ends — unlike a mouse,
+    // which keeps generating pointermove (and so keeps re-settling tilt)
+    // independent of button state, nothing would ever zero a touch-tilt
+    // target again after this lift without doing it explicitly here.
+    if (isTouchDevice) { tiltTargetX = 0; tiltTargetY = 0; }
   });
 
   // A touch sequence can end without ever reaching pointerup — the OS
@@ -2134,6 +2162,7 @@ export function initCard(container) {
     document.body.style.userSelect = '';
     document.body.style.webkitUserSelect = '';
     interactionRoot.style.touchAction = 'auto';
+    if (isTouchDevice) { tiltTargetX = 0; tiltTargetY = 0; }
   });
 
   interactionRoot.addEventListener('pointerleave', () => {
