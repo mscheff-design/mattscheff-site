@@ -408,24 +408,24 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
   .cs-frame-grid{grid-template-columns:repeat(3,1fr)}
 }
 @media (max-width:599px){
-  /* Master grid becomes a one-at-a-time carousel on phones — Instagram-
-     post style, not a peeking multi-column grid.
-     The actual cause of "the thumbnail moves around inside its box": per
-     the CSS Overflow spec, setting only overflow-x (auto) and leaving
-     overflow-y at its default (visible) doesn't actually keep overflow-y
-     as visible — a lone non-visible axis forces the other to compute as
-     auto too, so .project-grid was quietly ALSO a vertical scroll
-     container. Any sub-pixel height mismatch between the grid and its
-     tile gave it just enough vertical scroll range for a touch drag to
-     rubber-band the whole row up/down within its own box. overflow-y:
-     hidden below removes that scroll axis entirely — touch-action:pan-x
-     is additionally kept as a second guard on the gesture itself.
-     scroll-snap-stop:always plus 100%-width slides (no peek) means a
-     single swipe always lands on exactly the next project. Native
-     scrollbar hidden. */
-  .project-grid{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:0;touch-action:pan-x;scrollbar-width:none}
+  /* Master grid becomes a one-at-a-time carousel on phones, each project
+     sized under 100% so the next one peeks in from the right edge —
+     signals there's more to swipe to without extra dot-indicator chrome.
+     The actual cause of the earlier "thumbnail moves around inside its
+     box" bug: per the CSS Overflow spec, setting only overflow-x (auto)
+     and leaving overflow-y at its default (visible) doesn't actually keep
+     overflow-y visible — a lone non-visible axis forces the other to
+     compute as auto too, so .project-grid was quietly ALSO a vertical
+     scroll container. Any sub-pixel height mismatch gave it just enough
+     vertical scroll range for a touch drag to rubber-band the whole row
+     within its own box. overflow-y:hidden below removes that scroll axis
+     entirely (unrelated to the peek width itself) — touch-action:pan-x is
+     kept as a second guard on the gesture. scroll-snap-stop:always means
+     a single swipe always lands on exactly the next project, never more
+     than one. Native scrollbar hidden. */
+  .project-grid{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;touch-action:pan-x;scrollbar-width:none}
   .project-grid::-webkit-scrollbar{display:none}
-  .project-tile{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always}
+  .project-tile{flex:0 0 86%;scroll-snap-align:start;scroll-snap-stop:always}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
 }
 
