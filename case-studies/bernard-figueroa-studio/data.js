@@ -85,6 +85,7 @@ export const CASE_STUDY = {
         heading: 'Archive',
         chapter: true,
         chapterLabel: 'Archive',
+        compact: true,
         body: [
           'I maintain the studio archive across both locations. Image assets, production documentation, and the record of each piece are held in one structure, so material photographed in France and material photographed in New Jersey are filed the same way.',
           'The archive supports the website, sales materials, and gallery submissions, and serves as the studio’s permanent record of the work.'
@@ -97,6 +98,7 @@ export const CASE_STUDY = {
         heading: 'Video',
         chapter: true,
         chapterLabel: 'Video',
+        compact: true,
         body: [
           'Short-form video is the studio’s primary social content. I develop, shoot, and edit it, working directly with Bernard to build a production style around his practice. The emphasis is on process, material, and the making itself.'
         ]

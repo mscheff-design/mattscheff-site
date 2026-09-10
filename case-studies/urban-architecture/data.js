@@ -161,6 +161,7 @@ export const CASE_STUDY = {
         heading: `Voice and editorial`,
         chapter: true,
         chapterLabel: `Voice`,
+        compact: true,
         body: [
           `The writing draws on Keith’s knowledge of the products, their designers, and how they are made. Product descriptions, social captions, email, and press materials follow his conversational, opinionated style.`,
           `The editorial strategy uses that expertise to provide context for buyers researching Memphis design.`
@@ -173,6 +174,7 @@ export const CASE_STUDY = {
         heading: `Operations`,
         chapter: true,
         chapterLabel: `Operations`,
+        compact: true,
         body: [
           `A catalog workflow converts European supplier pricing into Shopify-ready data and flags discrepancies for review. This has caught pricing errors before publication and simplifies updates across the collection.`,
           `The broader workflow keeps Keith’s involvement manageable through brief approvals, photographs, and scheduled filming sessions. Production and publication are coordinated around those contributions.`
@@ -183,6 +185,7 @@ export const CASE_STUDY = {
       type: 'text',
       props: {
         heading: `Email`,
+        compact: true,
         body: [
           `The email program was designed around the gallery’s existing relationships with collectors, designers, and press. A private digital dispatch shares selected objects and commentary, with personalized introductions based on prior correspondence and known interests.`,
           `Each dispatch is built with a modular email tool I developed myself, designed to make campaign creation seamless — reusable content blocks assemble into a new issue without rebuilding the template from scratch each time.`,
@@ -218,17 +221,6 @@ export const CASE_STUDY = {
           { src: '/assets/case-studies/urban-architecture/video/sowden.mp4', poster: '/assets/case-studies/urban-architecture/video/sowden-poster.webp' },
           { src: '/assets/case-studies/urban-architecture/video/reel-01.mp4', poster: '/assets/case-studies/urban-architecture/video/reel-01-poster.webp' },
           { src: '/assets/case-studies/urban-architecture/video/hilton-cucumber.mp4', poster: '/assets/case-studies/urban-architecture/video/hilton-cucumber-poster.webp' }
-        ]
-      }
-    },
-    {
-      type: 'text',
-      props: {
-        heading: `Status`,
-        chapter: true,
-        chapterLabel: `Status`,
-        body: [
-          `The site is live, with a searchable catalog and direct inquiry process. The identity has been adapted for web, email, print, and video. The first digital dispatch is awaiting Keith’s approval of the mailing list.`
         ]
       }
     },
