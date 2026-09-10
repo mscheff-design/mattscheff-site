@@ -29,11 +29,34 @@ export function opacityAt(age, hold, fade) {
   return age <= hold ? 1 : Math.max(0, 1 - (age-hold)/fade);
 }
 
-// A single authored gesture, in a unit square whose middle half is the
-// card. Broad sweeps and three unequal loops; open at both ends. Control
-// points adapt to the available margins, not to a random walk.
-const MOBILE_DOODLE_START = [0.56, 0.13];
-const MOBILE_DOODLE_CURVES = [
+// Four open, authored gestures: each palette color owns a stable form.
+// The middle half of this unit square represents the measured card.
+// Loops live in the roomier top/bottom margins; the sides stay loose.
+const MOBILE_DOODLES = [
+  { name: 'red', start: [0.62,0.12], curves: [
+    [0.52,0.03, 0.30,0.07, 0.29,0.15],
+    [0.28,0.24, 0.58,0.22, 0.50,0.12],
+    [0.44,0.05, 0.20,0.10, 0.18,0.23],
+    [0.11,0.34, 0.22,0.43, 0.14,0.56],
+    [0.10,0.67, 0.18,0.75, 0.20,0.82],
+    [0.25,0.98, 0.39,0.75, 0.46,0.85],
+    [0.56,0.98, 0.45,0.98, 0.44,0.87],
+    [0.44,0.76, 0.74,0.81, 0.81,0.85],
+    [0.91,0.89, 0.85,0.70, 0.87,0.63],
+    [0.94,0.52, 0.80,0.46, 0.87,0.37]
+  ] },
+  { name: 'blue', start: [0.19,0.42], curves: [
+    [0.10,0.32, 0.14,0.13, 0.28,0.16],
+    [0.44,0.20, 0.50,0.04, 0.37,0.07],
+    [0.22,0.10, 0.52,0.24, 0.67,0.14],
+    [0.82,0.04, 0.91,0.20, 0.85,0.30],
+    [0.78,0.43, 0.92,0.55, 0.84,0.68],
+    [0.79,0.75, 0.92,0.86, 0.78,0.88],
+    [0.61,0.92, 0.52,0.78, 0.42,0.84],
+    [0.24,0.96, 0.20,0.80, 0.33,0.80],
+    [0.46,0.81, 0.23,0.99, 0.16,0.89]
+  ] },
+  { name: 'yellow', start: [0.56,0.13], curves: [
   [0.46,0.11, 0.25,0.13, 0.22,0.14],
   [0.14,0.16, 0.29,0.04, 0.32,0.12],
   [0.35,0.21, 0.18,0.18, 0.17,0.28],
@@ -46,6 +69,19 @@ const MOBILE_DOODLE_CURVES = [
   [0.95,0.90, 0.65,0.97, 0.73,0.86],
   [0.83,0.77, 0.94,0.66, 0.86,0.54],
   [0.78,0.42, 0.94,0.39, 0.85,0.29]
+] },
+  { name: 'green', start: [0.35,0.88], curves: [
+    [0.16,0.98, 0.10,0.86, 0.21,0.81],
+    [0.34,0.75, 0.38,0.93, 0.24,0.88],
+    [0.08,0.82, 0.20,0.70, 0.16,0.60],
+    [0.10,0.48, 0.23,0.42, 0.17,0.31],
+    [0.11,0.17, 0.25,0.08, 0.35,0.15],
+    [0.47,0.24, 0.49,0.01, 0.58,0.10],
+    [0.71,0.23, 0.84,0.08, 0.84,0.23],
+    [0.83,0.37, 0.95,0.47, 0.86,0.60],
+    [0.77,0.74, 0.91,0.78, 0.80,0.86],
+    [0.72,0.94, 0.61,0.79, 0.54,0.85]
+  ] }
 ];
 
 export function mountCrayonTrails(hero, {
@@ -55,7 +91,7 @@ export function mountCrayonTrails(hero, {
 } = {}) {
   const cfg = { ...CRAYON_DEFAULTS, ...overrides };
   const random = makeRandom(seed);
-  const chosenColor = color || CRAYON_COLORS[Math.floor(random()*CRAYON_COLORS.length)];
+  let chosenColor = color || CRAYON_COLORS[Math.floor(random()*CRAYON_COLORS.length)];
   const canvas = document.createElement('canvas');
   canvas.className = 'crayon-trails';
   canvas.setAttribute('aria-hidden', 'true');
@@ -64,32 +100,42 @@ export function mountCrayonTrails(hero, {
   if (!ctx) { canvas.remove(); throw new Error('2D canvas is unavailable.'); }
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const fine = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
-  let enabled = fine.matches && !motion.matches;
+  let enabled = !isTouchDevice && fine.matches && !motion.matches;
   let disposed = false, visible = true, paused = false;
   let width = 1, height = 1, dpr = 1, raf = 0, fadeTimer = 0;
   let previous = null, smooth = null, traveled = 0, phase = 0, smoothAngle = null;
   let stamps = [], density = new Map();
   const doodle = isTouchDevice ? {
     path: null, emitted: 0, progress: 0, elapsed: 0, lastTime: null,
-    frame: 0, complete: false, dismissed: false, measuredWidth: 0
+    frame: 0, complete: false, dismissed: false, measuredWidth: 0, delay: 300,
+    variant: Math.max(0, CRAYON_COLORS.indexOf(chosenColor))
   } : null;
-  const brushes = Array.from({length: 7}, () => {
-    const brush = document.createElement('canvas'); brush.width = brush.height = 64;
-    const ink = brush.getContext('2d');
-    ink.fillStyle = chosenColor;
-    // A cohesive wax deposit with a ragged edge and fine grain inside it.
-    // Each pixel belongs to the nib; pigment is not a cloud of scattered particles.
-    for (let y=0;y<64;y++) for (let x=0;x<64;x++) {
-      const r=Math.hypot((x-32)/30,(y-32)/25);
-      const tooth=random();
-      if(r>1 || tooth<.1 || (r>.86 && tooth<.35))continue;
-      const body=Math.min(1,(1-r)*7);
-      const striation=.85+.15*Math.sin(y*1.6);
-      ink.globalAlpha=body*striation*(.32+tooth*.48);
-      ink.fillRect(x,y,1,1);
-    }
-    return brush;
-  });
+  // Build each color's nibs only on first use; switching never allocates
+  // another full-size drawing canvas. At most four brush sets are cached.
+  const brushCache = new Map();
+  function brushesFor(inkColor) {
+    if (brushCache.has(inkColor)) return brushCache.get(inkColor);
+    const set = Array.from({length: 7}, () => {
+      const brush = document.createElement('canvas'); brush.width = brush.height = 64;
+      const ink = brush.getContext('2d');
+      ink.fillStyle = inkColor;
+      // A cohesive wax deposit with a ragged edge and fine grain inside it.
+      // Each pixel belongs to the nib; pigment is not a cloud of scattered particles.
+      for (let y=0;y<64;y++) for (let x=0;x<64;x++) {
+        const r=Math.hypot((x-32)/30,(y-32)/25);
+        const tooth=random();
+        if(r>1 || tooth<.1 || (r>.86 && tooth<.35))continue;
+        const body=Math.min(1,(1-r)*7);
+        const striation=.85+.15*Math.sin(y*1.6);
+        ink.globalAlpha=body*striation*(.32+tooth*.48);
+        ink.fillRect(x,y,1,1);
+      }
+      return brush;
+    });
+    brushCache.set(inkColor, set);
+    return set;
+  }
+  let brushes = brushesFor(chosenColor);
   // Fixed paper tooth prevents overlapping stamps from polishing away the grain.
   const toothCanvas=document.createElement('canvas');toothCanvas.width=toothCanvas.height=128;
   const toothCtx=toothCanvas.getContext('2d');toothCtx.fillStyle='#000';
@@ -101,10 +147,15 @@ export function mountCrayonTrails(hero, {
   function breakStroke() { previous=null; smooth=null; traveled=0; phase=0; smoothAngle=null; }
   function updateToggle() {
     if (!toggle) return;
-    toggle.setAttribute('aria-pressed', String(enabled));
-    // A minimal dot has no room for a visible label — aria-label keeps it
-    // announced correctly for screen readers/keyboard users regardless.
-    toggle.setAttribute('aria-label', `Crayon trails ${enabled ? 'on' : 'off'}`);
+    if (doodle) {
+      toggle.removeAttribute('aria-pressed');
+      toggle.setAttribute('aria-label', `Change squiggle. Current color: ${MOBILE_DOODLES[doodle.variant].name}`);
+    } else {
+      toggle.setAttribute('aria-pressed', String(enabled));
+      // A minimal dot has no room for a visible label — aria-label keeps it
+      // announced correctly for screen readers/keyboard users regardless.
+      toggle.setAttribute('aria-label', `Crayon trails ${enabled ? 'on' : 'off'}`);
+    }
     toggle.style.setProperty('--crayon-color', chosenColor);
   }
   function cancelWork() { cancelAnimationFrame(raf); clearTimeout(fadeTimer); raf=0; fadeTimer=0; stopDoodle(); }
@@ -280,7 +331,7 @@ export function mountCrayonTrails(hero, {
     if(stamps.length>cfg.maxStamps) stamps.splice(0,stamps.length-cfg.maxStamps);
     schedule();
   }
-  const toggleClick=()=>setEnabled(!enabled);
+  const toggleClick=()=>doodle ? switchDoodle() : setEnabled(!enabled);
   const preferences=()=>{
     if (doodle) { if (motion.matches) finishDoodle(); else wakeDoodle(); }
     else setEnabled(fine.matches&&!motion.matches);
@@ -328,9 +379,10 @@ export function mountCrayonTrails(hero, {
       : v > 0.75 ? b + (extent-inkInset-b)*(v-0.75)/0.25
       : a + (b-a)*(v-0.25)/0.5;
     const map = (x,y) => ({ x: mapAxis(x,left,right,width), y: mapAxis(y,top,bottom,visibleH) });
-    let previous = map(...MOBILE_DOODLE_START);
+    const form = MOBILE_DOODLES[doodle.variant];
+    let previous = map(...form.start);
     const raw = [previous];
-    for (const curve of MOBILE_DOODLE_CURVES) {
+    for (const curve of form.curves) {
       const a=previous, b=map(curve[0],curve[1]), c=map(curve[2],curve[3]), d=map(curve[4],curve[5]);
       const length = Math.hypot(b.x-a.x,b.y-a.y)+Math.hypot(c.x-b.x,c.y-b.y)+Math.hypot(d.x-c.x,d.y-c.y);
       const steps = Math.max(20, Math.ceil(length/4));
@@ -376,6 +428,19 @@ export function mountCrayonTrails(hero, {
     return true;
   }
 
+  function switchDoodle() {
+    if (!doodle || disposed) return;
+    // Cancel a partial reveal before replacing it, even on rapid taps.
+    cancelWork();
+    doodle.variant=(doodle.variant+1)%MOBILE_DOODLES.length;
+    chosenColor=CRAYON_COLORS[doodle.variant];
+    brushes=brushesFor(chosenColor);
+    Object.assign(doodle, {path:null, emitted:0, progress:0, elapsed:0,
+      lastTime:null, complete:false, dismissed:false, measuredWidth:0, delay:0});
+    stamps=[]; density.clear(); breakStroke();
+    updateToggle(); composeDoodle(); paint(); wakeDoodle();
+  }
+
   function emitDoodle() {
     if (!doodle?.path || (!doodle.complete && doodle.progress <= 0)) return;
     const now=performance.now();
@@ -419,7 +484,7 @@ export function mountCrayonTrails(hero, {
       else stopDoodle();
       return;
     }
-    const t=Math.max(0,Math.min(1,(doodle.elapsed-300)/1200));
+    const t=Math.max(0,Math.min(1,(doodle.elapsed-doodle.delay)/1200));
     // A quick hand-drawn reveal with small, monotonic changes in pace.
     doodle.progress=t+0.025*Math.sin(t*Math.PI*2)-0.014*Math.sin(t*Math.PI*6);
     if (t===1) { finishDoodle(); return; }
@@ -428,7 +493,8 @@ export function mountCrayonTrails(hero, {
   }
 
   return {
-    canvas, color: chosenColor, clear, setEnabled,
+    canvas, clear, setEnabled,
+    get color(){return chosenColor;},
     pause(value=true) {paused=value;breakStroke();if(paused)stopDoodle();else wakeDoodle();},
     get enabled(){return enabled;},
     get markCount(){return stamps.length;},

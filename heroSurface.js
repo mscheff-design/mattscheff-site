@@ -72,6 +72,7 @@ function injectStyles() {
        aria-label instead of visible text so the dot stays accessible
        without needing any text on the page. */
     .hero-materials .trails-toggle{position:absolute;z-index:200;pointer-events:auto;bottom:16px;right:18px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:0;padding:0;background:transparent;border-radius:50%;cursor:pointer}
+    @media(pointer:coarse){.hero-materials .trails-toggle{width:44px;height:44px;bottom:8px;right:10px;touch-action:manipulation}}
     .hero-materials .trails-toggle::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--crayon-color,var(--accent));transition:background 0.2s,opacity 0.2s}
     .hero-materials .trails-toggle[aria-pressed='false']::before{background:rgba(var(--ink-rgb),0.3)}
     .hero-materials .trails-toggle:hover::before{opacity:0.8}
@@ -94,10 +95,11 @@ export function initHeroSurface({ hero, cardIsBusy, navElement, getCardScreenRec
   // A sibling of .hero, not a child — see the CSS comment above.
   const materials = document.createElement('div');
   materials.className = 'hero-materials';
-  materials.setAttribute('aria-hidden', 'true');
+  // The switcher is interactive; only decorative children are aria-hidden.
 
   const paperShadow = document.createElement('div');
   paperShadow.className = 'hero-paper-shadow';
+  paperShadow.setAttribute('aria-hidden', 'true');
   const paper = document.createElement('div');
   paper.className = 'hero-paper';
   paperShadow.append(paper);
@@ -105,6 +107,7 @@ export function initHeroSurface({ hero, cardIsBusy, navElement, getCardScreenRec
   if (WOOD_ENABLED) {
     const wood = document.createElement('div');
     wood.className = 'hero-wood';
+    wood.setAttribute('aria-hidden', 'true');
     materials.append(wood);
   }
   materials.append(paperShadow);
