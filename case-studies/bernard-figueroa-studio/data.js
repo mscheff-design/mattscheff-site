@@ -17,9 +17,11 @@
 // assumption from the foundry/glassblower relationships, not a confirmed
 // material range; "gallery liaison" (mentioned once in Overview) could
 // become its own section given which galleries and what the coordination
-// involves; email cadence/list size and specific exhibitions are unstated;
-// and Status currently ends on "ongoing work" rather than a named outcome
-// (placement, commission, or press) — none of that is guessed at here.
+// involves; email cadence/list size and specific exhibitions are unstated.
+// The original draft's Status section (ending on "ongoing work" rather
+// than a named outcome) was removed 2026-09-10 per request, along with
+// the placeholder lighting-documentation image, and Production/Sales
+// materials/Email and social were condensed into one combined section.
 
 function placeholder(label, w = 1200, h = 800, bg = 'd8cfc0', fg = '1c140a') {
   const escapedLabel = String(label).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -53,16 +55,14 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'text',
+      type: 'textMedia',
       props: {
         heading: 'Overview',
         chapter: true,
         chapterLabel: 'Overview',
-        body: [
-          'Bernard Figueroa designs and produces sculptural lighting in bronze, glass, and mixed materials. The studio operates across two locations, New Jersey and Montpellier, and the work is made in collaboration with foundries and artisan glassblowers rather than in volume production.',
-          'I was hired to develop the portfolio website. The role expanded into studio assistant, content producer, and gallery liaison as it became clear that the site depended on material the studio did not yet have in an organized form.',
-          'The work is sold to collectors, decorators, and design professionals who are buying a hand-made object. Everything produced for the studio has to reflect that, and has to fit around a production schedule set by material and fabrication rather than by a content calendar.'
-        ]
+        body: 'Bernard Figueroa designs and produces sculptural lighting in bronze, glass, and mixed materials. The studio operates across two locations, New Jersey and Montpellier, and the work is made in collaboration with foundries and artisan glassblowers rather than in volume production.<br><br>I was hired to develop the portfolio website. The role expanded into studio assistant, content producer, and gallery liaison as it became clear that the site depended on material the studio did not yet have in an organized form.<br><br>The work is sold to collectors, decorators, and design professionals who are buying a hand-made object. Everything produced for the studio has to reflect that, and has to fit around a production schedule set by material and fabrication rather than by a content calendar.',
+        media: { type: 'video', src: '/assets/case-studies/bernard-figueroa-studio/video/panel.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/panel-poster.webp' },
+        orientation: 'right'
       }
     },
     {
@@ -87,13 +87,6 @@ export const CASE_STUDY = {
           'Lighting is documented twice. Once as an object, lit so form, material, and finish read clearly. Once as a light source, exposed for what the piece does to the space around it. Buyers need both, and neither image is sufficient alone.',
           'Capture is continuous and publication is selective. Documentation is folded into days the studio is already working, which keeps the public presence regular without asking Bernard to produce anything for it.'
         ]
-      }
-    },
-    {
-      type: 'fullBleedMedia',
-      props: {
-        media: { type: 'image', src: placeholder('LIGHTING DOCUMENTATION — OBJECT + LIGHT SOURCE, 1920x1080', 1920, 1080) },
-        caption: 'Each piece documented twice — once as an object, once as the light it produces.'
       }
     },
     {
@@ -139,53 +132,14 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'videoPanel',
-      props: {
-        video: { src: '/assets/case-studies/bernard-figueroa-studio/video/panel.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/panel-poster.webp' }
-      }
-    },
-    {
       type: 'text',
       props: {
-        heading: 'Production',
+        heading: 'Production, sales & outreach',
         chapter: true,
-        chapterLabel: 'Production',
+        chapterLabel: 'Production & outreach',
         body: [
-          'I represent the studio in procurement and fabrication relationships with bronze foundries and artisan glassblowers, communicating specifications, tracking lead times, and following up on deliveries. I also coordinate material sourcing and production timelines between the two locations.',
-          'The work is conducted in English and French depending on the vendor.'
-        ]
-      }
-    },
-    {
-      type: 'text',
-      props: {
-        heading: 'Sales materials',
-        chapter: true,
-        chapterLabel: 'Sales materials',
-        body: [
-          'I design spec sheets for prospective buyers, covering dimensions, materials, finishes, and editions, with the images needed to support a purchase decision. These are the documents a decorator forwards to a client, so they have to hold up on their own.'
-        ]
-      }
-    },
-    {
-      type: 'text',
-      props: {
-        heading: 'Email and social',
-        chapter: true,
-        chapterLabel: 'Email & social',
-        body: [
-          'Mailchimp campaigns go to a list of collectors, decorators, and design professionals, covering new work, studio activity, and exhibitions. Instagram is fed from the ongoing documentation, so the feed reads as a record of a studio at work.'
-        ]
-      }
-    },
-    {
-      type: 'text',
-      props: {
-        heading: 'Status',
-        chapter: true,
-        chapterLabel: 'Status',
-        body: [
-          'The website is live and maintained. Documentation and archiving are ongoing across both locations, video is in regular production, and email and social run from the same body of material.'
+          'I represent the studio in procurement and fabrication relationships with bronze foundries and artisan glassblowers — communicating specifications, tracking lead times, and coordinating material sourcing and production timelines between the two locations, in English or French depending on the vendor.',
+          'I also design spec sheets for prospective buyers, and run the studio’s email and social channels: Mailchimp campaigns to a list of collectors, decorators, and press, and an Instagram feed drawn from the ongoing documentation.'
         ]
       }
     },
