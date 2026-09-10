@@ -1227,10 +1227,17 @@ const projectTiles = new Map();
 
   // One random mark framing the whole mobile carousel box (CSS keeps it
   // hidden above 599px) — see .carousel-grease-mark and the .contact-sheet
-  // it's anchored to.
+  // it's anchored to. Deliberately NOT drawn from nextGreaseMark()/
+  // greaseMarkBag — that bag exists to keep the 5 per-tile hover marks
+  // distinct from each other, and this is a separate, unrelated draw; going
+  // through the shared bag consumed one of its 5 slots up front, so the 5
+  // tiles were only ever really drawing from 4 remaining marks before a
+  // reshuffle forced an early repeat — the "one duplicate, one missing"
+  // pattern. A plain independent pick here can't touch that bag.
   const contactSheet = document.querySelector('.contact-sheet');
   if (contactSheet) {
-    contactSheet.insertAdjacentHTML('beforeend', carouselGreaseMarkSVG(nextGreaseMark()));
+    const carouselMark = GREASE_MARKS[Math.floor(Math.random() * GREASE_MARKS.length)];
+    contactSheet.insertAdjacentHTML('beforeend', carouselGreaseMarkSVG(carouselMark));
   }
 })();
 
