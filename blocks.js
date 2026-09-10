@@ -36,6 +36,32 @@ function mediaEl(media, { eager = false } = {}) {
     video.dataset.src = media.src;
     return video;
   }
+  if (media.type === 'html') {
+    // A real HTML document (e.g. an exported Mailchimp campaign) embedded
+    // as-is via iframe, rather than a screenshot — table-based email
+    // markup with inline styles would otherwise fight the page's own CSS
+    // if injected directly. Same-origin, so contentDocument is readable:
+    // once it loads, the iframe is resized to the document's own natural
+    // height, so it never scrolls internally — all scrolling happens on
+    // fullBleedMediaBlock's own scroll-frame instead (see its own
+    // scrollable handling), the same as a tall screenshot image would.
+    const iframe = document.createElement('iframe');
+    iframe.className = 'cs-media-el';
+    iframe.src = media.src;
+    iframe.title = media.title || '';
+    iframe.loading = 'lazy';
+    iframe.addEventListener('load', () => {
+      try {
+        const doc = iframe.contentDocument;
+        const h = doc.documentElement.scrollHeight || doc.body.scrollHeight;
+        if (h) iframe.style.height = `${h}px`;
+      } catch (err) {
+        // Cross-origin or otherwise unreadable — leave whatever height
+        // was already set rather than throwing.
+      }
+    });
+    return iframe;
+  }
   const img = document.createElement('img');
   img.className = 'cs-media-el';
   img.src = media.src;
@@ -182,7 +208,11 @@ export function fullBleedMediaBlock(props) {
       thumb.style.top = `${scrollRatio * (trackHeight - thumbHeight)}px`;
     };
     frame.addEventListener('scroll', updateThumb);
-    if (media.tagName === 'IMG') media.addEventListener('load', updateThumb);
+    // IFRAME's own load listener (see mediaEl) resizes it to its
+    // document's natural height first — both listeners are attached to
+    // the same 'load' event in this same order, so by the time this one
+    // runs, frame.scrollHeight already reflects the resized iframe.
+    if (media.tagName === 'IMG' || media.tagName === 'IFRAME') media.addEventListener('load', updateThumb);
     requestAnimationFrame(updateThumb);
     frame.appendChild(track);
     inner.appendChild(frame);
@@ -548,7 +578,7 @@ function injectStyles() {
     .cs-full-bleed-scroll-hint{font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4);text-align:center;margin-bottom:16px}
     .cs-full-bleed-scroll-frame{position:relative;max-width:min(900px,92vw);margin:0 auto;overflow-y:auto;border:1px solid rgba(var(--ink-rgb),0.15);box-shadow:0 12px 32px rgba(0,0,0,0.18);scrollbar-width:none}
     .cs-full-bleed-scroll-frame::-webkit-scrollbar{display:none}
-    .cs-full-bleed-scroll-frame .cs-media-el{width:100%;display:block;object-fit:contain}
+    .cs-full-bleed-scroll-frame .cs-media-el{width:100%;display:block;object-fit:contain;border:0}
     .cs-full-bleed-scroll-track{position:absolute;top:10px;bottom:10px;right:8px;width:3px;background:rgba(var(--ink-rgb),0.08);border-radius:2px;pointer-events:none}
     .cs-full-bleed-scroll-thumb{position:absolute;left:0;width:100%;background:rgba(var(--ink-rgb),0.32);border-radius:2px}
 

@@ -44,7 +44,7 @@ export const CASE_STUDY = {
           { label: 'Principal', value: 'Keith Johnson, “The Merchant of Memphis”' },
           { label: 'Role', value: 'Digital Consultant & Creative Director' }
         ],
-        scope: `Brand strategy · Art direction · Shopify development · Copywriting · Editorial · Email · Catalog systems · Video · Press strategy · Art handling · Vendor liaison`
+        scope: `Brand strategy · Art direction · Shopify development · Copywriting · Editorial · Email · Catalog systems · Video · Press strategy · Art handling · Vendor liaison · Product photography`
       }
     },
     {
@@ -171,29 +171,6 @@ export const CASE_STUDY = {
     {
       type: 'text',
       props: {
-        heading: `Selected details`
-      }
-    },
-    {
-      type: 'gallery',
-      props: {
-        images: [
-          { src: placeholder('INQUIRY FORM — INLINE EXPANSION', 600, 600), alt: 'Inquiry form expanding inline beneath a single button' },
-          { src: placeholder('TRADE PROGRAM — ROTATING BADGE', 600, 600), alt: 'Rotating SVG trade badge on a dark ground' },
-          { src: placeholder('SEARCH OVERLAY — PREDICTIVE RESULTS', 600, 600), alt: 'Full-screen overlay search with predictive results' }
-        ]
-      }
-    },
-    {
-      type: 'fullBleedMedia',
-      props: {
-        media: { type: 'image', src: placeholder('THE DIVIDER — SOTTSASS STATIONERY BORDER, SVG', 1600, 400) },
-        caption: `The same Sottsass border used as a compositional break on the site itself, borrowed here to do the same job.`
-      }
-    },
-    {
-      type: 'text',
-      props: {
         heading: `Voice and editorial`,
         chapter: true,
         chapterLabel: `Voice`,
@@ -216,12 +193,23 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'textMedia',
+      type: 'text',
       props: {
         heading: `Email`,
-        body: `The email program was designed around the gallery’s existing relationships with collectors, designers, and press. A private digital dispatch shares selected objects and commentary, with personalized introductions based on prior correspondence and known interests.<br><br>The design extends to a printed letter using the original gallery border. Both formats retain the personal tone of Keith’s client correspondence.`,
-        media: { type: 'image', src: placeholder('DISPATCH — EMAIL TEMPLATE + PHYSICAL MAILER') },
-        orientation: 'right'
+        body: [
+          `The email program was designed around the gallery’s existing relationships with collectors, designers, and press. A private digital dispatch shares selected objects and commentary, with personalized introductions based on prior correspondence and known interests.`,
+          `Each dispatch is built with a modular email tool I developed myself, designed to make campaign creation seamless — reusable content blocks assemble into a new issue without rebuilding the template from scratch each time.`,
+          `The design extends to a printed letter using the original gallery border. Both formats retain the personal tone of Keith’s client correspondence.`
+        ]
+      }
+    },
+    {
+      type: 'fullBleedMedia',
+      props: {
+        scrollable: true,
+        maxHeight: '760px',
+        scrollHint: `Scroll to read the full dispatch`,
+        media: { type: 'html', src: '/assets/case-studies/urban-architecture/dispatch-001.html', title: 'Urban Architecture Inc. — Dispatch No. 001, a real email campaign' }
       }
     },
     {
