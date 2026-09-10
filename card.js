@@ -2972,8 +2972,52 @@ export function initCard(container) {
   // setPaused(true/false) — see explicitlyPaused above; a host page
   // calls this around anything that fully covers the card (a modal),
   // so the render loop stops paying for a frame nobody can see.
+  // The canvas fills the hero; its DOM rect is NOT the card's footprint.
+  // Cache unique mesh vertices once, then project them only when requested
+  // by the mobile ghost. Include the tab shader's displacement explicitly:
+  // Box3.setFromObject() cannot see vertex positions changed in a shader.
+  let screenBoundSources = null;
+  const boundsPoint = new THREE.Vector3();
+  const boundsMatrix = new THREE.Matrix4();
+  const boundsViewProjection = new THREE.Matrix4();
+  function getScreenRect() {
+    const canvasRect = renderer.domElement.getBoundingClientRect();
+    if (!canvasRect.width || !canvasRect.height) return null;
+    if (!screenBoundSources) {
+      screenBoundSources = [frontCap, backCap, edgeMesh, tabGroup.children[0]].map(mesh => {
+        const positions = mesh.geometry.attributes.position;
+        const weights = mesh.geometry.attributes.aTabWeight;
+        const unique = new Map();
+        for (let i = 0; i < positions.count; i++) {
+          const point = [positions.getX(i), positions.getY(i), positions.getZ(i), weights ? weights.getX(i) : 0];
+          unique.set(point.join(','), point);
+        }
+        return { mesh, points: [...unique.values()] };
+      });
+    }
+    camera.updateWorldMatrix(true, false);
+    boundsViewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    for (const { mesh, points } of screenBoundSources) {
+      mesh.updateWorldMatrix(true, false);
+      boundsMatrix.multiplyMatrices(boundsViewProjection, mesh.matrixWorld);
+      for (const [x, y, z, weight] of points) {
+        boundsPoint.set(x, y + weight * tabOffsetFront.value.x, z + weight * tabOffsetFront.value.y);
+        boundsPoint.applyMatrix4(boundsMatrix);
+        if (boundsPoint.z < -1 || boundsPoint.z > 1) continue;
+        const sx = canvasRect.left + (boundsPoint.x + 1) * canvasRect.width / 2;
+        const sy = canvasRect.top + (1 - boundsPoint.y) * canvasRect.height / 2;
+        left = Math.min(left, sx); right = Math.max(right, sx);
+        top = Math.min(top, sy); bottom = Math.max(bottom, sy);
+      }
+    }
+    if (![left, top, right, bottom].every(Number.isFinite)) return null;
+    return { left, top, right, bottom, width: right - left, height: bottom - top };
+  }
+
   return {
     hitsCard,
+    getScreenRect,
     isCardSettled,
     setPaused(paused) {
       explicitlyPaused = !!paused;

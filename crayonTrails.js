@@ -29,10 +29,81 @@ export function opacityAt(age, hold, fade) {
   return age <= hold ? 1 : Math.max(0, 1 - (age-hold)/fade);
 }
 
+// Ghost-only geometry, in the same CSS-pixel coordinates as its stamps.
+// A small inset makes travel along an exclusion edge legal while still
+// rejecting segments that cut across a corner. No stamps are discarded.
+function ghostSegmentHitsRect(a, b, rect) {
+  if (!rect) return false;
+  let enter = 0, leave = 1;
+  for (const [axis, low, high] of [['x', rect.left + 0.001, rect.right - 0.001], ['y', rect.top + 0.001, rect.bottom - 0.001]]) {
+    if (low >= high) return false;
+    const delta = b[axis] - a[axis];
+    if (Math.abs(delta) < 1e-9) {
+      if (a[axis] < low || a[axis] > high) return false;
+    } else {
+      const t0 = (low - a[axis]) / delta, t1 = (high - a[axis]) / delta;
+      enter = Math.max(enter, Math.min(t0, t1));
+      leave = Math.min(leave, Math.max(t0, t1));
+      if (enter > leave) return false;
+    }
+  }
+  return enter <= leave;
+}
+
+function ghostSafePoint(point, area, obstacle) {
+  const p = { x: Math.max(area.left, Math.min(area.right, point.x)), y: Math.max(area.top, Math.min(area.bottom, point.y)) };
+  if (!obstacle || !ghostSegmentHitsRect(p, p, obstacle)) return p;
+  const exits = [
+    { x: obstacle.left, y: p.y }, { x: obstacle.right, y: p.y },
+    { x: p.x, y: obstacle.top }, { x: p.x, y: obstacle.bottom }
+  ].filter(q => q.x >= area.left && q.x <= area.right && q.y >= area.top && q.y <= area.bottom);
+  exits.sort((a, b) => Math.hypot(a.x-p.x, a.y-p.y) - Math.hypot(b.x-p.x, b.y-p.y));
+  return exits[0] || null; // A fully covered surface has nowhere to draw.
+}
+
+function ghostRouteSegment(from, target, area, obstacle) {
+  const start = ghostSafePoint(from, area, obstacle);
+  const end = ghostSafePoint(target, area, obstacle);
+  if (!start || !end) return [];
+  // If a resize/tab expansion covers the current pen, leave continuously
+  // through the nearest available edge, rather than teleporting the pen.
+  const prefix = [from];
+  if (start.x !== from.x || start.y !== from.y) prefix.push(start);
+  if (!ghostSegmentHitsRect(start, end, obstacle)) return [...prefix, end];
+  const corners = [
+    { x: obstacle.left, y: obstacle.top }, { x: obstacle.right, y: obstacle.top },
+    { x: obstacle.right, y: obstacle.bottom }, { x: obstacle.left, y: obstacle.bottom }
+  ].filter(p => p.x >= area.left && p.x <= area.right && p.y >= area.top && p.y <= area.bottom);
+  // At most six nodes. Find the shortest continuous route around the box;
+  // normal loops take the direct fast path above and retain their shape.
+  const nodes = [start, end, ...corners];
+  const distances = nodes.map(() => Infinity), parents = nodes.map(() => -1), done = new Set();
+  distances[0] = 0;
+  for (let step = 0; step < nodes.length; step++) {
+    let current = -1;
+    for (let i = 0; i < nodes.length; i++) {
+      if (!done.has(i) && (current < 0 || distances[i] < distances[current])) current = i;
+    }
+    if (current < 0 || !Number.isFinite(distances[current])) break;
+    if (current === 1) {
+      const route = [];
+      for (let i = 1; i !== 0; i = parents[i]) route.unshift(nodes[i]);
+      return [...prefix, ...route];
+    }
+    done.add(current);
+    for (let i = 0; i < nodes.length; i++) {
+      if (done.has(i) || ghostSegmentHitsRect(nodes[current], nodes[i], obstacle)) continue;
+      const next = distances[current] + Math.hypot(nodes[i].x-nodes[current].x, nodes[i].y-nodes[current].y);
+      if (next < distances[i]) { distances[i] = next; parents[i] = current; }
+    }
+  }
+  return prefix; // No visible corridor: stay on this side of the card.
+}
+
 export function mountCrayonTrails(hero, {
   surface = hero, toggle = null, color = null, seed = Math.floor(Math.random()*4294967295),
   getExclusionRects = () => [], isPointBlocked = () => false, isBusy = () => false,
-  isPaperPoint = () => true, ...overrides
+  isPaperPoint = () => true, getCardScreenRect = () => null, ...overrides
 } = {}) {
   const cfg = { ...CRAYON_DEFAULTS, ...overrides };
   const random = makeRandom(seed);
@@ -306,41 +377,104 @@ export function mountCrayonTrails(hero, {
     let queue = [];
     let stampBudget = 0;
     let lastTime = performance.now();
+    let lastDrawn = null;
+    let environment = null;
+    let wanderTarget = null;
+
+    function readEnvironment() {
+      const surfaceRect = surface.getBoundingClientRect();
+      const visibleH = surface.clientHeight || height;
+      const nib = cfg.width * 0.6;
+      const area = { left: nib, top: nib, right: Math.max(nib, width - nib), bottom: Math.max(nib, visibleH - nib) };
+      const screen = getCardScreenRect();
+      let obstacle = null;
+      if (screen && surfaceRect.width > 0 && surfaceRect.height > 0) {
+        const sx = width / surfaceRect.width, sy = visibleH / surfaceRect.height;
+        // Extra clearance keeps the wax edge visible and gives gentle idle
+        // motion some room. Both rectangles use viewport coordinates, so
+        // subtracting them also handles scrolling and the sibling backdrop.
+        const clearance = nib + 10;
+        obstacle = {
+          left: (screen.left - surfaceRect.left) * sx - clearance,
+          right: (screen.right - surfaceRect.left) * sx + clearance,
+          top: (screen.top - surfaceRect.top) * sy - clearance,
+          bottom: (screen.bottom - surfaceRect.top) * sy + clearance
+        };
+        if (!Object.values(obstacle).every(Number.isFinite) || obstacle.right < area.left || obstacle.left > area.right || obstacle.bottom < area.top || obstacle.top > area.bottom) obstacle = null;
+      }
+      return { area, obstacle, visibleH };
+    }
+
+    function refreshEnvironment() {
+      const next = readEnvironment();
+      if (!environment) {
+        // Choose an initial visible position once. Later changes continue
+        // from the last emitted stamp, not the unconsumed queue's endpoint.
+        const initial = ghostSafePoint({ x: px, y: py }, next.area, next.obstacle);
+        if (initial) { px = initial.x; py = initial.y; }
+      } else {
+        const sizeChanged = next.area.right !== environment.area.right || next.area.bottom !== environment.area.bottom;
+        // Plan with ten pixels of breathing room, but replan only when
+        // queued travel threatens the brush clearance itself. Rebuilding
+        // on every small bounds change would interrupt loops during the
+        // card's normal idle breathing/tilt.
+        const guard = next.obstacle && {
+          left: next.obstacle.left + 8, right: next.obstacle.right - 8,
+          top: next.obstacle.top + 8, bottom: next.obstacle.bottom - 8
+        };
+        let previousPoint = lastDrawn;
+        const threatened = guard && queue.some(p => {
+          const crosses = ghostSegmentHitsRect(previousPoint || p, p, guard);
+          previousPoint = p;
+          return crosses;
+        });
+        if (sizeChanged || threatened) {
+          queue = [];
+          wanderTarget = null;
+          if (lastDrawn) { px = lastDrawn.x; py = lastDrawn.y; angle = lastDrawn.angle; }
+        }
+      }
+      environment = next;
+    }
 
     // One loop's worth of stamps, continuing from wherever the pen
     // currently is (not restarting somewhere random each time) — this
     // continuity, not the loop shape itself, is what makes it read as
     // one hand wandering around rather than repeated separate marks.
     function generateNextLoop() {
-      const visibleH = surface.clientHeight || height;
-      // Softly steers back toward the middle of the visible area once
-      // the pen drifts too close to an edge, instead of a hard bounce —
-      // keeps the doodle roaming broadly without ever fully wandering
-      // off-canvas.
-      const marginX = width * 0.12, marginY = visibleH * 0.12;
-      // The 3D card sits centered in the hero regardless of viewport size
-      // (flex-centered), so a rough centered zone approximates its
-      // footprint well enough — this module has no direct line to the
-      // card's real DOM rect, and "tends to avoid" doesn't need pixel
-      // accuracy. When the pen is inside it, steer away from that zone's
-      // own center instead of toward the canvas center, so the doodle
-      // stays in the visible margin around the card rather than wasting
-      // strokes somewhere the opaque card would just hide them.
-      const cardW = width * 0.72, cardH = visibleH * 0.5;
-      const cardCx = width / 2, cardCy = visibleH / 2;
-      const inCardZone = Math.abs(px - cardCx) < cardW / 2 && Math.abs(py - cardCy) < cardH / 2;
-      let biasAngle = null;
-      if (inCardZone) {
-        biasAngle = Math.atan2(py - cardCy, px - cardCx);
-      } else if (px < marginX || px > width - marginX || py < marginY || py > visibleH - marginY) {
-        biasAngle = Math.atan2(visibleH / 2 - py, width / 2 - px);
+      const { area, obstacle } = environment;
+      // Give the hand somewhere farther away to wander. Local avoidance
+      // alone traps small loops between the card and the screen edge,
+      // building a dense knot instead of the reference's open scribble.
+      if (!wanderTarget || Math.hypot(wanderTarget.x-px, wanderTarget.y-py) < 45) {
+        let farthest = 0;
+        for (let i = 0; i < 8; i++) {
+          const candidate = ghostSafePoint({
+            x: area.left + random() * (area.right-area.left),
+            y: area.top + random() * (area.bottom-area.top)
+          }, area, obstacle);
+          if (!candidate) continue;
+          const distance = Math.hypot(candidate.x-px, candidate.y-py);
+          const route = ghostRouteSegment({ x: px, y: py }, candidate, area, obstacle);
+          const end = route[route.length-1];
+          if (end && end.x === candidate.x && end.y === candidate.y && distance > farthest) {
+            farthest = distance; wanderTarget = candidate;
+          }
+        }
       }
+      const travelRoute = wanderTarget ? ghostRouteSegment({ x: px, y: py }, wanderTarget, area, obstacle) : [];
+      const guide = travelRoute.find(p => Math.hypot(p.x-px, p.y-py) > 0.1);
+      const biasAngle = guide ? Math.atan2(guide.y-py, guide.x-px) : null;
       const dir = random() < 0.5 ? 1 : -1;
       const radius = 34 * (0.65 + random() * 0.4);
       const radiusY = radius * (0.55 + random() * 0.25);
       const sweep = Math.PI * 2 * (0.55 + random() * 0.55);
       const loopAngle = biasAngle !== null ? biasAngle + (random() - 0.5) * 0.8 : angle;
-      const raw = [];
+      // Include the previous endpoint: never jump to the first point on
+      // the next ellipse. All connecting segments use the same resampler.
+      const raw = [{ x: px, y: py }];
+      const travelAngle = biasAngle === null ? angle : biasAngle;
+      const drift = radius * 1.5;
       const steps = 26;
       for (let i = 0; i <= steps; i++) {
         const u = i / steps;
@@ -348,7 +482,12 @@ export function mountCrayonTrails(hero, {
         // A real scribbling hand never traces a perfectly smooth curve —
         // small per-step wobble on top of the ellipse itself.
         const wobble = (random() - 0.5) * radius * 0.08;
-        raw.push({ x: px + Math.cos(a) * (radius + wobble), y: py + Math.sin(a) * (radiusY + wobble) });
+        const target = {
+          x: px + Math.cos(a) * (radius + wobble) + Math.cos(travelAngle) * drift * u,
+          y: py + Math.sin(a) * (radiusY + wobble) + Math.sin(travelAngle) * drift * u
+        };
+        const route = ghostRouteSegment(raw[raw.length - 1], target, area, obstacle);
+        raw.push(...route.slice(1));
       }
       angle = loopAngle + dir * sweep + (random() - 0.5) * 0.7;
       px = raw[raw.length - 1].x;
@@ -392,12 +531,14 @@ export function mountCrayonTrails(hero, {
       if (disposed) return;
       const dt = Math.min(0.1, (now - lastTime) / 1000);
       lastTime = now;
-      if (visible && !document.hidden) {
+      if (visible && !document.hidden && !paused && !motion.matches) {
+        refreshEnvironment();
         if (queue.length < 40) generateNextLoop();
-        stampBudget += (drawSpeedPxPerSec * dt) / spacing;
+        stampBudget = queue.length ? stampBudget + (drawSpeedPxPerSec * dt) / spacing : 0;
         while (stampBudget >= 1 && queue.length) {
           stampBudget -= 1;
           const p = queue.shift();
+          lastDrawn = p;
           stamps.push({ x: p.x, y: p.y, time: now, angle: p.angle, size: p.size, alpha: p.alpha, brush: Math.floor(random() * brushes.length) });
         }
         paint();

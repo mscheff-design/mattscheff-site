@@ -736,6 +736,7 @@ const card = initCard(document.getElementById('card3d'));
 initHeroSurface({
   hero: document.querySelector('.hero'),
   cardIsBusy: () => !card.isCardSettled(),
+  getCardScreenRect: () => card.getScreenRect(),
   navElement: document.querySelector('nav')
 });
 document.getElementById('card3d').addEventListener('resume-job-click', (e) => {

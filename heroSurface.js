@@ -85,7 +85,7 @@ function injectStyles() {
     mountCrayonTrails call below) — the crayon canvas sits behind the card in
     z-order, so a mark recorded there just stays hidden until the card moves
     off it, rather than leaving a permanent gap shaped like the card. */
-export function initHeroSurface({ hero, cardIsBusy, navElement }) {
+export function initHeroSurface({ hero, cardIsBusy, navElement, getCardScreenRect = () => null }) {
   if (typeof cardIsBusy !== 'function') {
     throw new TypeError('initHeroSurface needs a cardIsBusy callback.');
   }
@@ -166,6 +166,9 @@ export function initHeroSurface({ hero, cardIsBusy, navElement }) {
     surface: materials,
     toggle,
     isBusy: cardIsBusy,
+    // Used only by the touch ghost; interactive desktop strokes retain
+    // their existing behavior behind the card.
+    getCardScreenRect,
     // Trying marks under nav too, per request — nav sits above the crayon
     // canvas in z-order (z-index:100 vs the backdrop's auto) with its own
     // frosted-glass blur, so marks there show through blurred/desaturated
