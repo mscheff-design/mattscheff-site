@@ -297,9 +297,9 @@ export function mountCrayonTrails(hero, {
   function startGhostDoodle() {
     if (disposed) return;
     const spacing = Math.max(1.4, cfg.width * 0.1);
-    // How fast the virtual pen moves, in px/sec — slow and unhurried,
-    // like an idle doodle rather than a rushed reveal.
-    const drawSpeedPxPerSec = 20;
+    // How fast the virtual pen moves, in px/sec — unhurried, but with
+    // enough pace that the doodle visibly progresses rather than crawling.
+    const drawSpeedPxPerSec = 34;
     let px = width * (0.2 + random() * 0.6);
     let py = (surface.clientHeight || height) * (0.2 + random() * 0.6);
     let angle = random() * Math.PI * 2;
@@ -318,8 +318,21 @@ export function mountCrayonTrails(hero, {
       // keeps the doodle roaming broadly without ever fully wandering
       // off-canvas.
       const marginX = width * 0.12, marginY = visibleH * 0.12;
+      // The 3D card sits centered in the hero regardless of viewport size
+      // (flex-centered), so a rough centered zone approximates its
+      // footprint well enough — this module has no direct line to the
+      // card's real DOM rect, and "tends to avoid" doesn't need pixel
+      // accuracy. When the pen is inside it, steer away from that zone's
+      // own center instead of toward the canvas center, so the doodle
+      // stays in the visible margin around the card rather than wasting
+      // strokes somewhere the opaque card would just hide them.
+      const cardW = width * 0.72, cardH = visibleH * 0.5;
+      const cardCx = width / 2, cardCy = visibleH / 2;
+      const inCardZone = Math.abs(px - cardCx) < cardW / 2 && Math.abs(py - cardCy) < cardH / 2;
       let biasAngle = null;
-      if (px < marginX || px > width - marginX || py < marginY || py > visibleH - marginY) {
+      if (inCardZone) {
+        biasAngle = Math.atan2(py - cardCy, px - cardCx);
+      } else if (px < marginX || px > width - marginX || py < marginY || py > visibleH - marginY) {
         biasAngle = Math.atan2(visibleH / 2 - py, width / 2 - px);
       }
       const dir = random() < 0.5 ? 1 : -1;
