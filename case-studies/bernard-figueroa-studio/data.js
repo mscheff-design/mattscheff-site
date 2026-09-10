@@ -97,6 +97,15 @@ export const CASE_STUDY = {
       }
     },
     {
+      type: 'gallery',
+      props: {
+        images: [
+          { src: '/assets/case-studies/bernard-figueroa-studio/sculpture-cave.webp', alt: 'A bronze sculpture mounted on a rusted steel bracket, cast in dramatic natural light' },
+          { src: '/assets/case-studies/bernard-figueroa-studio/floor-piece-interior.webp', alt: 'A tall plaster floor piece staged in a collector’s living room' }
+        ]
+      }
+    },
+    {
       type: 'text',
       props: {
         heading: 'Archive',
@@ -127,6 +136,12 @@ export const CASE_STUDY = {
           { src: '/assets/case-studies/bernard-figueroa-studio/video/old.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/old-poster.webp' },
           { src: '/assets/case-studies/bernard-figueroa-studio/video/quick.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/quick-poster.webp' }
         ]
+      }
+    },
+    {
+      type: 'videoPanel',
+      props: {
+        video: { src: '/assets/case-studies/bernard-figueroa-studio/video/panel.mp4', poster: '/assets/case-studies/bernard-figueroa-studio/video/panel-poster.webp' }
       }
     },
     {
