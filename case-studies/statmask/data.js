@@ -151,7 +151,7 @@ export const CASE_STUDY = {
     },
     {
       type: 'nextProject',
-      props: { nextId: 'contributor-development-partnership' }
+      props: { nextId: 'urban-architecture' }
     }
   ]
 };
