@@ -355,7 +355,7 @@ export function videoTriptychBlock(props) {
     const tile = el('div', 'cs-video-tile');
     const video = mediaEl({ type: 'video', src: item.src, poster: item.poster });
     tile.appendChild(video);
-    tile.appendChild(el('div', 'cs-video-sound', '🔊 Sound'));
+    tile.appendChild(el('div', 'cs-video-sound', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M18.5 6.5a8 8 0 0 1 0 11"/></svg>'));
     if (isTouchDevice) {
       tile.addEventListener('click', () => {
         video.muted = !video.muted;
@@ -706,7 +706,8 @@ function injectStyles() {
     .cs-shadowbox-inner{max-width:min(1100px,92vw);margin:0 auto;padding:0 24px;box-sizing:border-box}
     .cs-video-tile{position:relative;aspect-ratio:9/16;overflow:hidden;background:#000;box-shadow:inset 0 0 32px rgba(0,0,0,0.6)}
     .cs-video-tile .cs-media-el{width:100%;height:100%;display:block;object-fit:cover}
-    .cs-video-sound{position:absolute;right:10px;bottom:10px;font-family:var(--font-mono);font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.45);background:rgba(0,0,0,0.4);padding:4px 8px;border-radius:2px;pointer-events:none;transition:color 0.2s ease,background-color 0.2s ease}
+    .cs-video-sound{position:absolute;right:10px;bottom:10px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.45);background:rgba(0,0,0,0.4);border-radius:50%;pointer-events:none;transition:color 0.2s ease,background-color 0.2s ease}
+    .cs-video-sound svg{width:14px;height:14px;display:block}
     .cs-video-tile:hover .cs-video-sound,.cs-video-tile.is-unmuted .cs-video-sound{color:#fff;background:rgba(0,0,0,0.7)}
 
     .cs-video-triptych-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
