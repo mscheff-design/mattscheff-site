@@ -204,14 +204,15 @@ export const CASE_STUDY = {
       }
     },
     {
-      type: 'textMedia',
+      type: 'text',
       props: {
         heading: `Operations`,
         chapter: true,
         chapterLabel: `Operations`,
-        body: `A catalog workflow converts European supplier pricing into Shopify-ready data and flags discrepancies for review. This has caught pricing errors before publication and simplifies updates across the collection.<br><br>The broader workflow keeps Keith’s involvement manageable through brief approvals, photographs, and scheduled filming sessions. Production and publication are coordinated around those contributions.`,
-        media: { type: 'image', src: placeholder('PRICING PIPELINE — TERMINAL / SHEET CAPTURE') },
-        orientation: 'left'
+        body: [
+          `A catalog workflow converts European supplier pricing into Shopify-ready data and flags discrepancies for review. This has caught pricing errors before publication and simplifies updates across the collection.`,
+          `The broader workflow keeps Keith’s involvement manageable through brief approvals, photographs, and scheduled filming sessions. Production and publication are coordinated around those contributions.`
+        ]
       }
     },
     {
