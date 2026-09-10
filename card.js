@@ -2073,22 +2073,12 @@ export function initCard(container) {
   });
 
   window.addEventListener('pointermove', (e) => {
-    // Mobile still drops free-drag and the hover guides, by request —
-    // tap-to-flip (via handleCardClick, in pointerup below) remains the
-    // only gesture besides this. Touch-tilt is back: reacts only while a
-    // touch that started on the card (pointerDownOnCard, set at
-    // pointerdown below — the same flag interactionRoot's own touch-
-    // action:none already gates on) is moving and hasn't crossed the drag
-    // threshold yet, mirroring desktop's own !dragging gate on the same
-    // updateHoverTilt call. touchAction is already 'none' for exactly
-    // this gesture, so this never fights page scroll. pointerup/
-    // pointercancel below reset the tilt target back to 0 on lift, since
-    // touch has no lingering "hover" the way a mouse does once contact
-    // ends — nothing else would ever zero it out again.
-    if (isTouchDevice) {
-      if (pointerDownOnCard && !dragging) updateHoverTilt(e.clientX, e.clientY);
-      return;
-    }
+    // Mobile drops hover/tilt, free-drag, and the hover guides entirely,
+    // by request — tap-to-flip (via handleCardClick, in pointerup below)
+    // is the only gesture left there. Touch-tilt was tried and reverted;
+    // the card's idle sway/breathe is the ambient motion cue on mobile
+    // instead (see idleBlend/swayY/breathe below, amplified for touch).
+    if (isTouchDevice) return;
     lastPointerX = e.clientX;
     lastPointerY = e.clientY;
     if (!dragging) updateHoverTilt(e.clientX, e.clientY);
@@ -2138,11 +2128,6 @@ export function initCard(container) {
     document.body.style.userSelect = '';
     document.body.style.webkitUserSelect = '';
     interactionRoot.style.touchAction = 'auto';
-    // Touch has no lingering "hover" once contact ends — unlike a mouse,
-    // which keeps generating pointermove (and so keeps re-settling tilt)
-    // independent of button state, nothing would ever zero a touch-tilt
-    // target again after this lift without doing it explicitly here.
-    if (isTouchDevice) { tiltTargetX = 0; tiltTargetY = 0; }
   });
 
   // A touch sequence can end without ever reaching pointerup — the OS
@@ -2162,7 +2147,6 @@ export function initCard(container) {
     document.body.style.userSelect = '';
     document.body.style.webkitUserSelect = '';
     interactionRoot.style.touchAction = 'auto';
-    if (isTouchDevice) { tiltTargetX = 0; tiltTargetY = 0; }
   });
 
   interactionRoot.addEventListener('pointerleave', () => {
@@ -2896,8 +2880,14 @@ export function initCard(container) {
     // instead of snapping it, so a stale phase no longer reads as a pop.
     const idleActive = mode === 'idle' && !hovering && !dragging && !physicsSuspended;
     idleBlend += ((idleActive ? 1 : 0) - idleBlend) * (1 - Math.pow(1 - 0.1, dt60));
-    const swayY = THREE.MathUtils.degToRad(4) * Math.sin(idleT * 0.5) * idleBlend;
-    const breathe = Math.sin(idleT * 0.6) * 0.035 * idleBlend;
+    // Bigger on touch — with touch-tilt gone (tried and reverted), this
+    // idle sway/breathe is the ONLY ambient motion a mobile visitor ever
+    // sees on the card at rest, where desktop also has real hover-tilt to
+    // read as "alive." Desktop's own amplitude is unchanged.
+    const swayAmplitude = isTouchDevice ? 7 : 4;
+    const breatheAmplitude = isTouchDevice ? 0.065 : 0.035;
+    const swayY = THREE.MathUtils.degToRad(swayAmplitude) * Math.sin(idleT * 0.5) * idleBlend;
+    const breathe = Math.sin(idleT * 0.6) * breatheAmplitude * idleBlend;
 
     // posY is a transient drag offset (always springs back to 0); cardLift
     // is the persistent, state-driven "parked near the top" offset for

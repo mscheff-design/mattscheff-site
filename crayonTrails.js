@@ -295,20 +295,47 @@ export function mountCrayonTrails(hero, {
   // uses), not per frame — it's meant to look considered, not jittery.
   function generateFlourishPath() {
     const visibleH = surface.clientHeight || height;
-    const marginX = Math.min(150, width * 0.32);
-    const marginY = Math.min(100, visibleH * 0.16);
-    const originX = width - marginX * 0.5;
-    const originY = visibleH - marginY * 0.6;
-    const spanX = marginX * 0.95;
-    const spanY = marginY * 0.7;
+    // A dense, continuous chain of loose, overlapping loops drifting
+    // across a horizontal band — Cy Twombly's scribble drawings (the
+    // blackboard pieces especially) rather than a handful of clean
+    // discrete shapes: tight, energetic, cursive-like, elongated
+    // ellipses, wobbling instead of tracing perfect curves, with each
+    // loop's size and rhythm varying irregularly rather than shrinking on
+    // a clean progression. Everything randomized below comes from the
+    // same seeded random() every other stamp on this canvas already
+    // uses, so it's consistent per mount, not per frame.
+    const bandW = Math.min(340, width * 0.66);
+    const bandH = Math.min(150, visibleH * 0.2);
+    let cx = width - bandW * 0.92;
+    const baseY = visibleH - bandH * 1.15;
+    let cy = baseY;
+    let angle = random() * Math.PI * 2;
+    const loopCount = 12 + Math.floor(random() * 6);
     const raw = [];
-    const steps = 72;
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      raw.push({
-        x: originX - spanX * t + Math.sin(t * Math.PI * 2.3) * (spanX * 0.16),
-        y: originY - Math.sin(t * Math.PI) * spanY + Math.sin(t * Math.PI * 4.1) * (spanY * 0.1)
-      });
+    for (let loop = 0; loop < loopCount; loop++) {
+      const dir = random() < 0.5 ? 1 : -1;
+      const radiusX = bandH * (0.3 + random() * 0.32);
+      const radiusY = radiusX * (0.5 + random() * 0.25);
+      // Not a clean full circle — anywhere from a bit over half a loop to
+      // a loop and a half, so successive loops overlap unevenly instead
+      // of stacking in a tidy repeating rhythm.
+      const sweep = Math.PI * 2 * (0.6 + random() * 0.7);
+      const steps = 24;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const a = angle + dir * sweep * t;
+        // A real scribbling hand never traces a perfectly smooth curve —
+        // small per-step wobble on top of the ellipse itself.
+        const wobble = (random() - 0.5) * radiusX * 0.08;
+        raw.push({ x: cx + Math.cos(a) * (radiusX + wobble), y: cy + Math.sin(a) * (radiusY + wobble) });
+      }
+      angle += dir * sweep + (random() - 0.5) * 0.7;
+      // Drifts generally leftward across the band, like a line of loose
+      // cursive writing, while wandering vertically within it — this
+      // sweep is what makes it read as one gestural pass instead of
+      // loops piling up in one spot.
+      cx -= (bandW / loopCount) * (0.6 + random() * 0.9);
+      cy = baseY + (random() - 0.5) * bandH * 0.55;
     }
     // Same tangent-angle-from-consecutive-points approach move() uses for
     // real strokes, just walking a generated array instead of live
