@@ -29,10 +29,10 @@ export const JOBS = [
   },
   {
     id: 'statmask',
-    role: 'Social Media & E-Commerce Manager, Product Photographer',
+    role: 'Social Media Manager, Product Photographer',
     name: 'STATMASK',
     dates: '2020 – 2022',
-    tags: ['PRODUCT PHOTOGRAPHY', 'PAID SOCIAL', 'E-COMMERCE'],
+    tags: ['PRODUCT PHOTOGRAPHY', 'PAID SOCIAL', 'META ADS'],
     caseStudyUrl: '/case-studies/statmask/'
   },
   {

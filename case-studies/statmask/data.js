@@ -2,8 +2,14 @@
 //
 // REAL COPY — user-provided narrative, provided 2026-09-09. Real product/
 // lifestyle photography and ad-creative assets added 2026-09-10, under
-// /assets/case-studies/statmask/. A few placeholder() SVGs remain where no
-// matching asset was provided (Storefront has no PDP screenshot yet).
+// /assets/case-studies/statmask/.
+//
+// The original draft included a "Storefront" section (managing Shopify
+// catalog/listing/promo mechanics) and an "E-Commerce Manager" role —
+// removed 2026-09-10 per correction: the storefront itself wasn't the
+// user's responsibility at the time (there was a separate web developer),
+// so that scope was never actually theirs to claim. Role trimmed to
+// "Social Media Manager, Product Photographer" to match.
 //
 // The user's draft included a "NOTES FOR MATT, not for publication" section
 // flagging open questions (the specific mechanism behind the Q3 2021
@@ -19,15 +25,6 @@
 // first), since the story is about photography-driven paid social — a
 // bold visual open fits it better than the text-first opens used in
 // urban-architecture/bernard-figueroa-studio.
-
-function placeholder(label, w = 1200, h = 800, bg = 'd8cfc0', fg = '1c140a') {
-  const escapedLabel = String(label).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'>
-    <rect width='100%' height='100%' fill='#${bg}'/>
-    <text x='50%' y='50%' font-family='monospace' font-size='20' fill='#${fg}' fill-opacity='0.5' text-anchor='middle' dominant-baseline='middle'>${escapedLabel}</text>
-  </svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
 
 export const CASE_STUDY = {
   id: 'statmask',
@@ -54,9 +51,9 @@ export const CASE_STUDY = {
         caseId: 'STM — 03',
         items: [
           { label: 'Client', value: 'STATMASK' },
-          { label: 'Role', value: 'Social Media & E-Commerce Manager, Product Photographer' }
+          { label: 'Role', value: 'Social Media Manager, Product Photographer' }
         ],
-        scope: 'Product photography, short-form video, art direction, modular asset system, Meta campaign management, Shopify operations, analytics, and sales collateral.'
+        scope: 'Product photography, short-form video, art direction, modular asset system, Meta campaign management, analytics, and sales collateral.'
       }
     },
     {
@@ -114,18 +111,6 @@ export const CASE_STUDY = {
         body: 'I managed Meta campaign strategy through the ads portal: audience construction and refinement with Facebook Audiences, interest and lookalike layering, budget allocation, and the testing schedule.<br><br>Testing was structured around one variable at a time, usually image style, offer framing, or copy angle, so results could be attributed. Winning variants moved into the primary set and losing ones informed the next production block.',
         media: { type: 'image', src: '/assets/case-studies/statmask/black-friday-ad-creative.webp', alt: 'A Black Friday Meta ad creative built from the modular asset system' },
         orientation: 'left'
-      }
-    },
-    {
-      type: 'text',
-      props: {
-        heading: 'Storefront',
-        chapter: true,
-        chapterLabel: 'Storefront',
-        body: [
-          'I managed e-commerce operations on Shopify, including catalog structure, listing copy, imagery, and promotional mechanics.',
-          'Owning the storefront and the ad account together meant the ad and the page it pointed to were built at the same time, from the same image, in the same language. A strong ad pointed at a weak product page loses money quickly.'
-        ]
       }
     },
     {
