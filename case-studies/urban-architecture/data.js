@@ -59,7 +59,7 @@ export const CASE_STUDY = {
           {
             heading: `The challenge`,
             body: [
-              `Urban Architecture’s audience is small, informed, and selective: collectors, interior designers, architects, and curators. Reaching more people was never the objective. The site had to be immediately credible to the few visitors who mattered.`,
+              `Urban Architecture’s audience is small, informed, and selective: collectors, interior designers, architects, and curators. Reaching more people was never the objective. The site had to be immediately credible to visitors already near the end of the conversion funnel — collectors who didn’t need an introduction to Memphis Milano, only reassurance this dealer was the real thing.`,
               `Most of the business existed in forms that do not translate directly to the internet. Knowledge held in conversation. Relationships held in a Rolodex. Prices held in European spreadsheets and printed reference books. Sales conducted through direct inquiry.`,
               `Each of those required a decision about what it should become online and what should stay personal. The e-commerce build and the visibility strategy also had to be developed in parallel, without either compromising the other.`
             ]
@@ -67,8 +67,7 @@ export const CASE_STUDY = {
           {
             heading: `The approach`,
             body: [
-              `Four words governed the strategy: micro, targeted, intentional, authentic.`,
-              `Keith sits at the center. The brand is built around him as The Merchant of Memphis, with authority that comes from having been there since the beginning.`,
+              `Four words governed the strategy — micro, targeted, intentional, authentic — and Keith sits at the center of it. The brand is built around him as The Merchant of Memphis, with authority that comes from having been there since the beginning.`,
               `The visual system is quiet and editorial. It gives the objects room and assumes intelligence in the visitor, avoiding over-explanation and sales language. In this market, restraint carries a signal of its own.`,
               `Every part of the system extends something already true. A small, taste-conscious audience recognizes anything manufactured quickly, so the work builds on existing knowledge and existing relationships rather than imitating them.`,
               `The objective throughout is a small number of high-value relationships rather than reach.`
