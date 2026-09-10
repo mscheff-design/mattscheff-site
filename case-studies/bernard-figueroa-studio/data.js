@@ -77,6 +77,12 @@ export const CASE_STUDY = {
       }
     },
     {
+      type: 'fullBleedMedia',
+      props: {
+        media: { type: 'image', src: '/assets/case-studies/bernard-figueroa-studio/homepage-screenshot.webp', alt: 'The Bernard Figueroa Lights homepage, a grid of sculptural lighting and sculpture pieces' }
+      }
+    },
+    {
       type: 'text',
       props: {
         heading: 'Documentation',
