@@ -311,10 +311,20 @@ const RESUME_PDF_PATH = 'assets/matthew-scheffler-resume.pdf';
 // something composed for it — YEAR_Y_F stays put either way since it's
 // pinned close to TOGGLE_BAND_TOP_F, but the block above it gets more
 // deliberate breathing room on portrait instead.
-const NAME_FIRST_Y_F = isTouchDevice ? 0.40 : 0.42;
-const NAME_LAST_Y_F = isTouchDevice ? 0.57 : 0.6;
-const TITLE_LINE1_Y_F = isTouchDevice ? 0.74 : 0.75;
-const TITLE_LINE2_Y_F = isTouchDevice ? 0.81 : 0.82;
+// Touch values pulled up and tightened relative to desktop's, not just
+// nudged — text is smaller on portrait (fitNameSize/fitTrackedSize shrink
+// it to the narrower width), so reusing near-desktop fractions left the
+// same absolute gaps sitting around visibly smaller text: an oversized
+// top margin before "Matthew" even starts, and a name/title block that
+// read as spaced-out rather than composed for its own scale. Pulling
+// NAME_FIRST_Y_F up is the main lever; the reclaimed room lands as a
+// deliberately larger gap before YEAR_Y_F (unchanged, still pinned near
+// TOGGLE_BAND_TOP_F either way) instead, which the dashed divider there
+// already marks as a real section break, not leftover space.
+const NAME_FIRST_Y_F = isTouchDevice ? 0.32 : 0.42;
+const NAME_LAST_Y_F = isTouchDevice ? 0.47 : 0.6;
+const TITLE_LINE1_Y_F = isTouchDevice ? 0.62 : 0.75;
+const TITLE_LINE2_Y_F = isTouchDevice ? 0.68 : 0.82;
 const YEAR_Y_F = 0.93;
 
 // Résumé/tab layout, expressed as fractions of BASE_CARD_HEIGHT measured
