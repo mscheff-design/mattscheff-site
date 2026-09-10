@@ -44,7 +44,7 @@ export const CASE_STUDY = {
           { label: 'Principal', value: 'Keith Johnson, “The Merchant of Memphis”' },
           { label: 'Role', value: 'Digital Consultant & Creative Director' }
         ],
-        scope: `Brand strategy · Art direction · Shopify development · Copywriting · Editorial · Email · Catalog systems · Video · Press strategy`
+        scope: `Brand strategy · Art direction · Shopify development · Copywriting · Editorial · Email · Catalog systems · Video · Press strategy · Art handling · Vendor liaison`
       }
     },
     {
@@ -56,7 +56,8 @@ export const CASE_STUDY = {
         body: [
           `Urban Architecture is a New York gallery specializing in Memphis Milano furniture, lighting, and objects. Prior to my joining, the business had virtually no online presence. Over forty years of conducting business in person and by phone, owner Keith Johnson had built a high-profile network of clients and collectors who valued discretion, boutique service, and his cultural authority.`,
           `Keith’s relationships with the designers and firsthand knowledge of their work are central to the buying experience. The challenge was to retain that intimacy and white-glove service while introducing the business to a digital audience of prospective buyers.`,
-          `The scope included the website, visual identity, product catalog, and a coordinated editorial, email, and social media strategy. Each needed to reflect Keith’s expertise and accommodate the way he worked.`
+          `The scope included the website, visual identity, product catalog, and a coordinated editorial, email, and social media strategy. Each needed to reflect Keith’s expertise and accommodate the way he worked.`,
+          `The day-to-day ran wider than any title implied: handling the art itself, acting as vendor liaison, even managing the gallery’s utilities when something needed to get done.`
         ]
       }
     },
