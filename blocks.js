@@ -98,15 +98,31 @@ export function heroBlock(props) {
 
 export function textMediaBlock(props) {
   const orientation = props.orientation === 'left' ? 'left' : 'right';
-  const wrap = el('div', `cs-block cs-text-media cs-text-media--${orientation}` + (props.thumbnail ? ' cs-text-media--thumb' : ''));
+  const classes = ['cs-block', 'cs-text-media', `cs-text-media--${orientation}`];
+  if (props.thumbnail) classes.push('cs-text-media--thumb');
+  // flow: true swaps the normal rigid two-column split for an actual CSS
+  // float — the image sits inset in the text column and paragraphs wrap
+  // around it (and below, once its height runs out), the way a magazine
+  // page would set an image against body copy. Needs the media element
+  // physically inside .cs-text-media-text (a float only affects layout
+  // for content that follows it in the same flow — a separate flex
+  // column, as the non-flow layout uses, can't wrap around anything).
+  if (props.flow) classes.push('cs-text-media--flow');
+  const wrap = el('div', classes.join(' '));
   const text = el('div', 'cs-text-media-text');
   if (props.heading) text.appendChild(el('h2', 'cs-text-media-heading', props.heading));
-  if (props.body) text.appendChild(el('p', 'cs-text-media-body', props.body));
   const mediaWrap = el('div', 'cs-text-media-media');
   const media = mediaEl(props.media);
   if (media) mediaWrap.appendChild(media);
-  wrap.appendChild(text);
-  wrap.appendChild(mediaWrap);
+  if (props.flow) {
+    text.appendChild(mediaWrap);
+    if (props.body) text.appendChild(el('p', 'cs-text-media-body', props.body));
+    wrap.appendChild(text);
+  } else {
+    if (props.body) text.appendChild(el('p', 'cs-text-media-body', props.body));
+    wrap.appendChild(text);
+    wrap.appendChild(mediaWrap);
+  }
   return wrap;
 }
 
@@ -611,6 +627,16 @@ function injectStyles() {
     .cs-text-media--thumb .cs-text-media-media{flex:0 0 240px;width:240px}
     .cs-text-media--thumb .cs-text-media-media .cs-media-el{border:1px solid rgba(var(--ink-rgb),0.12)}
 
+    /* flow variant — a real CSS float instead of a rigid two-column
+       split, so body text wraps around the image (and continues full-
+       width once past its height) rather than sitting in its own
+       independent lane next to it. display:block on the outer wrap
+       since .cs-text-media's own display:flex/gap only meant anything
+       for the two-column layout this replaces. */
+    .cs-text-media--flow{display:block}
+    .cs-text-media--flow .cs-text-media-media{float:right;width:40%;margin:6px 0 24px 44px}
+    .cs-text-media--flow.cs-text-media--left .cs-text-media-media{float:left;margin:6px 44px 24px 0}
+
     /* full-bleed media */
     .cs-full-bleed{padding:64px 0;max-width:none}
     .cs-full-bleed-inner{width:100vw;margin-left:calc(50% - 50vw)}
@@ -693,6 +719,7 @@ function injectStyles() {
 
     ${isTouchDevice ? `
     .cs-text-media{flex-direction:column !important;gap:24px}
+    .cs-text-media--flow .cs-text-media-media{float:none;width:100%;margin:0 0 20px}
     .cs-hero{padding-top:100px}
     ` : ''}
   `;
