@@ -29,7 +29,7 @@ export const JOBS = [
   },
   {
     id: 'statmask',
-    role: 'Digital Manager, Fulfillment Lead',
+    role: 'Social Media & E-Commerce Manager, Product Photographer',
     name: 'STATMASK',
     dates: '2020 – 2022',
     tags: ['PRODUCT PHOTOGRAPHY', 'PAID SOCIAL', 'E-COMMERCE'],
