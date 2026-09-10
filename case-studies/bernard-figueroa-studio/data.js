@@ -28,7 +28,10 @@ export const CASE_STUDY = {
       type: 'hero',
       props: {
         summary: 'Digital presence and studio support for a sculptor and lighting designer working between New Jersey and France.',
-        media: { type: 'image', src: '/assets/case-studies/bernard-figueroa-studio/homepage-screenshot.webp', alt: 'The Bernard Figueroa Lights homepage, a grid of sculptural lighting and sculpture pieces' }
+        scrollable: true,
+        maxHeight: '760px',
+        scrollHint: `Scroll to explore the full homepage`,
+        media: { type: 'image', src: '/assets/case-studies/bernard-figueroa-studio/homepage-full-screenshot.webp', alt: 'The Bernard Figueroa Lights homepage, shown in full' }
       }
     },
     {

@@ -90,7 +90,17 @@ export function heroBlock(props) {
   if (props.summary) wrap.appendChild(el('p', 'cs-hero-summary', props.summary));
   if (props.media) {
     const mediaWrap = el('div', 'cs-hero-media');
-    mediaWrap.appendChild(mediaEl(props.media, { eager: true }));
+    const media = mediaEl(props.media, { eager: true });
+    // scrollable reuses fullBleedMediaBlock's own scroll-frame mechanism
+    // (see buildScrollableMediaFrame) — a source image far taller than any
+    // hero could reasonably display at once, e.g. a full homepage
+    // screenshot, kept at native width and scrolled through in a bounded
+    // frame instead of being cropped down to one static banner slice.
+    if (props.scrollable) {
+      mediaWrap.appendChild(buildScrollableMediaFrame(media, props));
+    } else {
+      mediaWrap.appendChild(media);
+    }
     wrap.appendChild(mediaWrap);
   }
   return wrap;
@@ -228,43 +238,51 @@ export function moduleBlock(props) {
   return wrap;
 }
 
+// Builds a bounded, custom-scrollbar viewport for a media element far
+// taller than any page could reasonably display at once (e.g. a full-page
+// screenshot) — instead of scaling it down to illegibility, it keeps native
+// width and lets the viewer scroll through it inside a framed viewport.
+// Shared by fullBleedMediaBlock and heroBlock's own scrollable path, so the
+// scroll-thumb behavior has one implementation instead of two copies.
+function buildScrollableMediaFrame(media, props) {
+  const frag = document.createDocumentFragment();
+  if (props.scrollHint) frag.appendChild(el('div', 'cs-full-bleed-scroll-hint', props.scrollHint));
+  const frame = el('div', 'cs-full-bleed-scroll-frame');
+  if (props.maxHeight) frame.style.maxHeight = props.maxHeight;
+  frame.appendChild(media);
+  // the native scrollbar is hidden entirely (CSS) in favor of this custom
+  // thin indicator, so its look is consistent regardless of OS/browser
+  // scrollbar settings — position/height are driven by real scroll state.
+  const track = el('div', 'cs-full-bleed-scroll-track');
+  const thumb = el('div', 'cs-full-bleed-scroll-thumb');
+  track.appendChild(thumb);
+  const updateThumb = () => {
+    const trackHeight = track.clientHeight;
+    const ratio = frame.clientHeight / frame.scrollHeight;
+    const thumbHeight = Math.max(24, ratio * trackHeight);
+    const maxScroll = frame.scrollHeight - frame.clientHeight;
+    const scrollRatio = maxScroll > 0 ? frame.scrollTop / maxScroll : 0;
+    thumb.style.height = `${thumbHeight}px`;
+    thumb.style.top = `${scrollRatio * (trackHeight - thumbHeight)}px`;
+  };
+  frame.addEventListener('scroll', updateThumb);
+  // IFRAME's own load listener (see mediaEl) resizes it to its
+  // document's natural height first — both listeners are attached to
+  // the same 'load' event in this same order, so by the time this one
+  // runs, frame.scrollHeight already reflects the resized iframe.
+  if (media.tagName === 'IMG' || media.tagName === 'IFRAME') media.addEventListener('load', updateThumb);
+  requestAnimationFrame(updateThumb);
+  frame.appendChild(track);
+  frag.appendChild(frame);
+  return frag;
+}
+
 export function fullBleedMediaBlock(props) {
   const wrap = el('div', 'cs-block cs-full-bleed' + (props.theme === 'dark' ? ' cs-full-bleed--dark' : ''));
   const inner = el('div', 'cs-full-bleed-inner');
   const media = mediaEl(props.media);
   if (media && props.scrollable) {
-    // scrollable is for a source image far taller than any page could
-    // reasonably display at once (e.g. a full-page screenshot) — instead of
-    // scaling it down to illegibility, it keeps native width and lets the
-    // viewer scroll through it inside a bounded, framed viewport.
-    if (props.scrollHint) inner.appendChild(el('div', 'cs-full-bleed-scroll-hint', props.scrollHint));
-    const frame = el('div', 'cs-full-bleed-scroll-frame');
-    if (props.maxHeight) frame.style.maxHeight = props.maxHeight;
-    frame.appendChild(media);
-    // the native scrollbar is hidden entirely (CSS) in favor of this custom
-    // thin indicator, so its look is consistent regardless of OS/browser
-    // scrollbar settings — position/height are driven by real scroll state.
-    const track = el('div', 'cs-full-bleed-scroll-track');
-    const thumb = el('div', 'cs-full-bleed-scroll-thumb');
-    track.appendChild(thumb);
-    const updateThumb = () => {
-      const trackHeight = track.clientHeight;
-      const ratio = frame.clientHeight / frame.scrollHeight;
-      const thumbHeight = Math.max(24, ratio * trackHeight);
-      const maxScroll = frame.scrollHeight - frame.clientHeight;
-      const scrollRatio = maxScroll > 0 ? frame.scrollTop / maxScroll : 0;
-      thumb.style.height = `${thumbHeight}px`;
-      thumb.style.top = `${scrollRatio * (trackHeight - thumbHeight)}px`;
-    };
-    frame.addEventListener('scroll', updateThumb);
-    // IFRAME's own load listener (see mediaEl) resizes it to its
-    // document's natural height first — both listeners are attached to
-    // the same 'load' event in this same order, so by the time this one
-    // runs, frame.scrollHeight already reflects the resized iframe.
-    if (media.tagName === 'IMG' || media.tagName === 'IFRAME') media.addEventListener('load', updateThumb);
-    requestAnimationFrame(updateThumb);
-    frame.appendChild(track);
-    inner.appendChild(frame);
+    inner.appendChild(buildScrollableMediaFrame(media, props));
   } else {
     // maxHeight (non-scrollable path) is an escape hatch for a tall/portrait
     // source image (e.g. a scanned document) that would otherwise stretch
