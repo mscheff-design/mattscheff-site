@@ -80,6 +80,23 @@ export const CASE_STUDY = {
       }
     },
     {
+      type: 'fullBleedMedia',
+      props: {
+        media: { type: 'image', src: '/assets/case-studies/urban-architecture/graves-dining-set.webp', alt: 'A Michael Graves dining table and chair set from the gallery’s inventory' },
+        caption: `A Michael Graves dining table and chair set, from the gallery’s inventory.`
+      }
+    },
+    {
+      type: 'gallery',
+      props: {
+        images: [
+          { src: '/assets/case-studies/urban-architecture/graves-chair.webp', alt: 'A Michael Graves ring-back chair from the gallery’s inventory' },
+          { src: '/assets/case-studies/urban-architecture/sottsass-console.webp', alt: 'An Ettore Sottsass console with mirror and dresser boxes from the gallery’s inventory' },
+          { src: '/assets/case-studies/urban-architecture/sottsass-shelf.webp', alt: 'A Sottsass-style wall shelf and side table from the gallery’s inventory' }
+        ]
+      }
+    },
+    {
       type: 'text',
       props: {
         heading: `Translating the business`,
@@ -129,23 +146,6 @@ export const CASE_STUDY = {
         body: [
           `The website was designed and built on Shopify, with a searchable catalog, available inventory, and a dedicated trade section. Product pages combine photographs, specifications, provenance, and Keith’s own notes on each piece.`,
           `Purchases are handled through direct inquiry. This allows Keith to discuss condition, delivery, and placement with prospective buyers, retaining the personal service his clients expect. Pricing and availability can be updated by the team through Shopify.`
-        ]
-      }
-    },
-    {
-      type: 'fullBleedMedia',
-      props: {
-        media: { type: 'image', src: '/assets/case-studies/urban-architecture/graves-dining-set.webp', alt: 'A Michael Graves dining table and chair set from the gallery’s inventory' },
-        caption: `A Michael Graves dining table and chair set, from the gallery’s inventory.`
-      }
-    },
-    {
-      type: 'gallery',
-      props: {
-        images: [
-          { src: '/assets/case-studies/urban-architecture/graves-chair.webp', alt: 'A Michael Graves ring-back chair from the gallery’s inventory' },
-          { src: '/assets/case-studies/urban-architecture/sottsass-console.webp', alt: 'An Ettore Sottsass console with mirror and dresser boxes from the gallery’s inventory' },
-          { src: '/assets/case-studies/urban-architecture/sottsass-shelf.webp', alt: 'A Sottsass-style wall shelf and side table from the gallery’s inventory' }
         ]
       }
     },
