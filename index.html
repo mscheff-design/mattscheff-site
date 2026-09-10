@@ -39,7 +39,16 @@ body{font-family:var(--font-mono);overflow-x:hidden}
 /* Glass is bounded exactly to nav's own box now (bottom:0, no mask fade) —
    see chrome.js's matching rules for the full reasoning; kept in sync by
    hand, same as the rest of this nav/footer chrome. */
-nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:20px 48px;mix-blend-mode:normal;box-shadow:0 2px 6px -3px rgba(var(--ink-rgb),0.22),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(var(--ink-rgb),0.16)}
+/* Grid, not flex space-between — with only two real children (nav-radio,
+   nav-links), space-between pins them to opposite edges, which read as
+   nav-links being pushed "too far right" rather than centered on the bar.
+   1fr/auto/1fr gives nav-radio a left-aligned column, nav-links an
+   auto-sized (centered) column, and an empty third column that balances
+   it — nav-links ends up genuinely centered across the full bar width,
+   not just centered in the space left over after nav-radio. */
+nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:20px 48px;mix-blend-mode:normal;box-shadow:0 2px 6px -3px rgba(var(--ink-rgb),0.22),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(var(--ink-rgb),0.16)}
+.nav-radio{justify-self:start}
+.nav-links{justify-self:center}
 nav::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1;background:linear-gradient(120deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0) 40%,rgba(255,255,255,0) 60%,rgba(255,255,255,0.025) 100%),rgba(var(--ink-rgb),0.05);backdrop-filter:blur(8px) saturate(1.45);-webkit-backdrop-filter:blur(8px) saturate(1.45)}
 nav::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1;pointer-events:none;opacity:0.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:90px 90px}
 .nav-links{display:flex;gap:32px}
@@ -94,15 +103,17 @@ nav::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1
 /* Below 599px there isn't room for both the full radio widget (icon +
    visualizer + station name) and all four nav links without clipping —
    CONTACT was getting pushed off the right edge of the viewport. Rather
-   than a hamburger menu (which would hide the links behind an extra tap),
-   the radio widget collapses to just its play/pause icon — still fully
-   functional, just without the visualizer/station-name chrome — and nav's
-   own padding/link gap tighten up to match. Station switching stays a
-   desktop-only affordance; reachable via the full widget there. */
+   than a hamburger menu (which would hide the links behind an extra tap)
+   or hiding the widget's own pieces, the widget keeps its normal look but
+   shrinks (station text, viz bars, its own internal gap), and nav's own
+   padding/link gap tighten up to match. */
 @media (max-width:599px){
-  nav{padding:16px 20px}
-  .nav-links{gap:16px}
-  .radio-viz,.radio-station{display:none}
+  nav{padding:16px 18px}
+  .nav-links{gap:14px}
+  .nav-radio{gap:7px}
+  .radio-station{font-size:7.5px}
+  .radio-viz{height:7px;gap:1.5px}
+  .radio-viz span{width:1.5px}
 }
 
 /* nav.is-on-dark — toggled by JS below whenever the Photography section is

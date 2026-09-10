@@ -55,7 +55,12 @@ function injectStyles() {
     /* inset highlight = a thin line of light catching the glass's top edge;
        the inset shadow beneath it is the glass's own bottom edge — a real
        physical boundary where the pane ends, not a fade into the page. */
-    nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:20px 48px;mix-blend-mode:normal;box-shadow:0 2px 6px -3px rgba(var(--ink-rgb),0.22),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(var(--ink-rgb),0.16)}
+    /* Grid, not flex space-between — see index.html's own copy of this
+       comment for why (nav-links ends up genuinely centered across the
+       full bar, not pushed to the right edge). Keep in sync by hand. */
+    nav{position:fixed;top:0;left:0;width:100%;z-index:100;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:20px 48px;mix-blend-mode:normal;box-shadow:0 2px 6px -3px rgba(var(--ink-rgb),0.22),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(var(--ink-rgb),0.16)}
+    .nav-radio{justify-self:start}
+    .nav-links{justify-self:center}
     /* Bounded exactly to nav's own box (bottom:0, no overhang/mask-fade) —
        backdrop-filter blur never extends past its own element anyway, so
        letting it taper past that edge (an earlier version extended this
@@ -121,6 +126,17 @@ function injectStyles() {
     .radio-volume::-webkit-slider-thumb{-webkit-appearance:none;width:7px;height:7px;border-radius:50%;background:rgba(var(--ink-rgb),0.5);cursor:pointer}
     .radio-volume::-moz-range-thumb{width:7px;height:7px;border:none;border-radius:50%;background:rgba(var(--ink-rgb),0.5);cursor:pointer}
     @media (max-width:640px){.radio-now,.radio-volume{display:none}}
+    /* Below 599px there isn't room for both the full radio widget and all
+       four nav links without clipping — see index.html's own copy of this
+       comment/rule for the full reasoning. Keep in sync by hand. */
+    @media (max-width:599px){
+      nav{padding:16px 18px}
+      .nav-links{gap:14px}
+      .nav-radio{gap:7px}
+      .radio-station{font-size:7.5px}
+      .radio-viz{height:7px;gap:1.5px}
+      .radio-viz span{width:1.5px}
+    }
     footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;border-top:0.5px solid rgba(var(--ink-light-rgb),0.08);display:flex;justify-content:space-between;align-items:center}
     .footer-left{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-light-rgb),0.2);letter-spacing:0.08em}
     .footer-links{display:flex;gap:24px}
