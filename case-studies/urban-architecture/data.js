@@ -150,6 +150,16 @@ export const CASE_STUDY = {
       }
     },
     {
+      type: 'gallery',
+      props: {
+        images: [
+          { src: '/assets/case-studies/urban-architecture/graves-chair.webp', alt: 'A Michael Graves ring-back chair from the gallery’s inventory' },
+          { src: '/assets/case-studies/urban-architecture/sottsass-console.webp', alt: 'An Ettore Sottsass console with mirror and dresser boxes from the gallery’s inventory' },
+          { src: '/assets/case-studies/urban-architecture/sottsass-shelf.webp', alt: 'A Sottsass-style wall shelf and side table from the gallery’s inventory' }
+        ]
+      }
+    },
+    {
       type: 'fullBleedMedia',
       props: {
         scrollable: true,
