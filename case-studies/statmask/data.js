@@ -108,7 +108,7 @@ export const CASE_STUDY = {
         heading: 'Campaigns',
         chapter: true,
         chapterLabel: 'Campaigns',
-        body: 'I managed Meta campaign strategy through the ads portal: audience construction and refinement with Facebook Audiences, interest and lookalike layering, budget allocation, and the testing schedule.<br><br>Testing was structured around one variable at a time, usually image style, offer framing, or copy angle, so results could be attributed. Winning variants moved into the primary set and losing ones informed the next production block.',
+        body: 'I managed Meta campaign strategy through the ads portal: audience construction and refinement with Facebook Audiences, interest and lookalike layering, budget allocation, and the testing schedule.<br><br>Testing was structured around one variable at a time, usually image style, offer framing, or copy angle, so results could be attributed. Winning variants moved into the primary set and losing ones informed the next production block.<br><br>Placement was one of the clearest results: Instagram Stories consistently outperformed feed and grid, returning the most engagement for the least spend. Budget shifted toward it accordingly.',
         media: { type: 'image', src: '/assets/case-studies/statmask/black-friday-ad-creative.webp', alt: 'A Black Friday Meta ad creative built from the modular asset system' },
         orientation: 'left'
       }
