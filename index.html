@@ -1488,11 +1488,32 @@ function handleTileActivate(id, triggerEl) {
   }
 }
 
+// GALLERY_HISTORY_STATE marks the single history entry pushed whenever the
+// gallery/viewer sheet opens (see openGallery()/openViewerDirect()) — one
+// entry regardless of whether mode-grid or mode-viewer is showing, or how
+// many times openViewer() steps deeper from grid to viewer within it. That
+// makes "the whole sheet is open" a single on/off state in history rather
+// than a multi-level stack: a real back-button/back-gesture press always
+// fully exits the sheet in one step, the same as the swipe-down dismiss
+// gesture (see bindSwipe()) or the visible X button — it does not retrace
+// individual grid->viewer steps the way those in-page controls still do.
+// This was worth the simplicity trade-off since nothing asked for the
+// nested version, and it sidesteps having to reconstruct which sub-state
+// (grid vs. viewer, at which photo) a forward-navigation should restore.
+//
+// Without this, opening the sheet never touched browser history at all —
+// pure DOM/class state — so a back gesture had no "close the sheet" step
+// to consume and fell through to whatever real page navigation preceded
+// it (e.g. landing on an unrelated case-study page visited earlier in the
+// session), which is exactly the bug this fixes.
+const GALLERY_HISTORY_STATE = { galleryOpen: true };
+
 function openViewerDirect(project, triggerEl) {
   activeProject = project;
   updateTileStates();
   galleryTrigger = triggerEl || null;
   scrollYBeforeViewer = window.scrollY;
+  history.pushState(GALLERY_HISTORY_STATE, '', location.href);
   sheetBackdrop.classList.add('open');
   sheetBackdrop.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
@@ -1509,6 +1530,7 @@ function openGallery(project, triggerEl) {
   updateTileStates();
   galleryTrigger = triggerEl || null;
   scrollYBeforeViewer = window.scrollY;
+  history.pushState(GALLERY_HISTORY_STATE, '', location.href);
   sheetBackdrop.classList.add('open', 'mode-grid');
   sheetBackdrop.setAttribute('aria-hidden', 'false');
   sheetPanel.className = 'sheet-panel mode-grid';
@@ -1523,7 +1545,26 @@ function openGallery(project, triggerEl) {
   sheetPanel.querySelector('.ps-close')?.focus({ preventScroll: true });
 }
 
+// Every UI close path (X button, Escape, backdrop tap, swipe-down dismiss)
+// calls this same function, which never touches the DOM directly — it
+// only ever asks history to go back. closeGalleryDOM() below is the one
+// place the sheet actually tears down, run exclusively from the popstate
+// handler, so the history stack and the visible UI can never desync
+// (e.g. a stale pushed entry left over from a UI-triggered close that
+// skipped popping it, which would need an extra back press later to
+// actually leave the page).
 function closeGallery() {
+  if (history.state && history.state.galleryOpen) {
+    history.back();
+  } else {
+    // Defensive fallback only — shouldn't happen in normal use, since
+    // every open path pushes GALLERY_HISTORY_STATE first.
+    closeGalleryDOM();
+  }
+}
+
+function closeGalleryDOM() {
+  if (!sheetBackdrop.classList.contains('open')) return;
   const previous = activeProject;
   activeProject = null;
   updateTileStates();
@@ -1539,6 +1580,16 @@ function closeGallery() {
   focusTileQuietly(returnTo);
   galleryTrigger = null;
 }
+
+// The one place popstate is handled for the gallery/viewer sheet — closes
+// it if we've popped back to (or past) the state before it opened. Doesn't
+// fire for the everyday close paths in practice (those already got what
+// they wanted from closeGallery()'s own history.back() call before this
+// ever runs), but is what actually performs the DOM teardown in every
+// case, including a real back-gesture/back-button press.
+window.addEventListener('popstate', (e) => {
+  if (!(e.state && e.state.galleryOpen)) closeGalleryDOM();
+});
 
 // Returning focus to the trigger tile after closing is correct
 // accessibility practice regardless of input modality, but Safari applies
@@ -1896,23 +1947,98 @@ function navigate(dir) {
 function cfNext() { navigate(1); }
 function cfPrev() { navigate(-1); }
 
+// Two-axis gesture on the same stage: horizontal drag navigates photos
+// (unchanged from before), vertical drag downward dismisses the whole
+// viewer — deliberately a different axis from navigation rather than
+// overloading horizontal drag with both meanings, and specifically
+// different from iOS's own horizontal edge-swipe-back gesture, which is
+// what was colliding with photo-swiping and (before the history fix in
+// closeGallery()/GALLERY_HISTORY_STATE above) also landing on an
+// unrelated previous page instead of closing the viewer. Axis is decided
+// once, after a small dead zone, and locked for the rest of the gesture
+// so a diagonal-ish drag doesn't flip between the two mid-swipe.
 function bindSwipe(el) {
-  let startX = 0, startY = 0, tracking = false;
+  const AXIS_LOCK_PX = 10;
+  const DISMISS_PX = 100;
+  let startX = 0, startY = 0, tracking = false, axis = null;
+
   el.addEventListener('touchstart', (e) => {
+    if (cfAnimating) return;
     const t = e.touches[0];
     startX = t.clientX;
     startY = t.clientY;
     tracking = true;
+    axis = null;
   }, { passive: true });
+
+  el.addEventListener('touchmove', (e) => {
+    if (!tracking) return;
+    const t = e.touches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    if (!axis) {
+      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
+      axis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
+    }
+    // Downward only — dragging up over the photo isn't a gesture this
+    // viewer gives meaning to, so it's left alone (no feedback, no
+    // preventDefault) rather than inventing a use for it.
+    if (axis === 'y' && dy > 0) {
+      // Stops iOS's own rubber-band/pull-to-refresh from fighting this
+      // transform — needs {passive:false} on this listener to be legal.
+      e.preventDefault();
+      const progress = Math.min(dy / (window.innerHeight * 0.5), 1);
+      el.style.transition = 'none';
+      el.style.transform = `translateY(${dy}px) scale(${1 - progress * 0.08})`;
+      // Fades the whole sheet (photo, edges, label/count/toggles all sit
+      // under sheetPanel) toward the page underneath as a "pulling this
+      // away" cue — stops short of fully transparent (min 0.4) so a
+      // partial drag that snaps back doesn't flash the page behind at
+      // full strength.
+      sheetPanel.style.transition = 'none';
+      sheetPanel.style.opacity = String(1 - progress * 0.6);
+    }
+  }, { passive: false });
+
   el.addEventListener('touchend', (e) => {
     if (!tracking) return;
     tracking = false;
     const t = e.changedTouches[0];
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) cfNext(); else cfPrev();
+    if (axis === 'y') {
+      if (dy > DISMISS_PX) {
+        // No snap-back styling needed on commit — closeGalleryDOM() (run
+        // via the popstate this triggers, see closeGallery()'s own
+        // comment) replaces sheetPanel's content and class outright.
+        closeViewer();
+      } else {
+        snapBack();
+      }
+    } else if (axis === 'x') {
+      if (Math.abs(dx) > 50) {
+        if (dx < 0) cfNext(); else cfPrev();
+      }
     }
+    axis = null;
+  }, { passive: true });
+
+  function snapBack() {
+    el.style.transition = 'transform 0.25s cubic-bezier(.22,1,.36,1)';
+    sheetPanel.style.transition = 'opacity 0.25s ease';
+    el.style.transform = '';
+    sheetPanel.style.opacity = '';
+  }
+
+  // The OS can interrupt a touch sequence mid-drag (an incoming call, a
+  // system gesture stealing it) without ever firing touchend — without
+  // this, that leaves the photo/sheet stuck mid-fade with no way to
+  // finish or reverse the gesture.
+  el.addEventListener('touchcancel', () => {
+    if (!tracking) return;
+    tracking = false;
+    if (axis === 'y') snapBack();
+    axis = null;
   }, { passive: true });
 }
 
