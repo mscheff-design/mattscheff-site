@@ -393,17 +393,21 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    closer to what a real grease-pencil-annotated contact sheet would look
    like, and gives each project a stable visual identity across visits
    rather than a random draw.
-   inset:0/100% overrides .grease-mark's own -15%/130% overscan — that
-   overscan was fine for a brief desktop hover flash with generous grid
-   space around it, but confirmed (via a real device + an on-page
-   diagnostic) to be the actual source of a genuine mobile horizontal-
-   scroll bug once these marks became permanent: the last tile's mark
-   overscanning past its own tile leaked through .contact-sheet/
-   .photo-section (neither of which clip horizontally) all the way to
-   document-level scrollWidth. Bounding the static mark fully within its
-   own tile removes that leak at the root instead of papering over the
-   symptom with more overflow:hidden further up the tree. */
-.grease-mark--static{opacity:1;inset:0;width:100%;height:100%}
+   Inherits .grease-mark's own -15%/130% overscan unchanged (an earlier
+   attempt here instead bounded this to inset:0/100%, which did remove a
+   confirmed 8px real page-overflow bug, but shrank the mark's own ink
+   along with its container — the source SVGs bake in padding around the
+   actual mark, so the oversized container is what makes the ink itself
+   land near the tile's edges; at 100% it read as visibly too small).
+   Containment now lives at the tile level instead — see
+   .project-tile{overflow:hidden} in the mobile media query below, which
+   clips any tile's own overscanning children (this mark, currently the
+   only one) at that tile's own boundary. That's a structurally safer
+   guarantee than matching this element's own size exactly: it holds
+   regardless of the precise overscan amount or which specific ancestor a
+   leak was routing through, rather than relying on this rule alone never
+   drifting from a hand-verified value again. */
+.grease-mark--static{opacity:1}
 
 /* level 2 — cursor-following glass loupe, see loupe.js */
 .loupe-root{position:fixed;top:0;left:0;pointer-events:none;z-index:250;border-radius:50%;overflow:hidden;opacity:0;transition:opacity 0.25s cubic-bezier(.22,1,.36,1);filter:drop-shadow(0 10px 26px rgba(0,0,0,0.4))}
@@ -548,7 +552,18 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
      stopping dead at the carousel's own edge. */
   .project-grid{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none}
   .project-grid::-webkit-scrollbar{display:none}
-  .project-tile{flex:0 0 80%;scroll-snap-align:center;scroll-snap-stop:always}
+  /* overflow:hidden — .project-tile is already position:relative (base
+     rule), so this clips any of ITS OWN absolutely-positioned children
+     that overscan its bounds at that exact boundary. The only such child
+     today is .grease-mark--static (see its own comment for the full
+     story: its 130%/-15% overscan, needed so the mark's own ink actually
+     reaches the tile's edges, was confirmed to leak through .contact-
+     sheet/.photo-section — neither of which clip horizontally — into a
+     real page-level horizontal-scroll bug). Clipping here instead of
+     matching the mark's own size exactly is the more durable fix: it
+     holds regardless of the precise overscan amount, and covers any
+     future tile content that might overscan the same way. */
+  .project-tile{flex:0 0 80%;scroll-snap-align:center;scroll-snap-stop:always;overflow:hidden}
   /* Taller than the shared desktop/tablet 3:4 — on a phone this sat with
      a lot of dead black space above/below it in the section; a taller
      frame at a wider tile width fills more of that. */
