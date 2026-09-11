@@ -218,8 +218,13 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    background — the section should read as subordinate, not as a fourth
    and fifth entry in the list above it. */
 .additional-credits{margin-top:32px;padding-top:28px;border-top:0.5px solid rgba(var(--ink-rgb),0.08)}
-.additional-credits h3{font-family:var(--font-serif);font-size:15px;font-weight:400;color:rgba(var(--ink-rgb),0.65);margin-bottom:4px}
-.additional-credits-sub{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-rgb),0.35);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:22px}
+/* margin-bottom absorbs the gap a "Roles outside the case study work"
+   sub-label used to carry on its own line before it was dropped — see
+   this section's own comment above for why (the phrase was the site's
+   only visible use of "case study" anywhere, and didn't earn its keep
+   once "Additional credits" already reads as subordinate to Selected
+   Work by position alone). */
+.additional-credits h3{font-family:var(--font-serif);font-size:15px;font-weight:400;color:rgba(var(--ink-rgb),0.65);margin-bottom:22px}
 .credits-list{list-style:none;display:flex;flex-direction:column;gap:16px}
 .credit-entry{display:flex;flex-direction:column;gap:3px}
 .credit-entry-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 6px;font-family:var(--font-mono);font-size:11px}
@@ -753,7 +758,6 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
 
       <section class="additional-credits">
         <h3>Additional credits</h3>
-        <div class="additional-credits-sub">Roles outside the case study work</div>
         <ul class="credits-list">
           <li class="credit-entry">
             <div class="credit-entry-meta">
