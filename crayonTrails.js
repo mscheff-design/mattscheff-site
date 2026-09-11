@@ -29,58 +29,50 @@ export function opacityAt(age, hold, fade) {
   return age <= hold ? 1 : Math.max(0, 1 - (age-hold)/fade);
 }
 
-// Four open, authored gestures: each palette color owns a stable form.
-// The middle half of this unit square represents the measured card.
-// Loops live in the roomier top/bottom margins; the sides stay loose.
+// Traced from the approved four-panel concept, September 11, 2026.
+// Coordinates describe the whole paper, with the reference card occupying
+// x=.108..892, y=.281..770. These are continuous gestures THROUGH the card
+// area, not exclusion routes. The existing opaque 3D card hides the ink.
 const MOBILE_DOODLES = [
-  { name: 'red', start: [0.62,0.12], curves: [
-    [0.52,0.03, 0.30,0.07, 0.29,0.15],
-    [0.28,0.24, 0.58,0.22, 0.50,0.12],
-    [0.44,0.05, 0.20,0.10, 0.18,0.23],
-    [0.11,0.34, 0.22,0.43, 0.14,0.56],
-    [0.10,0.67, 0.18,0.75, 0.20,0.82],
-    [0.25,0.98, 0.39,0.75, 0.46,0.85],
-    [0.56,0.98, 0.45,0.98, 0.44,0.87],
-    [0.44,0.76, 0.74,0.81, 0.81,0.85],
-    [0.91,0.89, 0.85,0.70, 0.87,0.63],
-    [0.94,0.52, 0.80,0.46, 0.87,0.37]
+  { name: 'red', widthScale: .66, start: [-.025,.193], curves: [
+    [.040,.165, .186,.123, .244,.105],
+    [.188,.139, .079,.202, .016,.224],
+    [.141,.195, .382,.102, .508,.075],
+    [.528,.073, .305,.223, .185,.269],
+    [.312,.241, .530,.160, .640,.144],
+    [.672,.153, .564,.231, .542,.275],
+    [.566,.270, .588,.249, .610,.252],
+    [.649,.296, .641,.403, .714,.505],
+    [.794,.625, .833,.719, .892,.752],
+    [.984,.729, .965,.791, .747,.854]
   ] },
-  { name: 'blue', start: [0.19,0.42], curves: [
-    [0.10,0.32, 0.14,0.13, 0.28,0.16],
-    [0.44,0.20, 0.50,0.04, 0.37,0.07],
-    [0.22,0.10, 0.52,0.24, 0.67,0.14],
-    [0.82,0.04, 0.91,0.20, 0.85,0.30],
-    [0.78,0.43, 0.92,0.55, 0.84,0.68],
-    [0.79,0.75, 0.92,0.86, 0.78,0.88],
-    [0.61,0.92, 0.52,0.78, 0.42,0.84],
-    [0.24,0.96, 0.20,0.80, 0.33,0.80],
-    [0.46,0.81, 0.23,0.99, 0.16,0.89]
+  { name: 'blue', widthScale: .47, start: [-.025,.870], curves: [
+    [.094,.918, .397,.789, .465,.662],
+    [.548,.512, .410,.346, .555,.202],
+    [.670,.063, .861,.052, .923,.139],
+    [1.010,.260, .655,.322, .499,.303],
+    [.399,.291, .636,.162, .818,.137],
+    [.908,.116, 1.001,.121, 1.032,.153]
   ] },
-  { name: 'yellow', start: [0.56,0.13], curves: [
-  [0.46,0.11, 0.25,0.13, 0.22,0.14],
-  [0.14,0.16, 0.29,0.04, 0.32,0.12],
-  [0.35,0.21, 0.18,0.18, 0.17,0.28],
-  [0.08,0.38, 0.23,0.40, 0.16,0.51],
-  [0.22,0.62, 0.07,0.70, 0.17,0.82],
-  [0.32,0.96, 0.42,0.80, 0.25,0.81],
-  [0.09,0.81, 0.28,0.96, 0.34,0.90],
-  [0.39,0.79, 0.40,0.98, 0.48,0.92],
-  [0.60,0.83, 0.73,0.80, 0.80,0.83],
-  [0.95,0.90, 0.65,0.97, 0.73,0.86],
-  [0.83,0.77, 0.94,0.66, 0.86,0.54],
-  [0.78,0.42, 0.94,0.39, 0.85,0.29]
-] },
-  { name: 'green', start: [0.35,0.88], curves: [
-    [0.16,0.98, 0.10,0.86, 0.21,0.81],
-    [0.34,0.75, 0.38,0.93, 0.24,0.88],
-    [0.08,0.82, 0.20,0.70, 0.16,0.60],
-    [0.10,0.48, 0.23,0.42, 0.17,0.31],
-    [0.11,0.17, 0.25,0.08, 0.35,0.15],
-    [0.47,0.24, 0.49,0.01, 0.58,0.10],
-    [0.71,0.23, 0.84,0.08, 0.84,0.23],
-    [0.83,0.37, 0.95,0.47, 0.86,0.60],
-    [0.77,0.74, 0.91,0.78, 0.80,0.86],
-    [0.72,0.94, 0.61,0.79, 0.54,0.85]
+  { name: 'yellow', widthScale: .44, start: [-.023,.766], curves: [
+    [.052,.661, .144,.590, .214,.490],
+    [.271,.403, .232,.345, .216,.289],
+    [.181,.214, .321,.143, .451,.139],
+    [.531,.145, .475,.246, .361,.255],
+    [.232,.269, .385,.135, .548,.121],
+    [.670,.128, .500,.281, .439,.309],
+    [.391,.334, .414,.254, .491,.244],
+    [.680,.226, .823,.186, .895,.118],
+    [.938,.079, .956,.049, .969,.036]
+  ] },
+  { name: 'green', widthScale: .48, start: [-.027,.390], curves: [
+    [.088,.410, .142,.466, .196,.505],
+    [.364,.613, .738,.462, .882,.619],
+    [.994,.695, 1.026,.810, .786,.897],
+    [.746,.873, .681,.818, .620,.782],
+    [.557,.751, .316,.855, .187,.913],
+    [.354,.921, .701,.864, .810,.831],
+    [.919,.786, .682,.784, .492,.825]
   ] }
 ];
 
@@ -368,18 +360,22 @@ export function mountCrayonTrails(hero, {
     const visibleH = surface.clientHeight || height;
     if (!card || !rect.width || !rect.height || !width || !visibleH) return false;
     const sx = width / rect.width, sy = visibleH / rect.height;
-    const inkInset = cfg.width * 0.5 + 2;
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    const left = clamp((card.left-rect.left)*sx - inkInset, inkInset, width-inkInset);
-    const right = clamp((card.right-rect.left)*sx + inkInset, left, width-inkInset);
-    const top = clamp((card.top-rect.top)*sy - inkInset, inkInset, visibleH-inkInset);
-    const bottom = clamp((card.bottom-rect.top)*sy + inkInset, top, visibleH-inkInset);
-    const mapAxis = (v, a, b, extent) => v < 0.25
-      ? inkInset + (a-inkInset)*v/0.25
-      : v > 0.75 ? b + (extent-inkInset-b)*(v-0.75)/0.25
-      : a + (b-a)*(v-0.25)/0.5;
-    const map = (x,y) => ({ x: mapAxis(x,left,right,width), y: mapAxis(y,top,bottom,visibleH) });
     const form = MOBILE_DOODLES[doodle.variant];
+    const strokeWidth = cfg.width * form.widthScale;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const left = clamp((card.left-rect.left)*sx, 0, width);
+    const right = clamp((card.right-rect.left)*sx, left, width);
+    const top = clamp((card.top-rect.top)*sy, 0, visibleH);
+    const bottom = clamp((card.bottom-rect.top)*sy, top, visibleH);
+    // Match the reference composition around the real card. Mapping is
+    // continuous across its edges, so hidden stretches remain connected.
+    // A few authored endpoints run off the paper; the canvas clips them.
+    const mapAxis = (v, a, b, extent, refA, refB) => v < refA
+      ? a*v/refA
+      : v > refB ? b+(extent-b)*(v-refB)/(1-refB)
+      : a+(b-a)*(v-refA)/(refB-refA);
+    const map = (x,y) => ({ x:mapAxis(x,left,right,width,.108,.892),
+      y:mapAxis(y,top,bottom,visibleH,.281,.770) });
     let previous = map(...form.start);
     const raw = [previous];
     for (const curve of form.curves) {
@@ -395,7 +391,7 @@ export function mountCrayonTrails(hero, {
     }
     // Resample by distance, carrying the leftover between segments. Never
     // stamp just the segment endpoints (the earlier disconnected-dot bug).
-    const path=[], spacing=Math.max(1.4,cfg.width*0.085);
+    const path=[], spacing=Math.max(1.4,strokeWidth*0.085);
     const textureRandom=makeRandom(0x5c71bb1e);
     let distanceToNext=0, travelled=0;
     for (let i=1;i<raw.length;i++) {
@@ -411,12 +407,20 @@ export function mountCrayonTrails(hero, {
       }
       distanceToNext=along-length; travelled+=length;
     }
+    let revealDistance=0;
+    for (let i=0;i<path.length;i++) {
+      const p=path[i];
+      const hidden=p.x>left+strokeWidth && p.x<right-strokeWidth &&
+        p.y>top+strokeWidth && p.y<bottom-strokeWidth;
+      revealDistance+=(i ? p.distance-path[i-1].distance : 0)*(hidden ? .18 : 1);
+      p.revealDistance=revealDistance;
+    }
     for (const p of path) {
-      p.fraction=p.distance/Math.max(1,travelled);
+      p.fraction=p.revealDistance/Math.max(1,revealDistance);
       // Subtle hand pressure and slightly lighter open ends. No animated
       // noise: these values are fixed for the lifetime of the drawing.
       const taper=Math.min(1,p.distance/16,(travelled-p.distance)/20);
-      p.size=cfg.width*(0.82+0.10*Math.sin(p.fraction*13+0.4)+0.035*Math.sin(p.fraction*39));
+      p.size=strokeWidth*(0.82+0.10*Math.sin(p.fraction*13+0.4)+0.035*Math.sin(p.fraction*39));
       p.alpha=cfg.opacity*(0.65+0.35*Math.max(0,taper));
       p.persistent=true;
     }
