@@ -654,7 +654,16 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
    aren't flex items) but harmless to leave. transition:transform is the
    actual slide animation; nothing else here ever touches transform, so a
    permanent rule is simpler than toggling a class per-navigation. */
-.lv3-main img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;filter:url(#chromaticAberrationSubtle) grayscale(15%) contrast(1.08) brightness(0.92) saturate(0.9);-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none;transition:transform 0.32s cubic-bezier(.22,1,.36,1)}
+/* cubic-bezier(0,0,0.2,1) (Material's "standard decelerate" curve), not
+   the (.22,1,.36,1) curve elsewhere in this file (loupe/info-panel
+   fades) — that curve's control points both sit at y=1, meaning the
+   slide reaches nearly full velocity in the first ~25% of the 0.32s and
+   spends the remaining ~75% barely moving, a long flat tail rather than
+   a continuous glide. Reported as "swiping feels a little better but
+   could be more fluid" — (0,0,0.2,1) starts at full speed and
+   decelerates smoothly all the way to the end instead, which is the
+   more evenly-paced motion an actual finger-released swipe expects. */
+.lv3-main img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;filter:url(#chromaticAberrationSubtle) grayscale(15%) contrast(1.08) brightness(0.92) saturate(0.9);-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none;transition:transform 0.32s cubic-bezier(0,0,0.2,1)}
 
 /* height matches .lv3-main's own (see its comment) — same value in both
    places so the edge previews stay vertically aligned with the main
@@ -681,7 +690,10 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
    popping to their new photo once the main image's own slide finishes.
    .lv3-edge already has overflow:hidden, so no change needed there to
    clip the pair mid-slide. */
-.lv3-edge img{position:absolute;inset:0;width:8vw;height:80vh;object-fit:cover;display:block;filter:grayscale(20%) contrast(1.08) brightness(0.7) saturate(0.85);pointer-events:none;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none;transition:transform 0.32s cubic-bezier(.22,1,.36,1)}
+/* Same curve as .lv3-main img above, same reason — kept identical so the
+   two boxes' motion stays in lockstep (see navigate()'s own comment on
+   why that matters). */
+.lv3-edge img{position:absolute;inset:0;width:8vw;height:80vh;object-fit:cover;display:block;filter:grayscale(20%) contrast(1.08) brightness(0.7) saturate(0.85);pointer-events:none;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none;transition:transform 0.32s cubic-bezier(0,0,0.2,1)}
 .lv3-edge--prev img{object-position:100% 50%}
 .lv3-edge--next img{object-position:0% 50%}
 
@@ -1517,9 +1529,9 @@ function handleTileActivate(id, triggerEl) {
 // many times openViewer() steps deeper from grid to viewer within it. That
 // makes "the whole sheet is open" a single on/off state in history rather
 // than a multi-level stack: a real back-button/back-gesture press always
-// fully exits the sheet in one step, the same as the swipe-down dismiss
-// gesture (see bindSwipe()) or the visible X button — it does not retrace
-// individual grid->viewer steps the way those in-page controls still do.
+// fully exits the sheet in one step, the same as tapping outside the
+// photo or the visible X button — it does not retrace individual
+// grid->viewer steps the way those in-page controls still do.
 // This was worth the simplicity trade-off since nothing asked for the
 // nested version, and it sidesteps having to reconstruct which sub-state
 // (grid vs. viewer, at which photo) a forward-navigation should restore.
@@ -1568,8 +1580,8 @@ function openGallery(project, triggerEl) {
   sheetPanel.querySelector('.ps-close')?.focus({ preventScroll: true });
 }
 
-// Every UI close path (X button, Escape, backdrop tap, swipe-down dismiss)
-// calls this same function, which never touches the DOM directly — it
+// Every UI close path (X button, Escape, tap outside the photo) calls
+// this same function, which never touches the DOM directly — it
 // only ever asks history to go back. closeGalleryDOM() below is the one
 // place the sheet actually tears down, run exclusively from the popstate
 // handler, so the history stack and the visible UI can never desync
@@ -1970,98 +1982,33 @@ function navigate(dir) {
 function cfNext() { navigate(1); }
 function cfPrev() { navigate(-1); }
 
-// Two-axis gesture on the same stage: horizontal drag navigates photos
-// (unchanged from before), vertical drag downward dismisses the whole
-// viewer — deliberately a different axis from navigation rather than
-// overloading horizontal drag with both meanings, and specifically
-// different from iOS's own horizontal edge-swipe-back gesture, which is
-// what was colliding with photo-swiping and (before the history fix in
-// closeGallery()/GALLERY_HISTORY_STATE above) also landing on an
-// unrelated previous page instead of closing the viewer. Axis is decided
-// once, after a small dead zone, and locked for the rest of the gesture
-// so a diagonal-ish drag doesn't flip between the two mid-swipe.
+// Horizontal-only. A vertical swipe-down-to-dismiss gesture briefly lived
+// here (meant to avoid colliding with iOS's own horizontal edge-swipe-
+// back gesture) but was dropped in favor of a plain, generous tap-
+// outside-the-photo close instead (see the sheetPanel click handler and
+// .lv3-main/.lv3-edge's own sizing, which is what leaves real tappable
+// black space around the photo) — simpler mental model, and one less
+// gesture competing with photo-swiping on the same touch surface. The
+// edge-swipe-back collision itself is still handled regardless, by the
+// history fix in closeGallery()/GALLERY_HISTORY_STATE above.
 function bindSwipe(el) {
-  const AXIS_LOCK_PX = 10;
-  const DISMISS_PX = 100;
-  let startX = 0, startY = 0, tracking = false, axis = null;
-
+  let startX = 0, startY = 0, tracking = false;
   el.addEventListener('touchstart', (e) => {
     if (cfAnimating) return;
     const t = e.touches[0];
     startX = t.clientX;
     startY = t.clientY;
     tracking = true;
-    axis = null;
   }, { passive: true });
-
-  el.addEventListener('touchmove', (e) => {
-    if (!tracking) return;
-    const t = e.touches[0];
-    const dx = t.clientX - startX;
-    const dy = t.clientY - startY;
-    if (!axis) {
-      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
-      axis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
-    }
-    // Downward only — dragging up over the photo isn't a gesture this
-    // viewer gives meaning to, so it's left alone (no feedback, no
-    // preventDefault) rather than inventing a use for it.
-    if (axis === 'y' && dy > 0) {
-      // Stops iOS's own rubber-band/pull-to-refresh from fighting this
-      // transform — needs {passive:false} on this listener to be legal.
-      e.preventDefault();
-      const progress = Math.min(dy / (window.innerHeight * 0.5), 1);
-      el.style.transition = 'none';
-      el.style.transform = `translateY(${dy}px) scale(${1 - progress * 0.08})`;
-      // Fades the whole sheet (photo, edges, label/count/toggles all sit
-      // under sheetPanel) toward the page underneath as a "pulling this
-      // away" cue — stops short of fully transparent (min 0.4) so a
-      // partial drag that snaps back doesn't flash the page behind at
-      // full strength.
-      sheetPanel.style.transition = 'none';
-      sheetPanel.style.opacity = String(1 - progress * 0.6);
-    }
-  }, { passive: false });
-
   el.addEventListener('touchend', (e) => {
     if (!tracking) return;
     tracking = false;
     const t = e.changedTouches[0];
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
-    if (axis === 'y') {
-      if (dy > DISMISS_PX) {
-        // No snap-back styling needed on commit — closeGalleryDOM() (run
-        // via the popstate this triggers, see closeGallery()'s own
-        // comment) replaces sheetPanel's content and class outright.
-        closeViewer();
-      } else {
-        snapBack();
-      }
-    } else if (axis === 'x') {
-      if (Math.abs(dx) > 50) {
-        if (dx < 0) cfNext(); else cfPrev();
-      }
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) cfNext(); else cfPrev();
     }
-    axis = null;
-  }, { passive: true });
-
-  function snapBack() {
-    el.style.transition = 'transform 0.25s cubic-bezier(.22,1,.36,1)';
-    sheetPanel.style.transition = 'opacity 0.25s ease';
-    el.style.transform = '';
-    sheetPanel.style.opacity = '';
-  }
-
-  // The OS can interrupt a touch sequence mid-drag (an incoming call, a
-  // system gesture stealing it) without ever firing touchend — without
-  // this, that leaves the photo/sheet stuck mid-fade with no way to
-  // finish or reverse the gesture.
-  el.addEventListener('touchcancel', () => {
-    if (!tracking) return;
-    tracking = false;
-    if (axis === 'y') snapBack();
-    axis = null;
   }, { passive: true });
 }
 
