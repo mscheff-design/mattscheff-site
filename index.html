@@ -383,17 +383,17 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .project-tile:hover .grease-mark--hover{opacity:1}
 .cs-frame-cell:hover .grease-mark--hover{opacity:1}
 }
-/* Mobile has no per-tile hover to reveal these with, and swiping through
-   5 individually-marked tiles read as noisy anyway — one mark for the
-   whole carousel box instead keeps the motif present without it
-   following every tile. Hidden by default; the @media(max-width:599px)
-   rule above turns it on, sized to overscan .contact-sheet the same way
-   .grease-mark overscans a project-tile. */
-.carousel-grease-mark{display:none;position:absolute;inset:-8%;width:116%;height:116%;pointer-events:none;z-index:25;overflow:visible}
-.carousel-grease-mark image{overflow:visible}
-@media (max-width:599px){
-  .carousel-grease-mark{display:block}
-}
+/* Static counterpart to .grease-mark--hover above — no opacity:0 resting
+   state and no hover/focus binding, since the mobile master-grid carousel
+   (see the @media(max-width:599px) rules further down) gives each tile a
+   permanent, fixed mark instead of a hover reveal it could never trigger
+   anyway. Superseded the previous single shared mark that framed the
+   whole carousel box regardless of which tile was showing — this reads
+   as each project's own mark traveling with its own tile as you swipe,
+   closer to what a real grease-pencil-annotated contact sheet would look
+   like, and gives each project a stable visual identity across visits
+   rather than a random draw. */
+.grease-mark--static{opacity:1}
 
 /* level 2 — cursor-following glass loupe, see loupe.js */
 .loupe-root{position:fixed;top:0;left:0;pointer-events:none;z-index:250;border-radius:50%;overflow:hidden;opacity:0;transition:opacity 0.25s cubic-bezier(.22,1,.36,1);filter:drop-shadow(0 10px 26px rgba(0,0,0,0.4))}
@@ -513,6 +513,11 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
   /* Master grid becomes a one-at-a-time carousel on phones, each project
      sized under 100% so the next one peeks in from the right edge —
      signals there's more to swipe to without extra dot-indicator chrome.
+     Centered (not start-aligned) and narrower than the original 92% so
+     BOTH the previous and next project peek in from either edge at
+     once, closer to the level-3 photo viewer's own main+edge-preview
+     layout (flat peeks, no Cover-Flow-style depth/tilt) rather than a
+     one-sided "next tile only" reveal.
      The text hint below is a second, more explicit nudge at the same
      idea — quiet mono caption, same treatment as the rest of the film-strip
      chrome (.rebate-text etc.), not a callout.
@@ -533,18 +538,11 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
      stopping dead at the carousel's own edge. */
   .project-grid{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none}
   .project-grid::-webkit-scrollbar{display:none}
-  .project-tile{flex:0 0 92%;scroll-snap-align:start;scroll-snap-stop:always}
+  .project-tile{flex:0 0 80%;scroll-snap-align:center;scroll-snap-stop:always}
   /* Taller than the shared desktop/tablet 3:4 — on a phone this sat with
      a lot of dead black space above/below it in the section; a taller
      frame at a wider tile width fills more of that. */
   .project-frame{aspect-ratio:2/3}
-  /* One grease mark framing the whole carousel box, not one per tile (see
-     .carousel-grease-mark below and its insertion in initLevel1()) —
-     .contact-sheet is the static frame around #projectGrid's own
-     overflow-x:auto scroller, so anchoring the mark here keeps it in
-     place as the user swipes tiles underneath it rather than scrolling
-     away with the content. */
-  .contact-sheet{position:relative}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
   .carousel-hint{display:block;margin:10px 0 0;text-align:center;font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-light-rgb),0.35)}
 }
@@ -1172,12 +1170,20 @@ const GREASE_MARKS = [
   'assets/grease-mark-5.svg'
 ];
 
-// Mobile carousel's own independent draw (see its own comment further
-// down) pulls from this instead of GREASE_MARKS directly — grease-mark.svg
-// (fill:#9a3737, a dark red) read wrong framing the mobile one-photo
-// shadowbox specifically, at the user's request. Left in GREASE_MARKS
-// itself so the level 1/2 desktop hover marks are unaffected.
-const CAROUSEL_GREASE_MARKS = GREASE_MARKS.filter((m) => m !== 'assets/grease-mark.svg');
+// Fixed, one-to-one — unlike GREASE_MARKS' own random-per-session draw
+// (assignedGreaseMark(), used for the desktop hover reveal below), the
+// mobile master-grid carousel gives each project a permanent, specific
+// mark of its own (see initLevel1()'s isTouchDevice branch), a stable
+// identity across visits rather than a random assignment. Keyed by
+// project.id (projectCode.toLowerCase(), see the PROJECTS.forEach() setup
+// above) so it stays correct regardless of PROJECTS' own array order.
+const PROJECT_GREASE_MARKS = {
+  jpan: 'assets/grease-mark-4.svg',
+  eurp: 'assets/grease-mark-5.svg',
+  mlnd: 'assets/grease-mark-3.svg',
+  helo: 'assets/grease-mark-2.svg',
+  fcmg: 'assets/grease-mark.svg'
+};
 
 function shuffle(arr) {
   const a = arr.slice();
@@ -1207,14 +1213,6 @@ function greaseMarkSVG(modifierClass) {
   return `
     <svg class="grease-mark ${modifierClass}" overflow="visible">
       <image href="" x="0" y="0" width="100%" height="100%" preserveAspectRatio="xMidYMid meet"/>
-    </svg>
-  `;
-}
-
-function carouselGreaseMarkSVG(href) {
-  return `
-    <svg class="carousel-grease-mark" overflow="visible">
-      <image href="${href}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="xMidYMid meet"/>
     </svg>
   `;
 }
@@ -1371,11 +1369,20 @@ function resolveLeadIndex(project) {
   tile.setAttribute('aria-controls', 'sheetPanel');
   tile.setAttribute('aria-label', `${project.title}, ${project.year}`);
   tile.appendChild(frame);
-  tile.insertAdjacentHTML('beforeend', greaseMarkSVG('grease-mark--hover'));
-  const markImage = tile.querySelector('.grease-mark image');
-  tile.addEventListener('mouseenter', () => {
-    markImage.setAttribute('href', assignedGreaseMark(projectIdx));
-  });
+  // Mobile's master-grid carousel gives each project a permanent, fixed
+  // mark (PROJECT_GREASE_MARKS) with no hover/focus binding at all — see
+  // .grease-mark--static's own comment. Desktop keeps the original
+  // hover-revealed, randomly-assigned-per-session mark unchanged.
+  if (isTouchDevice) {
+    tile.insertAdjacentHTML('beforeend', greaseMarkSVG('grease-mark--static'));
+    tile.querySelector('.grease-mark image').setAttribute('href', PROJECT_GREASE_MARKS[project.id]);
+  } else {
+    tile.insertAdjacentHTML('beforeend', greaseMarkSVG('grease-mark--hover'));
+    const markImage = tile.querySelector('.grease-mark image');
+    tile.addEventListener('mouseenter', () => {
+      markImage.setAttribute('href', assignedGreaseMark(projectIdx));
+    });
+  }
   tile.addEventListener('click', () => handleTileActivate(project.id, tile));
   tile.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTileActivate(project.id, tile); }
@@ -1384,20 +1391,6 @@ function resolveLeadIndex(project) {
   projectGrid.appendChild(tile);
   });
 
-  // One random mark framing the whole mobile carousel box (CSS keeps it
-  // hidden above 599px) — see .carousel-grease-mark and the .contact-sheet
-  // it's anchored to. Deliberately NOT drawn from nextGreaseMark()/
-  // greaseMarkBag — that bag exists to keep the 5 per-tile hover marks
-  // distinct from each other, and this is a separate, unrelated draw; going
-  // through the shared bag consumed one of its 5 slots up front, so the 5
-  // tiles were only ever really drawing from 4 remaining marks before a
-  // reshuffle forced an early repeat — the "one duplicate, one missing"
-  // pattern. A plain independent pick here can't touch that bag.
-  const contactSheet = document.querySelector('.contact-sheet');
-  if (contactSheet) {
-    const carouselMark = CAROUSEL_GREASE_MARKS[Math.floor(Math.random() * CAROUSEL_GREASE_MARKS.length)];
-    contactSheet.insertAdjacentHTML('beforeend', carouselGreaseMarkSVG(carouselMark));
-  }
 })();
 
 /* ---------- selected work: rows generated from JOBS (shared with the
@@ -2035,14 +2028,20 @@ sheetPanel.addEventListener('click', (e) => {
   if (!sheetPanel.classList.contains('mode-viewer')) return;
   if (e.target === sheetPanel || e.target.id === 'cfStage' || e.target.classList.contains('lv3-main')) {
     // A tap on the photo while the mobile info panel is open dismisses
-    // just the panel, not the whole viewer — otherwise a visitor reading
-    // the statement who taps to put it away would unexpectedly back all
-    // the way out instead.
+    // just the panel, not the whole viewer — kept even on touch devices
+    // (unlike the full-exit tap below) since it's a different, still-
+    // useful interaction: putting the panel away, not leaving the gallery.
     const infoPanel = document.getElementById('lv3InfoPanel');
     if (infoPanel && infoPanel.classList.contains('is-open')) {
       toggleInfoPanel(false);
       return;
     }
+    // Touch devices exit via the visible X only now — tap-outside-to-
+    // close (kept for desktop's mouse-driven background click, an
+    // established, unquestioned pattern) turned out to compete with
+    // photo-swiping and the info toggle for the same touch surface, at
+    // the user's request to simplify back down to one clear mobile exit.
+    if (isTouchDevice) return;
     closeViewer();
   }
 });
