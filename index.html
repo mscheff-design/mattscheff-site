@@ -211,10 +211,20 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .project-row.is-inert:hover .row-name{color:rgba(var(--ink-rgb),0.85)}
 }
 .row-num{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-rgb),0.25);width:32px;flex-shrink:0;letter-spacing:0.08em}
-.row-body{flex:1}
+.row-body{flex:1;min-width:0}
 .row-name{font-family:var(--font-serif);font-size:22px;font-weight:400;color:rgba(var(--ink-rgb),0.85);margin-bottom:4px;transition:color 0.2s}
 .row-sub{font-family:var(--font-mono);font-size:8.5px;color:rgba(var(--ink-rgb),0.3);letter-spacing:0.1em;text-transform:uppercase}
-.row-tag{font-family:var(--font-mono);font-size:8px;color:rgba(var(--ink-rgb),0.25);letter-spacing:0.08em;text-transform:uppercase;text-align:right;line-height:1.8;flex-shrink:0}
+/* flex-shrink:0 used to hold each tag line (e.g. "SHOPIFY DEVELOPMENT") to
+   its unwrapped max-content width regardless of available space — a flex
+   item with flex-shrink:0 never shrinks below its content's preferred
+   width. On a narrow phone that forced .project-row itself wider than the
+   viewport (invisible until you look at page-level scrollWidth, since
+   nothing here shows a visible overflow indicator), which is the real
+   source of the sideways/rubber-band scroll on mobile — not the hover
+   state. max-width caps how much of the row it can claim; min-width:0
+   plus the default flex-shrink:1 let it actually shrink and wrap its two-
+   word tags onto a second line instead of forcing the row wider. */
+.row-tag{font-family:var(--font-mono);font-size:8px;color:rgba(var(--ink-rgb),0.25);letter-spacing:0.08em;text-transform:uppercase;text-align:right;line-height:1.8;flex-shrink:1;min-width:0;max-width:40%}
 .row-tag.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),var(--reactive-alpha,0.25))}
 .row-arrow{font-size:16px;color:rgba(var(--ink-rgb),0.2);transition:all 0.25s;opacity:0;margin-left:8px}
 
