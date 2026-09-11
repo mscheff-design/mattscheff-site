@@ -392,8 +392,18 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    as each project's own mark traveling with its own tile as you swipe,
    closer to what a real grease-pencil-annotated contact sheet would look
    like, and gives each project a stable visual identity across visits
-   rather than a random draw. */
-.grease-mark--static{opacity:1}
+   rather than a random draw.
+   inset:0/100% overrides .grease-mark's own -15%/130% overscan — that
+   overscan was fine for a brief desktop hover flash with generous grid
+   space around it, but confirmed (via a real device + an on-page
+   diagnostic) to be the actual source of a genuine mobile horizontal-
+   scroll bug once these marks became permanent: the last tile's mark
+   overscanning past its own tile leaked through .contact-sheet/
+   .photo-section (neither of which clip horizontally) all the way to
+   document-level scrollWidth. Bounding the static mark fully within its
+   own tile removes that leak at the root instead of papering over the
+   symptom with more overflow:hidden further up the tree. */
+.grease-mark--static{opacity:1;inset:0;width:100%;height:100%}
 
 /* level 2 — cursor-following glass loupe, see loupe.js */
 .loupe-root{position:fixed;top:0;left:0;pointer-events:none;z-index:250;border-radius:50%;overflow:hidden;opacity:0;transition:opacity 0.25s cubic-bezier(.22,1,.36,1);filter:drop-shadow(0 10px 26px rgba(0,0,0,0.4))}
@@ -2065,57 +2075,6 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('contextmenu', (e) => {
   if (e.target.tagName === 'IMG') e.preventDefault();
 });
-</script>
-
-<!-- TEMP-DEBUG-OVERFLOW v2: first pass's className readout was broken for
-     SVG elements (className is an SVGAnimatedString object there, not a
-     string — getAttribute('class') works for both). Now reports the top 5
-     widest offenders (not just 1) with a readable ancestor path, and
-     separately reports every .grease-mark's own rect directly, since
-     that's the prime suspect (permanently visible on mobile as of this
-     session, previously only a brief desktop hover reveal). -->
-<script>
-(function() {
-  function pathOf(el) {
-    const parts = [];
-    let n = el, depth = 0;
-    while (n && n !== document.body && depth < 6) {
-      const cls = n.getAttribute && n.getAttribute('class');
-      parts.unshift(n.tagName.toLowerCase() + (n.id ? '#' + n.id : '') + (cls ? '.' + cls.trim().split(/\s+/).join('.') : ''));
-      n = n.parentElement;
-      depth++;
-    }
-    return parts.join(' > ');
-  }
-  function report() {
-    const docEl = document.documentElement;
-    const overflowPx = docEl.scrollWidth - docEl.clientWidth;
-    const offenders = [];
-    document.querySelectorAll('body *').forEach(el => {
-      const r = el.getBoundingClientRect();
-      if (r.right > docEl.clientWidth + 1) offenders.push({ el, right: r.right, left: r.left, width: r.width });
-    });
-    offenders.sort((a, b) => b.right - a.right);
-    const top = offenders.slice(0, 5).map(o =>
-      'right=' + Math.round(o.right) + ' left=' + Math.round(o.left) + ' w=' + Math.round(o.width) + '  ' + pathOf(o.el)
-    );
-    const greaseMarks = [...document.querySelectorAll('.grease-mark')].map(el => {
-      const r = el.getBoundingClientRect();
-      return 'right=' + Math.round(r.right) + ' left=' + Math.round(r.left) + ' w=' + Math.round(r.width) + '  ' + pathOf(el);
-    });
-    const badge = document.createElement('div');
-    badge.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:red;color:#fff;font:10px monospace;padding:6px;white-space:pre-wrap;pointer-events:none;max-height:70vh;overflow:hidden';
-    badge.textContent = 'scrollW=' + docEl.scrollWidth + ' clientW=' + docEl.clientWidth + ' overflow=' + overflowPx + 'px\n\n'
-      + 'TOP OFFENDERS:\n' + (top.length ? top.join('\n') : '(none exceed clientWidth)') + '\n\n'
-      + 'ALL .grease-mark RECTS:\n' + (greaseMarks.length ? greaseMarks.join('\n') : '(none on page)');
-    document.body.appendChild(badge);
-  }
-  if (document.readyState === 'complete') {
-    setTimeout(report, 800);
-  } else {
-    window.addEventListener('load', () => setTimeout(report, 800));
-  }
-})();
 </script>
 
 </body>
