@@ -297,7 +297,15 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .cs-root{background-color:var(--black)}
 
 .frame{position:relative;background:var(--bg-frame);overflow:hidden;isolation:isolate;transition:opacity 0.2s}
+/* (hover:hover) — without it, mobile browsers apply :hover after a tap
+   and have no mouseleave to ever clear it, since there's no cursor to
+   actually leave. A visitor tapping a tile to open it would see it
+   stuck dimmed/marked afterward, sometimes visible again if they came
+   back to the grid. :focus-visible (kept unconditional, see its own
+   rules) is real keyboard navigation and unaffected by this. */
+@media (hover:hover){
 .frame:hover{opacity:0.85}
+}
 /* Gutter-glow/edge-fringe experiment (box-shadow bloom + gradient fringe)
    dropped entirely at the user's request — it read as a border effect
    around the tile rather than something happening to the photo itself,
@@ -364,8 +372,17 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .grease-mark{position:absolute;inset:-15%;width:130%;height:130%;pointer-events:none;z-index:20;overflow:visible;opacity:0}
 .grease-mark image{overflow:visible}
 .grease-mark--hover{transition:opacity 0.18s ease}
+/* (hover:hover) — the design intent right below (no per-tile hover on
+   mobile) already assumed :hover just wouldn't fire there. It does:
+   mobile browsers apply :hover after a tap with no mouseleave to ever
+   clear it, so without this guard a tapped tile's mark got stuck showing
+   — exactly the "residual hover" that intent was supposed to rule out.
+   :focus-visible (separate rules, kept unconditional) is real keyboard
+   navigation and unaffected. */
+@media (hover:hover){
 .project-tile:hover .grease-mark--hover{opacity:1}
 .cs-frame-cell:hover .grease-mark--hover{opacity:1}
+}
 /* Mobile has no per-tile hover to reveal these with, and swiping through
    5 individually-marked tiles read as noisy anyway — one mark for the
    whole carousel box instead keeps the motif present without it
@@ -643,7 +660,13 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
    places so the edge previews stay vertically aligned with the main
    image instead of poking above/below it. */
 .lv3-edge{position:absolute;top:50%;transform:translateY(-50%);width:8vw;height:80vh;overflow:hidden;cursor:pointer;opacity:0.4;transition:opacity 0.25s ease;z-index:1}
+/* (hover:hover) — same reasoning as .frame/.grease-mark's own rules
+   above: without it, tapping an edge peek on mobile (it's also a real
+   tap target, see cfEdgePrevEl/cfEdgeNextEl's click listeners) leaves it
+   stuck at the brighter hover opacity with no mouseleave to clear it. */
+@media (hover:hover){
 .lv3-edge:hover{opacity:0.65}
+}
 .lv3-edge--prev{left:0}
 .lv3-edge--next{right:0}
 /* pointer-events:none + the drag/callout/select resets — same pattern as
