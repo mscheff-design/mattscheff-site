@@ -196,13 +196,20 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .collapsible-panel-inner{overflow:hidden}
 
 .project-row{display:flex;align-items:center;padding:22px 0;border-bottom:0.5px solid rgba(var(--ink-rgb),0.08);cursor:pointer;transition:all 0.25s;gap:20px;text-decoration:none;color:inherit}
+.project-row.is-inert{cursor:default}
+/* (hover:hover) — same convention as .frame:hover above: on a tap-only
+   device this hover state never clears (no cursor to leave), and worse
+   here, the padding-left shift plus the arrow's translateX both grow the
+   row's scrollable overflow, which is what was pushing a horizontal
+   scrollbar onto the mobile page. Real-mouse-only, so it's gone on touch. */
+@media (hover:hover){
 .project-row:hover{padding-left:8px}
 .project-row:hover .row-arrow{opacity:1;transform:translateX(4px)}
 .project-row:hover .row-name{color:var(--ink)}
-.project-row.is-inert{cursor:default}
 .project-row.is-inert:hover{padding-left:0}
 .project-row.is-inert:hover .row-arrow{opacity:0;transform:none}
 .project-row.is-inert:hover .row-name{color:rgba(var(--ink-rgb),0.85)}
+}
 .row-num{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-rgb),0.25);width:32px;flex-shrink:0;letter-spacing:0.08em}
 .row-body{flex:1}
 .row-name{font-family:var(--font-serif);font-size:22px;font-weight:400;color:rgba(var(--ink-rgb),0.85);margin-bottom:4px;transition:color 0.2s}
