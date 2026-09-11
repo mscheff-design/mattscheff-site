@@ -65,7 +65,7 @@ export function renderSiteFooter(mountEl) {
   injectStyles();
   mountEl.innerHTML = `
     <footer>
-      <span class="footer-left">© 2026 Matthew Scheffler</span>
+      <span class="footer-left">© 2026 Matthew Scheffler. All photographs are original work and may not be reproduced without permission.</span>
       <div class="footer-links">
         <a href="https://instagram.com/matt_scheff" target="_blank">Instagram</a>
         <a href="https://www.linkedin.com/in/mattscheffler/" target="_blank">LinkedIn</a>
@@ -182,7 +182,7 @@ function injectStyles() {
     nav.is-on-dark .radio-station{color:rgba(var(--ink-light-rgb),0.68)}
     nav.is-on-dark .radio-station:hover{color:rgba(var(--ink-light-rgb),0.85)}
     nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
-    footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;border-top:0.5px solid rgba(var(--ink-light-rgb),0.08);display:flex;justify-content:space-between;align-items:center}
+    footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;border-top:0.5px solid rgba(var(--ink-light-rgb),0.08);display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 24px}
     .footer-left{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-light-rgb),0.2);letter-spacing:0.08em}
     .footer-links{display:flex;gap:24px}
     .footer-links a{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-light-rgb),0.25);letter-spacing:0.08em;text-decoration:none;transition:color 0.2s}
