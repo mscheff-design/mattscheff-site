@@ -134,6 +134,10 @@ export function textMediaBlock(props) {
   const mediaWrap = el('div', 'cs-text-media-media');
   const media = mediaEl(props.media);
   if (media) mediaWrap.appendChild(media);
+  // Same quiet mono caption as fullBleedMediaBlock's own (.cs-full-bleed-
+  // caption) — this block just never had an image worth captioning until
+  // now.
+  if (props.caption) mediaWrap.appendChild(el('div', 'cs-text-media-caption', props.caption));
   if (props.flow) {
     text.appendChild(mediaWrap);
     if (props.body) text.appendChild(el('p', 'cs-text-media-body', props.body));
@@ -338,13 +342,30 @@ export function quoteBlock(props) {
   return wrap;
 }
 
+// cs-block (spacing/width) and cs-gallery (the actual flex/grid track) are
+// split across an outer/inner pair rather than one element carrying both
+// classes, so a mobile swipe hint can sit below the scrollable track as a
+// normal block sibling instead of becoming a flex item inside it.
 export function galleryBlock(props) {
-  const wrap = el('div', 'cs-block cs-gallery');
+  const wrap = el('div', 'cs-block');
+  const track = el('div', 'cs-gallery');
   (props.images || []).forEach((image) => {
     const item = el('div', 'cs-gallery-item');
     item.appendChild(mediaEl({ type: 'image', src: image.src, alt: image.alt }));
-    wrap.appendChild(item);
+    track.appendChild(item);
   });
+  wrap.appendChild(track);
+  // Diptych/triptych galleries scroll-snap horizontally on mobile (see
+  // .cs-gallery's own touch-only rules below) with no visible affordance
+  // that there's more than one frame — a visitor who doesn't habitually
+  // swipe case-study images could easily miss every photo after the
+  // first. One image needs no such hint (nothing to swipe to). Same
+  // quiet mono-caption treatment as the Photography section's own
+  // carousel hint (.carousel-hint in index.html), reworded for this
+  // context.
+  if (isTouchDevice && (props.images || []).length > 1) {
+    wrap.appendChild(el('p', 'cs-gallery-hint', 'Swipe for more'));
+  }
   return wrap;
 }
 
@@ -665,6 +686,12 @@ function injectStyles() {
     .cs-text-media-heading{font-family:var(--font-serif);font-weight:400;font-size:clamp(24px,3vw,32px);color:var(--ink);margin-bottom:16px}
     .cs-text-media-body{font-family:var(--font-serif);font-size:17px;line-height:1.65;color:rgba(var(--ink-rgb),0.75)}
     .cs-text-media-media .cs-media-el{width:100%;display:block;border-radius:2px}
+    /* Same quiet mono caption as .cs-full-bleed-caption, just left-aligned
+       and tighter to the image — this sits directly under a half-width
+       (or, in the flow variant, floated 40%-width) image, not a full-
+       bleed one, so centering it across the whole text column would read
+       oddly off-center relative to the photo it's actually captioning. */
+    .cs-text-media-caption{font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.4);margin-top:8px}
 
     /* thumbnail variant — a small reference image beside the text, not a half-width co-lead */
     .cs-text-media--thumb{align-items:flex-start;gap:40px}
@@ -715,8 +742,18 @@ function injectStyles() {
     .cs-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
     .cs-gallery-item .cs-media-el{width:100%;height:100%;display:block;object-fit:cover;border-radius:2px}
     ${isTouchDevice ? `
-    .cs-gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px}
+    /* overflow-y:hidden + touch-action:pan-x — the same fix index.html's
+       own .project-grid mobile carousel needed (see its own comment for
+       the full CSS Overflow spec explanation): setting only overflow-x
+       leaves overflow-y at its default (visible), which the spec quietly
+       promotes to auto too, making this ALSO a vertical scroll container
+       with just enough sub-pixel range for a touch drag to rubber-band
+       the whole row. That fix was never ported here when this gallery
+       was built, which is exactly the kind of accidental sideways drift
+       reported on mobile case-study pages. */
+    .cs-gallery{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;touch-action:pan-x;overscroll-behavior-x:contain;gap:12px}
     .cs-gallery-item{flex:0 0 min(80vw,420px);scroll-snap-align:start}
+    .cs-gallery-hint{margin:10px 0 0;text-align:center;font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.35)}
     ` : ''}
 
     /* video showcase — shared shadowbox treatment (videoTriptych + videoPanel) */
@@ -735,7 +772,9 @@ function injectStyles() {
     .cs-video-panel-tile:hover .cs-video-annotation,.cs-video-panel-tile.is-active .cs-video-annotation{opacity:1;transform:translateY(0)}
 
     ${isTouchDevice ? `
-    .cs-video-triptych-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px}
+    /* Same overflow-y:hidden/touch-action:pan-x fix as .cs-gallery above —
+       see that rule's own comment. */
+    .cs-video-triptych-grid{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;touch-action:pan-x;overscroll-behavior-x:contain;gap:12px}
     .cs-video-triptych-grid .cs-video-tile{flex:0 0 min(70vw,300px);scroll-snap-align:start}
     ` : ''}
 

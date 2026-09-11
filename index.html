@@ -502,8 +502,11 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
      entirely (unrelated to the peek width itself) — touch-action:pan-x is
      kept as a second guard on the gesture. scroll-snap-stop:always means
      a single swipe always lands on exactly the next project, never more
-     than one. Native scrollbar hidden. */
-  .project-grid{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;touch-action:pan-x;scrollbar-width:none}
+     than one. Native scrollbar hidden. overscroll-behavior-x:contain
+     stops a swipe that reaches the first/last tile from chaining into a
+     horizontal scroll/bounce on the page itself, rather than just
+     stopping dead at the carousel's own edge. */
+  .project-grid{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none}
   .project-grid::-webkit-scrollbar{display:none}
   .project-tile{flex:0 0 92%;scroll-snap-align:start;scroll-snap-stop:always}
   /* Taller than the shared desktop/tablet 3:4 — on a phone this sat with
