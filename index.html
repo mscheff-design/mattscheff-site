@@ -122,7 +122,10 @@ nav::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1
    ink tone to --ink-light-rgb so they stay legible over solid black. Higher
    specificity (3 classes) on .nav-radio.is-playing's own accent rules above
    means "currently playing" still wins its accent color regardless of which
-   section is underneath — this only touches the resting/hover ink color. */
+   section is underneath — this only touches the resting/hover ink color.
+   Also mirrored in chrome.js (case-study pages' shared nav) — that copy
+   watches for .cs-full-bleed--dark/.cs-shadowbox instead of this page's
+   own Photography/Contact/footer sections. Keep in sync by hand. */
 nav.is-on-dark .nav-links a{color:rgba(var(--ink-light-rgb),0.68)}
 nav.is-on-dark .nav-links a:hover{color:rgba(var(--ink-light-rgb),0.85)}
 nav.is-on-dark .radio-toggle{color:rgba(var(--ink-light-rgb),0.7)}

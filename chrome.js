@@ -28,6 +28,37 @@ export function renderSiteNav(mountEl) {
   `;
   initRadioWidget(mountEl.querySelector('#navRadio'));
   initThemeSwitcher(mountEl.querySelector('#themeSwitcher'));
+  initNavDarkWatcher(mountEl.querySelector('nav'));
+}
+
+// Same mechanism as index.html's own nav-dark watcher (see nav.is-on-dark's
+// CSS comment above for the full reasoning) — ported here since it existed
+// only on the homepage. Queries .cs-full-bleed-dark/.cs-shadowbox fresh on
+// every tick rather than caching a NodeList once: renderCaseStudyPage
+// hasn't populated #csMount with any of these yet at the moment
+// renderSiteNav runs (nav mounts first), only shortly after, and a stale
+// empty NodeList would mean this silently never triggers.
+function initNavDarkWatcher(navEl) {
+  if (!navEl) return;
+  let ticking = false;
+  const update = () => {
+    const navHeight = navEl.getBoundingClientRect().height;
+    const darkSections = document.querySelectorAll('.cs-full-bleed--dark, .cs-shadowbox');
+    const isOnDark = [...darkSections].some((section) => {
+      const rect = section.getBoundingClientRect();
+      return rect.top < navHeight && rect.bottom > 0;
+    });
+    navEl.classList.toggle('is-on-dark', isOnDark);
+    ticking = false;
+  };
+  const schedule = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(update);
+  };
+  window.addEventListener('scroll', schedule, { passive: true });
+  window.addEventListener('resize', schedule);
+  update();
 }
 
 export function renderSiteFooter(mountEl) {
@@ -137,6 +168,20 @@ function injectStyles() {
       .radio-viz{height:7px;gap:1.5px}
       .radio-viz span{width:1.5px}
     }
+    /* nav.is-on-dark — ported from index.html's own copy (see its comment
+       there for the full reasoning); this one was built only on the
+       homepage and never applied here, which is exactly why nav read as a
+       near-invisible smudge over case-study pages' own dark full-bleed
+       sections (.cs-full-bleed--dark, the video showcase's .cs-shadowbox).
+       Keep in sync by hand with index.html's copy. */
+    nav.is-on-dark .nav-links a{color:rgba(var(--ink-light-rgb),0.68)}
+    nav.is-on-dark .nav-links a:hover{color:rgba(var(--ink-light-rgb),0.85)}
+    nav.is-on-dark .radio-toggle{color:rgba(var(--ink-light-rgb),0.7)}
+    nav.is-on-dark .radio-toggle:hover{color:rgba(var(--ink-light-rgb),0.85)}
+    nav.is-on-dark .radio-viz span{background:rgba(var(--ink-light-rgb),0.6)}
+    nav.is-on-dark .radio-station{color:rgba(var(--ink-light-rgb),0.68)}
+    nav.is-on-dark .radio-station:hover{color:rgba(var(--ink-light-rgb),0.85)}
+    nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
     footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;border-top:0.5px solid rgba(var(--ink-light-rgb),0.08);display:flex;justify-content:space-between;align-items:center}
     .footer-left{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-light-rgb),0.2);letter-spacing:0.08em}
     .footer-links{display:flex;gap:24px}
