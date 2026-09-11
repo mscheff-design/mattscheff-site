@@ -524,6 +524,34 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .carousel-hint{display:none}
 
 @media (max-width:599px){
+  /* Breaks .contact-sheet out of .photo-section's 48px side padding plus
+     its own 12px padding/border — without this, the carousel below (and
+     its peeking tiles) sat inside that full ~60px inset on each side,
+     nowhere near the screen's actual edges, reading as "boxed in" rather
+     than reaching them the way the level-3 viewer's own full-bleed
+     layout does. Only .contact-sheet breaks out, not .cs-root (level 2's
+     own modal grid, sized independently via .sheet-panel.mode-grid,
+     never relied on this element's padding to begin with) or anything
+     above it (the KODAK PORTRA rebate label, etc. — only the carousel
+     itself needed to reach the edges here). padding/border go to
+     top-and-bottom only, since left/right at a literal screen edge would
+     look like stray marks rather than a frame.
+     margin:-48px (not blocks.js's width:100vw/calc(50% - 50vw) full-bleed
+     trick used elsewhere in this codebase) deliberately — that technique
+     resolves 50vw against window.innerWidth, which on desktop includes
+     a reserved scrollbar's own width, so it can differ from
+     document.documentElement.clientWidth (the real available area) by
+     however wide that scrollbar is. Confirmed directly: simulating it
+     here produced a real, measurable overflow purely from that
+     discrepancy. Mobile Safari's overlay scrollbars likely don't reserve
+     layout space the same way, but after two real overflow bugs already
+     this session, this margin instead cancels .photo-section's own
+     known 48px padding exactly — a fixed value with no viewport-unit
+     math and no scrollbar-width dependency at all, so there's no
+     discrepancy of this kind for it to ever have. Confirmed via the same
+     simulation: zero page overflow this way, with .contact-sheet's own
+     rect landing exactly on clientWidth's edges. */
+  .contact-sheet{margin:0 -48px;padding:12px 0;border-left:none;border-right:none}
   /* Master grid becomes a one-at-a-time carousel on phones, each project
      sized under 100% so the next one peeks in from the right edge —
      signals there's more to swipe to without extra dot-indicator chrome.
