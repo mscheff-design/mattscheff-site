@@ -37,7 +37,10 @@ export const JOBS = [
   }
   // Contributor Development Partnership moved out of the case-study
   // roster to index.html's "Additional credits" list — it doesn't
-  // warrant a full case study page. Its case-study files are left on
-  // disk (unlinked, not deleted) under case-studies/
-  // contributor-development-partnership/.
+  // warrant a full case study page. Its case-study files (draft
+  // placeholder copy, never finished) were deleted outright rather than
+  // left unlinked on disk, once that unlinked page turned out to still
+  // be publicly reachable and crashing (JOBS.find(...) returning
+  // undefined once this entry was removed, with no null check on the
+  // page's own side).
 ];
