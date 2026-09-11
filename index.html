@@ -1224,12 +1224,14 @@ const GREASE_MARKS = [
 ];
 
 // Fixed, one-to-one — unlike GREASE_MARKS' own random-per-session draw
-// (assignedGreaseMark(), used for the desktop hover reveal below), the
-// mobile master-grid carousel gives each project a permanent, specific
-// mark of its own (see initLevel1()'s isTouchDevice branch), a stable
-// identity across visits rather than a random assignment. Keyed by
-// project.id (projectCode.toLowerCase(), see the PROJECTS.forEach() setup
-// above) so it stays correct regardless of PROJECTS' own array order.
+// (assignedGreaseMark(), used for the desktop hover reveal below). Used to
+// give the mobile master-grid carousel a permanent, specific mark per
+// project (a stable identity across visits rather than a random
+// assignment); that call site in initLevel1() is commented out for now
+// (mobile grease marks pulled), so this map is currently unused. Left in
+// place rather than deleted since the mobile mark is meant to come back.
+// Keyed by project.id (projectCode.toLowerCase(), see the PROJECTS.forEach()
+// setup above) so it stays correct regardless of PROJECTS' own array order.
 const PROJECT_GREASE_MARKS = {
   jpan: 'assets/grease-mark-4.svg',
   eurp: 'assets/grease-mark-5.svg',
@@ -1422,14 +1424,12 @@ function resolveLeadIndex(project) {
   tile.setAttribute('aria-controls', 'sheetPanel');
   tile.setAttribute('aria-label', `${project.title}, ${project.year}`);
   tile.appendChild(frame);
-  // Mobile's master-grid carousel gives each project a permanent, fixed
-  // mark (PROJECT_GREASE_MARKS) with no hover/focus binding at all — see
-  // .grease-mark--static's own comment. Desktop keeps the original
-  // hover-revealed, randomly-assigned-per-session mark unchanged.
-  if (isTouchDevice) {
-    tile.insertAdjacentHTML('beforeend', greaseMarkSVG('grease-mark--static'));
-    tile.querySelector('.grease-mark image').setAttribute('href', PROJECT_GREASE_MARKS[project.id]);
-  } else {
+  // Mobile's master-grid carousel used to give each project a permanent,
+  // fixed mark (PROJECT_GREASE_MARKS) with no hover/focus binding at all —
+  // pulled for now (see PROJECT_GREASE_MARKS' own comment). Desktop keeps
+  // the original hover-revealed, randomly-assigned-per-session mark
+  // unchanged.
+  if (!isTouchDevice) {
     tile.insertAdjacentHTML('beforeend', greaseMarkSVG('grease-mark--hover'));
     const markImage = tile.querySelector('.grease-mark image');
     tile.addEventListener('mouseenter', () => {
