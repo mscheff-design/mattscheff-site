@@ -533,13 +533,6 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
   .project-grid{grid-template-columns:repeat(3,1fr)}
   .cs-frame-grid{grid-template-columns:repeat(3,1fr)}
 }
-/* Hidden by default — only ever shown inside the 599px carousel breakpoint
-   below, where .project-grid actually becomes swipeable. Plain markup
-   order (after .contact-sheet, before the panel closes) rather than a
-   JS-inserted node since, unlike the peek-width edge cue, it's static text
-   with nothing to sync to scroll position. */
-.carousel-hint{display:none}
-
 @media (max-width:599px){
   /* Breaks .contact-sheet out of .photo-section's 48px side padding plus
      its own 12px padding/border — without this, the carousel below (and
@@ -577,9 +570,6 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
      once, closer to the level-3 photo viewer's own main+edge-preview
      layout (flat peeks, no Cover-Flow-style depth/tilt) rather than a
      one-sided "next tile only" reveal.
-     The text hint below is a second, more explicit nudge at the same
-     idea — quiet mono caption, same treatment as the rest of the film-strip
-     chrome (.rebate-text etc.), not a callout.
      The actual cause of the earlier "thumbnail moves around inside its
      box" bug: per the CSS Overflow spec, setting only overflow-x (auto)
      and leaving overflow-y at its default (visible) doesn't actually keep
@@ -614,7 +604,6 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
      frame at a wider tile width fills more of that. */
   .project-frame{aspect-ratio:2/3}
   .cs-frame-grid{grid-template-columns:repeat(2,1fr);gap:0 5px}
-  .carousel-hint{display:block;margin:10px 0 0;text-align:center;font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-light-rgb),0.35)}
 }
 
 /* Contact section — a plain restatement of the 3D card's own CONTACT/
@@ -1005,7 +994,6 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
     <div class="contact-sheet">
       <div class="project-grid" id="projectGrid"></div>
     </div>
-    <p class="carousel-hint">Swipe to browse</p>
 
     </div>
     </div>
