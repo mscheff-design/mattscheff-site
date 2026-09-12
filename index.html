@@ -798,8 +798,18 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
   }
   .lv3-edge img{
     /* Peek now comes from viewport/scroll clipping (like .project-frame
-       img), not from a narrow object-position-cropped sliver. */
-    width:100%;height:100%;object-fit:cover;object-position:50% 50%;
+       img), not from a narrow object-position-cropped sliver.
+       object-fit:contain (not cover) deliberately matches .lv3-main img's
+       own treatment exactly — cover would crop the photo to fill the box,
+       and since recycling only ever swaps which slot's <img src> holds a
+       given photo (never re-fits it), a peek shown cropped-to-fill would
+       visibly snap to its true, uncropped proportions the instant it's
+       promoted to main. Matching fit here means nothing about a photo's
+       presentation changes at recycle time, only its position — the
+       whole point of the silent-recenter trick. Trade-off, accepted: a
+       photo whose aspect ratio doesn't match the tile can show letterbox
+       space in its peek sliver, rather than filling the peek completely. */
+    width:100%;height:100%;object-fit:contain;object-position:50% 50%;
   }
 }
 
