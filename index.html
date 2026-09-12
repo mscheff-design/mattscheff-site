@@ -1996,8 +1996,13 @@ function updateStage() {
   // bindTouchStage()'s recycle step could flash a not-yet-loaded image on
   // the newly-revealed far edge; this gives it a full navigation cycle's
   // head start. Harmless/additive for desktop too.
-  new Image().src = fullSrc(project, (cfIndex - 2 + total) % total);
-  new Image().src = fullSrc(project, (cfIndex + 2) % total);
+  // .decode() (not just .src) forces the browser to actually finish
+  // decoding in the background rather than just caching the bytes and
+  // deferring decode until this exact bitmap is first painted — .catch is
+  // just for an aborted/unsupported decode, not a real error to surface.
+  const prefetch = (i) => { const img = new Image(); img.src = fullSrc(project, i); img.decode?.().catch(() => {}); };
+  prefetch((cfIndex - 2 + total) % total);
+  prefetch((cfIndex + 2) % total);
 
   document.getElementById('cfLabel').innerHTML = `${code} ${project.year} <b>${String(cfIndex + 1).padStart(2, '0')}</b>`;
   document.getElementById('cfCount').textContent = `${String(cfIndex + 1).padStart(2, '0')} / ${total}`;
@@ -2168,6 +2173,30 @@ function bindTouchStage(stageEl) {
     }
     return best;
   }
+  // The one meaningful cost recycling doesn't cover for free: .lv3-main
+  // img alone carries the chromatic-aberration SVG filter (see its own
+  // comment on the Safari cost that got it restricted to a single
+  // instance) — .lv3-edge img uses a cheaper filter instead. Desktop's
+  // navigate() masks that filter's first-render cost inside its 320ms
+  // slide; this instant recycle has no motion to hide it behind, so it
+  // shows up as a bare pop-in delay on the promoted photo. Pre-warming
+  // both edges with .lv3-main img's own filter for the duration of an
+  // active touch gives the browser the whole gesture as a head start —
+  // transient, not permanent, since running that filter on 3 tiles at
+  // once at rest is exactly the multi-instance cost this codebase
+  // already avoids elsewhere.
+  const mainFilter = () => getComputedStyle(document.getElementById('cfMainImg')).filter;
+  function warmEdgeFilters() {
+    const f = mainFilter();
+    cfEdgePrevEl.querySelector('img').style.filter = f;
+    cfEdgeNextEl.querySelector('img').style.filter = f;
+  }
+  function unwarmEdgeFilters() {
+    cfEdgePrevEl.querySelector('img').style.filter = '';
+    cfEdgeNextEl.querySelector('img').style.filter = '';
+  }
+  stageEl.addEventListener('touchstart', warmEdgeFilters, { passive: true });
+
   // Plain debounce, not the newer scrollend event — simpler, dependency-
   // free, and doesn't need a feature-detection fallback.
   let settleTimer = null;
@@ -2178,8 +2207,9 @@ function bindTouchStage(stageEl) {
       const landed = centeredTile();
       if (landed === cfEdgeNextEl) cfIndex = (cfIndex + 1) % total;
       else if (landed === cfEdgePrevEl) cfIndex = (cfIndex - 1 + total) % total;
-      else return; // settled back on cfMainEl — cancelled drag, no-op
+      else { unwarmEdgeFilters(); return; } // settled back on cfMainEl — cancelled drag, no-op
       updateStage();
+      unwarmEdgeFilters(); // back to the cheap edge filter until the next touchstart
       // Re-fires this same 'scroll' listener; resolves to the cfMainEl
       // branch above next tick and no-ops there — expected, not a bug.
       centerInstant();
@@ -2189,7 +2219,9 @@ function bindTouchStage(stageEl) {
   // Tap-to-advance: smooth-scroll to the tapped edge and let the settle
   // detector above resolve the commit, unifying tap and swipe into one
   // path on mobile instead of routing through the old navigate() slide.
+  // Also pre-warms, same reasoning as touchstart above.
   function scrollToTile(tile) {
+    warmEdgeFilters();
     stageEl.scrollTo({ left: tile.offsetLeft - (stageEl.clientWidth - tile.offsetWidth) / 2, behavior: 'smooth' });
   }
   cfEdgePrevEl.addEventListener('click', () => scrollToTile(cfEdgePrevEl));
