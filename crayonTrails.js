@@ -16,7 +16,15 @@ export const CRAYON_DEFAULTS = {
   // hitting the cap. Raised well past what ordinary expressive doodling
   // needs; it's still there as a backstop against literally circling the
   // same spot indefinitely.
-  holdSeconds: 24, fadeSeconds: 32, maxStamps: 1800, densityLimit: 400
+  holdSeconds: 24, fadeSeconds: 32, maxStamps: 1800, densityLimit: 400,
+  // Separate from holdSeconds/fadeSeconds above, which are tuned for the
+  // desktop interactive hover-drawn strokes' own much slower fade-out. The
+  // touch doodle's auto-loop crossfade is a much quicker, continuous cycle:
+  // the outgoing mark starts fading the instant the next one begins
+  // drawing, fully gone right around when the new one's ~1.2s reveal
+  // finishes, and each mark then dwells fully visible for doodleLoopSeconds
+  // before the cycle advances again.
+  doodleFadeSeconds: .8, doodleLoopSeconds: 8
 };
 export function makeRandom(seed) {
   let n = seed >>> 0;
@@ -94,7 +102,7 @@ export function mountCrayonTrails(hero, {
   const fine = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
   let enabled = !isTouchDevice && fine.matches && !motion.matches;
   let disposed = false, visible = true, paused = false;
-  let width = 1, height = 1, dpr = 1, raf = 0, fadeTimer = 0;
+  let width = 1, height = 1, dpr = 1, raf = 0, fadeTimer = 0, loopTimer = 0;
   let previous = null, smooth = null, traveled = 0, phase = 0, smoothAngle = null;
   let stamps = [], density = new Map();
   const doodle = isTouchDevice ? {
@@ -150,7 +158,7 @@ export function mountCrayonTrails(hero, {
     }
     toggle.style.setProperty('--crayon-color', chosenColor);
   }
-  function cancelWork() { cancelAnimationFrame(raf); clearTimeout(fadeTimer); raf=0; fadeTimer=0; stopDoodle(); }
+  function cancelWork() { cancelAnimationFrame(raf); clearTimeout(fadeTimer); clearTimeout(loopTimer); raf=0; fadeTimer=0; loopTimer=0; stopDoodle(); }
   function clear() { if (doodle) doodle.dismissed=true; stamps=[]; density.clear(); breakStroke(); cancelWork(); ctx.clearRect(0,0,width,height); }
   function setEnabled(value) {
     enabled=Boolean(value); breakStroke(); if (!enabled) clear(); updateToggle();
@@ -163,11 +171,16 @@ export function mountCrayonTrails(hero, {
   function paint() {
     raf=0;
     const now=performance.now();
-    const life=(cfg.holdSeconds+cfg.fadeSeconds)*1000;
-    stamps=stamps.filter(s=>s.persistent || now-s.time<life);
+    // Per-stamp hold/fade (falling back to cfg's) rather than one flat
+    // life for every stamp — the doodle's auto-loop crossfade needs a much
+    // quicker fade than the desktop hover strokes' cfg.holdSeconds/
+    // fadeSeconds, set directly on its own stamps in switchDoodle(). ??
+    // (not ||) matters here: those stamps set hold:0, a legitimate value
+    // that || would treat as falsy and wrongly fall back to cfg.holdSeconds.
+    stamps=stamps.filter(s=>s.persistent || now-s.time<((s.hold??cfg.holdSeconds)+(s.fade??cfg.fadeSeconds))*1000);
     ctx.clearRect(0,0,width,height);
     for (const s of stamps) {
-      const fade=s.persistent ? 1 : opacityAt((now-s.time)/1000,cfg.holdSeconds,cfg.fadeSeconds);
+      const fade=s.persistent ? 1 : opacityAt((now-s.time)/1000,s.hold??cfg.holdSeconds,s.fade??cfg.fadeSeconds);
       ctx.globalAlpha=s.alpha*fade;
       // Absolute CSS px, not a fraction of width/height — a stamp's
       // position stays put if the canvas later resizes (e.g. the backdrop
@@ -325,10 +338,10 @@ export function mountCrayonTrails(hero, {
   }
   const toggleClick=()=>doodle ? switchDoodle() : setEnabled(!enabled);
   const preferences=()=>{
-    if (doodle) { if (motion.matches) finishDoodle(); else wakeDoodle(); }
+    if (doodle) { if (motion.matches) finishDoodle(); else {wakeDoodle();scheduleLoop();} }
     else setEnabled(fine.matches&&!motion.matches);
   };
-  const visibility=()=>{breakStroke();if(document.hidden)cancelWork();else {schedule();wakeDoodle();}};
+  const visibility=()=>{breakStroke();if(document.hidden)cancelWork();else {schedule();wakeDoodle();scheduleLoop();}};
   const scroll=()=>breakStroke();
   // window/documentElement, not hero — nav is a DOM SIBLING of hero, not a
   // descendant, so a listener on hero itself never sees pointer events
@@ -346,7 +359,7 @@ export function mountCrayonTrails(hero, {
   motion.addEventListener('change',preferences); fine.addEventListener('change',preferences);
   toggle?.addEventListener('click',toggleClick);
   const sizeObserver=new ResizeObserver(resize); sizeObserver.observe(surface);
-  const intersection=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible){schedule();wakeDoodle();}else{cancelWork();breakStroke();}});
+  const intersection=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible){schedule();wakeDoodle();scheduleLoop();}else{cancelWork();breakStroke();}});
   intersection.observe(hero);
   resize();updateToggle();
   // Draw once on first visibility, then stop all doodle scheduling. The
@@ -434,15 +447,56 @@ export function mountCrayonTrails(hero, {
 
   function switchDoodle() {
     if (!doodle || disposed) return;
-    // Cancel a partial reveal before replacing it, even on rapid taps.
-    cancelWork();
+    // Cancel a partial reveal before replacing it, even on rapid taps — but
+    // only the doodle's own reveal rAF chain (stopDoodle()), not a full
+    // cancelWork(): the outgoing mark is about to become a fading
+    // transient stamp below, and fading it needs the general paint()/
+    // fadeTimer loop to keep running and repainting across frames while
+    // the next mark draws on top of it.
+    stopDoodle();
+    // A manual tap (or an auto-advance) always restarts the loop's dwell
+    // clock from here, once the new mark finishes drawing (see
+    // scheduleLoop(), re-armed by finishDoodle()) — otherwise a switch
+    // that was already close to its next auto-advance would double-fire
+    // moments later.
+    clearTimeout(loopTimer); loopTimer=0;
+    const now=performance.now();
+    // Let the outgoing mark fade out on its own instead of composeDoodle()'s
+    // usual hard cut a few lines down (its own
+    // `stamps=stamps.filter(s=>!s.persistent)` would otherwise delete every
+    // one of this mark's stamps outright). Flipping them to a transient
+    // stamp with its own quick doodle-specific fade timing — not
+    // cfg.holdSeconds/fadeSeconds, tuned for the much slower desktop hover
+    // strokes — is what spares them from that filter; paint() already
+    // knows how to fade any non-persistent stamp via opacityAt().
+    for (const s of stamps) if (s.persistent) { s.persistent=false; s.time=now; s.hold=0; s.fade=cfg.doodleFadeSeconds; }
     doodle.variant=(doodle.variant+1)%MOBILE_DOODLES.length;
     chosenColor=CRAYON_COLORS[doodle.variant];
     brushes=brushesFor(chosenColor);
     Object.assign(doodle, {path:null, emitted:0, progress:0, elapsed:0,
       lastTime:null, complete:false, dismissed:false, measuredWidth:0, delay:0});
-    stamps=[]; density.clear(); breakStroke();
+    density.clear(); breakStroke();
     updateToggle(); composeDoodle(); paint(); wakeDoodle();
+  }
+
+  function scheduleLoop() {
+    clearTimeout(loopTimer); loopTimer=0;
+    // Only ever counts down once a mark is actually fully drawn (never
+    // mid-reveal) — finishDoodle() (re)arms this on every normal
+    // completion, and the various pause/hide resume paths re-arm it too,
+    // in case the mark had already finished before that happened.
+    // Continuous, unprompted cycling is exactly what prefers-reduced-motion
+    // asks pages to avoid, so the loop simply never (re)starts while that's
+    // set — the manual toggle still works regardless, since it doesn't
+    // depend on this timer.
+    if (!doodle || !doodle.complete || doodle.dismissed || disposed || paused || !visible || document.hidden || motion.matches) return;
+    loopTimer=setTimeout(advanceLoop, cfg.doodleLoopSeconds*1000);
+  }
+
+  function advanceLoop() {
+    loopTimer=0;
+    if (!doodle || doodle.dismissed || disposed || paused || !visible || document.hidden) return;
+    switchDoodle();
   }
 
   function emitDoodle() {
@@ -466,6 +520,7 @@ export function mountCrayonTrails(hero, {
     if (!doodle.path && !composeDoodle()) return;
     doodle.progress=1; doodle.complete=true;
     emitDoodle(); paint();
+    scheduleLoop();
   }
 
   function wakeDoodle() {
@@ -499,7 +554,7 @@ export function mountCrayonTrails(hero, {
   return {
     canvas, clear, setEnabled,
     get color(){return chosenColor;},
-    pause(value=true) {paused=value;breakStroke();if(paused)stopDoodle();else wakeDoodle();},
+    pause(value=true) {paused=value;breakStroke();if(paused){stopDoodle();clearTimeout(loopTimer);loopTimer=0;}else{wakeDoodle();scheduleLoop();}},
     get enabled(){return enabled;},
     get markCount(){return stamps.length;},
     destroy(){
