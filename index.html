@@ -2183,29 +2183,38 @@ function bindTouchStage(stageEl) {
     }
     return best;
   }
-  // The one meaningful cost recycling doesn't cover for free: .lv3-main
-  // img alone carries the chromatic-aberration SVG filter (see its own
-  // comment on the Safari cost that got it restricted to a single
-  // instance) — .lv3-edge img uses a cheaper filter instead. Desktop's
-  // navigate() masks that filter's first-render cost inside its 320ms
-  // slide; this instant recycle has no motion to hide it behind, so it
-  // shows up as a bare pop-in delay on the promoted photo. Pre-warming
-  // both edges with .lv3-main img's own filter for the duration of an
-  // active touch gives the browser the whole gesture as a head start —
-  // transient, not permanent, since running that filter on 3 tiles at
-  // once at rest is exactly the multi-instance cost this codebase
-  // already avoids elsewhere.
-  const mainFilter = () => getComputedStyle(document.getElementById('cfMainImg')).filter;
-  function warmEdgeFilters() {
-    const f = mainFilter();
-    cfEdgePrevEl.querySelector('img').style.filter = f;
-    cfEdgeNextEl.querySelector('img').style.filter = f;
+  // Two things distinguish a wing from .lv3-main, and BOTH are tied to
+  // which fixed DOM slot a photo currently sits in, not to how close to
+  // center it's actually scrolled: .lv3-main img alone carries the
+  // chromatic-aberration SVG filter (see its own comment on the Safari
+  // cost that restricted it to a single instance), and .lv3-edge itself
+  // sits at opacity:0.4 (deliberately dimmed, so the focused center photo
+  // reads as the one being looked at). Native scroll makes the incoming
+  // photo arrive at center instantly, but neither of these is scroll-
+  // position-driven — they only flip once the debounced settle handler
+  // below actually recycles the DOM slots, a beat after the motion
+  // itself. That gap (arrives bright-looking-dim, then pops bright a
+  // moment later) is what reads as a delay. Pre-warming both wings to
+  // .lv3-main's own filter+opacity for the duration of an active touch
+  // closes that gap — the incoming photo already looks exactly like the
+  // eventual main photo for the whole drag, so recycling afterward is
+  // purely positional and genuinely invisible. Transient, not permanent:
+  // running the expensive filter on 3 tiles at once at rest is exactly
+  // the multi-instance cost this codebase already avoids elsewhere.
+  function warmEdges() {
+    const f = getComputedStyle(document.getElementById('cfMainImg')).filter;
+    for (const el of [cfEdgePrevEl, cfEdgeNextEl]) {
+      el.querySelector('img').style.filter = f;
+      el.style.opacity = '1';
+    }
   }
-  function unwarmEdgeFilters() {
-    cfEdgePrevEl.querySelector('img').style.filter = '';
-    cfEdgeNextEl.querySelector('img').style.filter = '';
+  function unwarmEdges() {
+    for (const el of [cfEdgePrevEl, cfEdgeNextEl]) {
+      el.querySelector('img').style.filter = '';
+      el.style.opacity = '';
+    }
   }
-  stageEl.addEventListener('touchstart', warmEdgeFilters, { passive: true });
+  stageEl.addEventListener('touchstart', warmEdges, { passive: true });
 
   // Plain debounce, not the newer scrollend event — simpler, dependency-
   // free, and doesn't need a feature-detection fallback.
@@ -2217,9 +2226,9 @@ function bindTouchStage(stageEl) {
       const landed = centeredTile();
       if (landed === cfEdgeNextEl) cfIndex = (cfIndex + 1) % total;
       else if (landed === cfEdgePrevEl) cfIndex = (cfIndex - 1 + total) % total;
-      else { unwarmEdgeFilters(); return; } // settled back on cfMainEl — cancelled drag, no-op
+      else { unwarmEdges(); return; } // settled back on cfMainEl — cancelled drag, no-op
       updateStage();
-      unwarmEdgeFilters(); // back to the cheap edge filter until the next touchstart
+      unwarmEdges(); // back to the cheap/dimmed wing look until the next touchstart
       // Re-fires this same 'scroll' listener; resolves to the cfMainEl
       // branch above next tick and no-ops there — expected, not a bug.
       centerInstant();
@@ -2231,7 +2240,7 @@ function bindTouchStage(stageEl) {
   // path on mobile instead of routing through the old navigate() slide.
   // Also pre-warms, same reasoning as touchstart above.
   function scrollToTile(tile) {
-    warmEdgeFilters();
+    warmEdges();
     stageEl.scrollTo({ left: tile.offsetLeft - (stageEl.clientWidth - tile.offsetWidth) / 2, behavior: 'smooth' });
   }
   cfEdgePrevEl.addEventListener('click', () => scrollToTile(cfEdgePrevEl));
