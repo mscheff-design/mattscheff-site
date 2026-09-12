@@ -19,15 +19,16 @@ export const CRAYON_DEFAULTS = {
   holdSeconds: 24, fadeSeconds: 32, maxStamps: 1800, densityLimit: 400,
   // Separate from holdSeconds/fadeSeconds above, which are tuned for the
   // desktop interactive hover-drawn strokes' own much slower fade-out. The
-  // touch doodle's auto-loop transition is a quick, continuous cycle: the
-  // outgoing mark undraws itself — retreating along its own path, oldest
-  // point first — over doodleUndrawSeconds, timed to finish right around
-  // when the incoming mark's own ~1.2s reveal completes, so the two read as
-  // one continuous gesture rather than a cut. doodleUndrawTailSeconds is
-  // just the quick pop-off each individual point gets once its turn along
-  // that retreat comes up (see switchDoodle()), not the sweep's own length.
-  // Each mark then dwells fully visible for doodleLoopSeconds before the
-  // cycle advances again.
+  // touch doodle's auto-loop transition is two strictly sequential beats,
+  // never overlapping: the outgoing mark undraws itself first — retreating
+  // along its own path, oldest point first — over doodleUndrawSeconds, and
+  // only once it's fully gone does the incoming mark start its own ~1.2s
+  // hand-drawn reveal (see switchDoodle()'s doodle.delay, which holds the
+  // new mark at zero progress for exactly that long). doodleUndrawTailSeconds
+  // is just the quick pop-off each individual point gets once its turn
+  // along that retreat comes up, not the sweep's own length. Each mark then
+  // dwells fully visible for doodleLoopSeconds before the cycle advances
+  // again.
   doodleUndrawSeconds: 1.2, doodleUndrawTailSeconds: .12, doodleLoopSeconds: 8
 };
 export function makeRandom(seed) {
@@ -490,8 +491,17 @@ export function mountCrayonTrails(hero, {
     doodle.variant=(doodle.variant+1)%MOBILE_DOODLES.length;
     chosenColor=CRAYON_COLORS[doodle.variant];
     brushes=brushesFor(chosenColor);
+    // delay (not 0, like the old hard-cut used) is what keeps this
+    // sequential rather than simultaneous: advanceDoodle()'s progress stays
+    // pinned at zero — composeDoodle() below still runs immediately and
+    // builds the new path, but emitDoodle() draws none of it yet — until
+    // doodle.elapsed passes the outgoing mark's own full undraw span
+    // (doodleUndrawSeconds + doodleUndrawTailSeconds, the longest any of
+    // its stamps can possibly still be on screen), so the new mark only
+    // starts appearing once the old one is completely gone.
     Object.assign(doodle, {path:null, emitted:0, progress:0, elapsed:0,
-      lastTime:null, complete:false, dismissed:false, measuredWidth:0, delay:0});
+      lastTime:null, complete:false, dismissed:false, measuredWidth:0,
+      delay:(cfg.doodleUndrawSeconds+cfg.doodleUndrawTailSeconds)*1000});
     density.clear(); breakStroke();
     updateToggle(); composeDoodle(); paint(); wakeDoodle();
   }
