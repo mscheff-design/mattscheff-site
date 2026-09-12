@@ -780,10 +780,26 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
        reason .project-grid deliberately omits justify-content. */
     justify-content:flex-start;
     gap:12px; /* matches .project-grid's own gap */
+    /* --lv3-tile is the single source of truth for tile width; the side
+       padding is exactly the space a tile needs on either side to be able
+       to sit centered. WITHOUT this padding the first and last tiles can
+       never actually reach center — scrollLeft can't go below 0 or past
+       scrollWidth-clientWidth, so each edge tile comes up short by exactly
+       this much ((100vw - tile)/2, i.e. 8vw here). Measured directly: the
+       swiped-to tile rested ~8% of viewport width off-center, the browser
+       having scrolled as far as it could, and the commit's own recenter
+       then had to make up that difference — which is precisely the late
+       "snaps into the viewport" correction this whole layout was meant to
+       avoid. With the padding, every tile's centered position is exactly
+       reachable, so settling on one leaves the photo already centered and
+       the recycle is purely a content swap. */
+    --lv3-tile:84vw;
+    padding-left:calc((100vw - var(--lv3-tile)) / 2);
+    padding-right:calc((100vw - var(--lv3-tile)) / 2);
   }
   .lv3-stage::-webkit-scrollbar{display:none}
 
-  .lv3-main{flex:0 0 84vw;width:84vw;max-width:84vw;scroll-snap-align:center;scroll-snap-stop:always}
+  .lv3-main{flex:0 0 var(--lv3-tile);width:var(--lv3-tile);max-width:var(--lv3-tile);scroll-snap-align:center;scroll-snap-stop:always}
 
   .lv3-edge{
     /* Base rule below is position:absolute (desktop's stacked-slide
@@ -793,7 +809,7 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
        img's position:absolute;inset:0 needs — static would let that
        sizing fall through to .lv3-stage instead and break it. */
     position:relative;top:auto;left:auto;right:auto;transform:none;
-    flex:0 0 84vw;width:84vw;height:80vh;
+    flex:0 0 var(--lv3-tile);width:var(--lv3-tile);height:80vh;
     scroll-snap-align:center;scroll-snap-stop:always;
     /* opacity:1, not the base rule's 0.4 — see .lv3-edge img's filter
        note directly below for why the wings must be visually IDENTICAL
@@ -2214,34 +2230,56 @@ function bindTouchStage(stageEl) {
   // wings on touchstart never actually rendered until the scroll settled
   // (i.e. until the recycle, which made it pointless).
   function trySettle() {
-    clearTimeout(settleTimer);
     const total = activeProject.photos.length;
     const landed = centeredTile();
     if (landed === cfEdgeNextEl) cfIndex = (cfIndex + 1) % total;
     else if (landed === cfEdgePrevEl) cfIndex = (cfIndex - 1 + total) % total;
     else return; // settled back on cfMainEl — cancelled drag, no-op
     updateStage();
-    // Re-fires the 'scroll' listener below (and scrollend, where
-    // supported); resolves to the cfMainEl branch above next tick and
-    // no-ops there — expected, not a bug.
+    // Re-fires the 'scroll' listener below; the watcher re-arms, sees a
+    // stable position, resolves to the cfMainEl branch above and no-ops
+    // there — expected, not a bug.
     centerInstant();
   }
-  // scrollend fires exactly when the browser considers ALL scrolling —
-  // including scroll-snap's own inertial settle animation, not just the
-  // finger lifting — fully finished, so it's used as the primary signal
-  // where supported: a fixed debounce on 'scroll' alone waits some
-  // arbitrary extra time past that point "to be safe," and that gap is
-  // exactly what showed up as a second, subtle snap trailing behind the
-  // real motion once the filter/opacity pre-warming above closed the
-  // larger, more obvious gap. Where scrollend isn't supported, the
-  // debounce on 'scroll' is kept as the fallback, unchanged from before.
-  const supportsScrollend = 'onscrollend' in window;
-  let settleTimer = null;
-  stageEl.addEventListener('scroll', () => {
-    clearTimeout(settleTimer);
-    if (!supportsScrollend) settleTimer = setTimeout(trySettle, 140);
-  }, { passive: true });
-  if (supportsScrollend) stageEl.addEventListener('scrollend', trySettle, { passive: true });
+
+  // Commit only once scrollLeft has ACTUALLY stopped moving — measured,
+  // not inferred from a timeout or from scrollend. Both of those guess,
+  // and frame-stepping a screen recording showed the guess firing early:
+  // the content swapped while the photo was still 82px off-center, and
+  // the native snap then glided that last stretch over ~0.4s, decelerating
+  // — read as "the image sort of snaps into the viewport a beat late."
+  // (Whether that glide is the browser's own snap finishing or our
+  // centerInstant() being overridden by an in-flight native animation
+  // doesn't matter: committing mid-animation is wrong either way.)
+  // Polling the real position can't fire early by construction — if the
+  // scroll is still animating, the position is still changing. `touching`
+  // additionally blocks a commit while a finger is still down, so pausing
+  // mid-drag (a stable position, but not a finished gesture) doesn't
+  // count as settled.
+  let touching = false;
+  const touchOn = () => { touching = true; };
+  const touchOff = () => { touching = false; armSettleWatch(); };
+  stageEl.addEventListener('touchstart', touchOn, { passive: true });
+  stageEl.addEventListener('touchend', touchOff, { passive: true });
+  stageEl.addEventListener('touchcancel', touchOff, { passive: true });
+
+  let watchFrame = 0, stableFrames = 0, lastLeft = null;
+  function watchSettle() {
+    watchFrame = 0;
+    const cur = stageEl.scrollLeft;
+    if (lastLeft !== null && Math.abs(cur - lastLeft) < 0.5 && !touching) stableFrames++;
+    else stableFrames = 0;
+    lastLeft = cur;
+    // ~3 consecutive still frames: long enough not to trip on a single
+    // stalled frame mid-fling, short enough to feel immediate.
+    if (stableFrames >= 3) { stableFrames = 0; lastLeft = null; trySettle(); return; }
+    watchFrame = requestAnimationFrame(watchSettle);
+  }
+  function armSettleWatch() {
+    stableFrames = 0;
+    if (!watchFrame) watchFrame = requestAnimationFrame(watchSettle);
+  }
+  stageEl.addEventListener('scroll', armSettleWatch, { passive: true });
 
   // Tap-to-advance: smooth-scroll to the tapped edge and let the settle
   // detector above resolve the commit, unifying tap and swipe into one
