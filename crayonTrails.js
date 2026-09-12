@@ -19,12 +19,16 @@ export const CRAYON_DEFAULTS = {
   holdSeconds: 24, fadeSeconds: 32, maxStamps: 1800, densityLimit: 400,
   // Separate from holdSeconds/fadeSeconds above, which are tuned for the
   // desktop interactive hover-drawn strokes' own much slower fade-out. The
-  // touch doodle's auto-loop crossfade is a much quicker, continuous cycle:
-  // the outgoing mark starts fading the instant the next one begins
-  // drawing, fully gone right around when the new one's ~1.2s reveal
-  // finishes, and each mark then dwells fully visible for doodleLoopSeconds
-  // before the cycle advances again.
-  doodleFadeSeconds: .8, doodleLoopSeconds: 8
+  // touch doodle's auto-loop transition is a quick, continuous cycle: the
+  // outgoing mark undraws itself — retreating along its own path, oldest
+  // point first — over doodleUndrawSeconds, timed to finish right around
+  // when the incoming mark's own ~1.2s reveal completes, so the two read as
+  // one continuous gesture rather than a cut. doodleUndrawTailSeconds is
+  // just the quick pop-off each individual point gets once its turn along
+  // that retreat comes up (see switchDoodle()), not the sweep's own length.
+  // Each mark then dwells fully visible for doodleLoopSeconds before the
+  // cycle advances again.
+  doodleUndrawSeconds: 1.2, doodleUndrawTailSeconds: .12, doodleLoopSeconds: 8
 };
 export function makeRandom(seed) {
   let n = seed >>> 0;
@@ -461,15 +465,28 @@ export function mountCrayonTrails(hero, {
     // moments later.
     clearTimeout(loopTimer); loopTimer=0;
     const now=performance.now();
-    // Let the outgoing mark fade out on its own instead of composeDoodle()'s
-    // usual hard cut a few lines down (its own
+    // Let the outgoing mark undraw itself on its own instead of
+    // composeDoodle()'s usual hard cut a few lines down (its own
     // `stamps=stamps.filter(s=>!s.persistent)` would otherwise delete every
-    // one of this mark's stamps outright). Flipping them to a transient
-    // stamp with its own quick doodle-specific fade timing — not
-    // cfg.holdSeconds/fadeSeconds, tuned for the much slower desktop hover
-    // strokes — is what spares them from that filter; paint() already
-    // knows how to fade any non-persistent stamp via opacityAt().
-    for (const s of stamps) if (s.persistent) { s.persistent=false; s.time=now; s.hold=0; s.fade=cfg.doodleFadeSeconds; }
+    // one of this mark's stamps outright). Flipping them to transient
+    // stamps spares them from that filter; paint() already knows how to
+    // fade any non-persistent stamp via opacityAt(), keyed off each one's
+    // own hold/fade rather than one flat cfg pair.
+    //
+    // Staggering `hold` by the stamp's own `fraction` (0 at the start of
+    // the path, 1 at its end — the exact same value composeDoodle() used
+    // to pace the original hand-drawn reveal, carried straight through
+    // from doodle.path onto each stamp by emitDoodle()) is what turns a
+    // flat fade into a retreat: the point drawn FIRST is the point that
+    // disappears first, and the point drawn LAST lingers until the very
+    // end of doodleUndrawSeconds — the mark erases itself in the same
+    // order it was drawn, rather than everywhere at once. `fade` stays a
+    // short, fixed pop-off (doodleUndrawTailSeconds) so each point still
+    // reads as a clean edge sweeping along the line, not a long smear.
+    for (const s of stamps) if (s.persistent) {
+      s.persistent=false; s.time=now;
+      s.hold=(s.fraction??0)*cfg.doodleUndrawSeconds; s.fade=cfg.doodleUndrawTailSeconds;
+    }
     doodle.variant=(doodle.variant+1)%MOBILE_DOODLES.length;
     chosenColor=CRAYON_COLORS[doodle.variant];
     brushes=brushesFor(chosenColor);
