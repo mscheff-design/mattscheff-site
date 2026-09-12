@@ -2216,24 +2216,36 @@ function bindTouchStage(stageEl) {
   }
   stageEl.addEventListener('touchstart', warmEdges, { passive: true });
 
-  // Plain debounce, not the newer scrollend event — simpler, dependency-
-  // free, and doesn't need a feature-detection fallback.
+  function trySettle() {
+    clearTimeout(settleTimer);
+    const total = activeProject.photos.length;
+    const landed = centeredTile();
+    if (landed === cfEdgeNextEl) cfIndex = (cfIndex + 1) % total;
+    else if (landed === cfEdgePrevEl) cfIndex = (cfIndex - 1 + total) % total;
+    else { unwarmEdges(); return; } // settled back on cfMainEl — cancelled drag, no-op
+    updateStage();
+    unwarmEdges(); // back to the cheap/dimmed wing look until the next touchstart
+    // Re-fires the 'scroll' listener below (and scrollend, where
+    // supported); resolves to the cfMainEl branch above next tick and
+    // no-ops there — expected, not a bug.
+    centerInstant();
+  }
+  // scrollend fires exactly when the browser considers ALL scrolling —
+  // including scroll-snap's own inertial settle animation, not just the
+  // finger lifting — fully finished, so it's used as the primary signal
+  // where supported: a fixed debounce on 'scroll' alone waits some
+  // arbitrary extra time past that point "to be safe," and that gap is
+  // exactly what showed up as a second, subtle snap trailing behind the
+  // real motion once the filter/opacity pre-warming above closed the
+  // larger, more obvious gap. Where scrollend isn't supported, the
+  // debounce on 'scroll' is kept as the fallback, unchanged from before.
+  const supportsScrollend = 'onscrollend' in window;
   let settleTimer = null;
   stageEl.addEventListener('scroll', () => {
     clearTimeout(settleTimer);
-    settleTimer = setTimeout(() => {
-      const total = activeProject.photos.length;
-      const landed = centeredTile();
-      if (landed === cfEdgeNextEl) cfIndex = (cfIndex + 1) % total;
-      else if (landed === cfEdgePrevEl) cfIndex = (cfIndex - 1 + total) % total;
-      else { unwarmEdges(); return; } // settled back on cfMainEl — cancelled drag, no-op
-      updateStage();
-      unwarmEdges(); // back to the cheap/dimmed wing look until the next touchstart
-      // Re-fires this same 'scroll' listener; resolves to the cfMainEl
-      // branch above next tick and no-ops there — expected, not a bug.
-      centerInstant();
-    }, 140);
+    if (!supportsScrollend) settleTimer = setTimeout(trySettle, 140);
   }, { passive: true });
+  if (supportsScrollend) stageEl.addEventListener('scrollend', trySettle, { passive: true });
 
   // Tap-to-advance: smooth-scroll to the tapped edge and let the settle
   // detector above resolve the commit, unifying tap and swipe into one
