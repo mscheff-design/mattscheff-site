@@ -2230,11 +2230,22 @@ function bindTouchStage(stageEl) {
   // wings on touchstart never actually rendered until the scroll settled
   // (i.e. until the recycle, which made it pointless).
   function trySettle() {
-    const total = activeProject.photos.length;
     const landed = centeredTile();
+    if (landed === cfMainEl) return; // settled back on main — cancelled drag, no-op
+    // At most ONE commit per gesture. Without this, a single swipe could
+    // advance twice: centerInstant() below writes scrollLeft, but iOS can
+    // drop a scroll write issued right after momentum, leaving the stage
+    // still resting on the edge tile — the watcher then reads that same
+    // stale position, finds it stable, and commits a second time. Re-armed
+    // only by a fresh touchstart (see touchOn), so one swipe advances
+    // exactly one photo no matter how the platform handles the write.
+    // scroll-snap-stop:always already caps a fling at one tile, so there's
+    // no legitimate multi-advance to preserve here.
+    if (!armed) { centerInstant(); return; } // self-heal position, don't advance
+    const total = activeProject.photos.length;
     if (landed === cfEdgeNextEl) cfIndex = (cfIndex + 1) % total;
-    else if (landed === cfEdgePrevEl) cfIndex = (cfIndex - 1 + total) % total;
-    else return; // settled back on cfMainEl — cancelled drag, no-op
+    else cfIndex = (cfIndex - 1 + total) % total;
+    armed = false;
     updateStage();
     // Re-fires the 'scroll' listener below; the watcher re-arms, sees a
     // stable position, resolves to the cfMainEl branch above and no-ops
@@ -2256,28 +2267,38 @@ function bindTouchStage(stageEl) {
   // additionally blocks a commit while a finger is still down, so pausing
   // mid-drag (a stable position, but not a finished gesture) doesn't
   // count as settled.
-  let touching = false;
-  const touchOn = () => { touching = true; };
+  let touching = false, armed = true;
+  const touchOn = () => { touching = true; armed = true; };
   const touchOff = () => { touching = false; armSettleWatch(); };
   stageEl.addEventListener('touchstart', touchOn, { passive: true });
   stageEl.addEventListener('touchend', touchOff, { passive: true });
   stageEl.addEventListener('touchcancel', touchOff, { passive: true });
 
-  let watchFrame = 0, stableFrames = 0, lastLeft = null;
+  // `watching` stays true for the whole polling chain rather than being
+  // cleared at the top of each tick — otherwise a scroll event landing in
+  // that window starts a SECOND chain, and two chains sharing stableFrames
+  // both reach the threshold and both call trySettle(), which is the other
+  // way one swipe could advance two photos.
+  let watching = false, stableFrames = 0, lastLeft = null;
   function watchSettle() {
-    watchFrame = 0;
     const cur = stageEl.scrollLeft;
     if (lastLeft !== null && Math.abs(cur - lastLeft) < 0.5 && !touching) stableFrames++;
     else stableFrames = 0;
     lastLeft = cur;
     // ~3 consecutive still frames: long enough not to trip on a single
     // stalled frame mid-fling, short enough to feel immediate.
-    if (stableFrames >= 3) { stableFrames = 0; lastLeft = null; trySettle(); return; }
-    watchFrame = requestAnimationFrame(watchSettle);
+    if (stableFrames >= 3) {
+      watching = false; stableFrames = 0; lastLeft = null;
+      trySettle();
+      return;
+    }
+    requestAnimationFrame(watchSettle);
   }
   function armSettleWatch() {
     stableFrames = 0;
-    if (!watchFrame) watchFrame = requestAnimationFrame(watchSettle);
+    if (watching) return;
+    watching = true; lastLeft = null;
+    requestAnimationFrame(watchSettle);
   }
   stageEl.addEventListener('scroll', armSettleWatch, { passive: true });
 
