@@ -44,8 +44,20 @@ function injectStyles() {
        right at the cut edge, since clip-path restricts the whole element's
        paint (post-filter) to its shape. Left on a plain ancestor, the
        shadow can spill a couple px past the cut onto the wood beneath,
-       reading as the paper sitting physically on top of it. */
-    .hero-materials .hero-paper-shadow{position:absolute;inset:0;filter:drop-shadow(0 1px 2px rgba(40,28,16,0.28))}
+       reading as the paper sitting physically on top of it.
+       Only applied while WOOD_ENABLED — with the paper never clipped
+       otherwise, there's no cut edge for the shadow to fall against, so
+       it's fully invisible either way. Left as filter:none rather than
+       just leaving the rule in unconditionally: a filter (even one
+       that resolves to nothing visible) still makes Safari promote this
+       element to its own compositing layer, and this sits directly
+       beneath the crayon-trails canvas in the same .hero-materials
+       stack — Safari has a known history of compositing semi-transparent
+       canvas content against the wrong (opaque black) backdrop once a
+       neighboring layer gets promoted like that, which reads as the
+       crayon strokes randomly rendering far too dark. No reason to pay
+       that risk for an effect nobody can currently see. */
+    .hero-materials .hero-paper-shadow{position:absolute;inset:0;filter:${WOOD_ENABLED ? 'drop-shadow(0 1px 2px rgba(40,28,16,0.28))' : 'none'}}
     /* clip-path is set entirely in JS (see syncHeight) — it's one hexagon:
        a fixed cut near the top-left (unaffected by anything below), and a
        diagonal on the bottom-right that starts exactly where that corner

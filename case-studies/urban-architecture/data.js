@@ -18,10 +18,13 @@ export const CASE_STUDY = {
         // Milano furniture/lighting collection, chosen for the hero
         // because it captures the exact postmodern design world this
         // dealership deals in, not a screenshot of the site itself like
-        // the placeholder it replaces. Worth confirming usage rights
-        // before this goes live publicly, since its actual source/license
-        // hasn't been verified here.
-        media: { type: 'image', src: '/assets/case-studies/urban-architecture/hero-memphis-collection.webp', alt: 'A curated collection of Memphis Milano furniture and lighting' }
+        // the placeholder it replaces. Source confirmed below and
+        // attributed via caption; the page itself carried no photographer
+        // byline, so the credit points to the publication. Still worth
+        // confirming actual usage rights/license before this goes live
+        // publicly.
+        media: { type: 'image', src: '/assets/case-studies/urban-architecture/hero-memphis-collection.webp', alt: 'A curated collection of Memphis Milano furniture and lighting' },
+        caption: `Image via <a href="https://the-edit.lumens.com/the-look/memphis-group/" target="_blank" rel="noopener">Lumens, “The Look: Memphis Design Style”</a>`
       }
     },
     {

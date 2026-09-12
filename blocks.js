@@ -112,6 +112,9 @@ export function heroBlock(props) {
       mediaWrap.appendChild(media);
     }
     wrap.appendChild(mediaWrap);
+    // Same quiet mono caption as .cs-full-bleed-caption — used here for
+    // third-party image attribution rather than an in-house shot's caption.
+    if (props.caption) wrap.appendChild(el('div', 'cs-hero-caption', props.caption));
   }
   return wrap;
 }
@@ -608,6 +611,9 @@ function injectStyles() {
     .cs-hero-summary{font-family:var(--font-serif);font-size:19px;line-height:1.6;color:rgba(var(--ink-rgb),0.75);max-width:52ch}
     .cs-hero-media{margin-top:48px;width:100vw;margin-left:calc(50% - 50vw)}
     .cs-hero-media .cs-media-el{width:100%;display:block;object-fit:cover}
+    .cs-hero-caption{font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.4);margin-top:16px;text-align:center}
+    .cs-hero-caption a{color:inherit;text-decoration:underline;text-underline-offset:2px;transition:color 0.2s}
+    .cs-hero-caption a:hover{color:rgba(var(--ink-rgb),0.7)}
 
     /* plain text (no media slot — for text-forward case studies) */
     .cs-text-heading{font-family:var(--font-serif);font-weight:400;font-size:clamp(24px,3vw,32px);color:var(--ink);margin-bottom:16px}
