@@ -192,7 +192,13 @@ export function mountCrayonTrails(hero, {
       // growing taller while the résumé is open), instead of every
       // existing mark stretching/rescaling to the new dimensions.
       ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(s.angle);
-      ctx.drawImage(brushes[s.brush],-s.size/2,-s.size/2,s.size,s.size);
+      // s.brush is the actual brush canvas the stamp was made with, not an
+      // index into the (shared, mutable) `brushes` array — a color switch
+      // reassigns `brushes` to the new variant immediately, so an index
+      // looked up here would silently repaint every still-undrawing stamp
+      // from the OUTGOING mark in the incoming mark's color the instant
+      // the switch happens, well before that mark has actually retreated.
+      ctx.drawImage(s.brush,-s.size/2,-s.size/2,s.size,s.size);
       ctx.restore();
     }
     ctx.globalAlpha=1;
@@ -336,7 +342,7 @@ export function mountCrayonTrails(hero, {
       // Half the original ±0.08rad jitter — less scratchy zig-zag along
       // the stroke, closer to one continuous waxy line.
       stamps.push({x:px,y:py,time,angle:angle+(random()-.5)*.04,
-        size:cfg.width*pressure,alpha:cfg.opacity*marginWeight*taper,brush:Math.floor(random()*brushes.length)});
+        size:cfg.width*pressure,alpha:cfg.opacity*marginWeight*taper,brush:brushes[Math.floor(random()*brushes.length)]});
     }
     if(stamps.length>cfg.maxStamps) stamps.splice(0,stamps.length-cfg.maxStamps);
     schedule();
@@ -420,7 +426,7 @@ export function mountCrayonTrails(hero, {
         const t=along/length;
         path.push({ x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t,
           distance:travelled+along, angle:Math.atan2(b.y-a.y,b.x-a.x)+(textureRandom()-.5)*.04,
-          brush:Math.floor(textureRandom()*brushes.length) });
+          brush:brushes[Math.floor(textureRandom()*brushes.length)] });
         along+=spacing;
       }
       distanceToNext=along-length; travelled+=length;
