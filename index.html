@@ -2024,6 +2024,34 @@ function toggleInfoPanel(forceOpen) {
   infoToggle.setAttribute('aria-expanded', String(open));
 }
 
+// Point a wing's <img> at a new photo WITHOUT it blanking in between.
+// Assigning .src directly drops the currently-painted frame immediately
+// and leaves the element empty until the new file decodes — on the far
+// wing (the one revealed by a commit, whose photo was never on screen
+// before) that reads as a flicker. Loading into a detached Image first
+// and only swapping once it's decoded means the tile keeps showing its
+// previous photo until the replacement can be painted in one go. The
+// prefetch below usually makes that resolve on the spot; this just
+// removes the blank window when it doesn't.
+// `pending` guards against a stale swap: on a fast series of swipes an
+// earlier, slower load must not overwrite a newer assignment, so only
+// the most recent request for a given element is allowed to land.
+function setWingSrc(img, src) {
+  if (img.dataset.pending === src) return;   // already in flight
+  if (!img.dataset.pending && img.getAttribute('src') === src) return; // already shown
+  img.dataset.pending = src;
+  const pre = new Image();
+  const swap = () => {
+    if (img.dataset.pending !== src) return; // superseded by a newer swipe
+    delete img.dataset.pending;
+    img.src = src;
+  };
+  pre.onload = swap;
+  pre.onerror = swap;   // let the <img> surface the failure itself
+  pre.src = src;
+  if (pre.decode) pre.decode().then(swap).catch(() => {});
+}
+
 // Sets everything BUT the main image — used both for the initial render
 // (openViewer -> renderCoverflow, where there's no previous main image to
 // slide against) and at the end of navigate()'s slide, once the incoming
@@ -2035,11 +2063,17 @@ function updateStage() {
   const prevI = (cfIndex - 1 + total) % total;
   const nextI = (cfIndex + 1) % total;
 
+  // Main is assigned synchronously and must stay that way: the photo
+  // going into it is the one the viewer is already looking at (it was the
+  // wing they just swiped to, so it's decoded), and bindTouchStage()'s
+  // recenter happens immediately after — deferring this would briefly
+  // show the OUTGOING photo in the centered slot, which is far worse
+  // than any load flicker.
   const mainImg = document.getElementById('cfMainImg');
   mainImg.src = fullSrc(project, cfIndex);
   mainImg.alt = `${project.title}, frame ${cfIndex + 1}`;
-  cfEdgePrevEl.querySelector('img').src = fullSrc(project, prevI);
-  cfEdgeNextEl.querySelector('img').src = fullSrc(project, nextI);
+  setWingSrc(cfEdgePrevEl.querySelector('img'), fullSrc(project, prevI));
+  setWingSrc(cfEdgeNextEl.querySelector('img'), fullSrc(project, nextI));
   // Headless prefetch, index±2 — not on screen yet, but becomes an edge
   // tile's src on the very next commit in that direction. Without this,
   // bindTouchStage()'s recycle step could flash a not-yet-loaded image on
