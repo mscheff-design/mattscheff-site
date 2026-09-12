@@ -754,6 +754,55 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
 .lv3-edge--prev img{object-position:100% 50%}
 .lv3-edge--next img{object-position:0% 50%}
 
+/* Touch-only: real native scroll-snap over the same 3 DOM elements
+   (cfEdgePrevEl/cfMainEl/cfEdgeNextEl), matching .project-grid's own
+   mobile-carousel technique exactly (see its comment) — the browser's
+   compositor drives the drag/momentum/snap instead of the desktop
+   navigate()/startSlide() canned-transition path (see bindTouchStage()),
+   which is what makes level 1's swipe feel fluid and level 3's felt
+   clunky by comparison. Gated on (pointer:coarse), not a viewport-width
+   breakpoint, since this is a capability difference (native touch drag
+   vs mouse+keyboard), not a screen-size one — a touch tablet above any
+   width breakpoint should still get this. */
+@media (pointer:coarse){
+  .lv3-stage{
+    overflow-x:auto;overflow-y:hidden;
+    scroll-snap-type:x mandatory;
+    /* Overrides html{scroll-behavior:smooth} (inherited) — without this,
+       every silent recenter in bindTouchStage() would visibly animate
+       instead of jumping, breaking the "already there" illusion the
+       whole recycling trick depends on. */
+    scroll-behavior:auto;
+    touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none;
+    /* .lv3-stage's base rule below (desktop) centers via justify-content;
+       once this becomes a real overflowing scroll container, a centered
+       flex row risks unreachable negative scroll in some engines — same
+       reason .project-grid deliberately omits justify-content. */
+    justify-content:flex-start;
+    gap:12px; /* matches .project-grid's own gap */
+  }
+  .lv3-stage::-webkit-scrollbar{display:none}
+
+  .lv3-main{flex:0 0 84vw;width:84vw;max-width:84vw;scroll-snap-align:center;scroll-snap-stop:always}
+
+  .lv3-edge{
+    /* Base rule below is position:absolute (desktop's stacked-slide
+       layout) — pulled out of flex flow entirely, so it can't size via
+       flex or scroll with the container. position:relative (not static)
+       keeps this element itself as the positioned ancestor its own
+       img's position:absolute;inset:0 needs — static would let that
+       sizing fall through to .lv3-stage instead and break it. */
+    position:relative;top:auto;left:auto;right:auto;transform:none;
+    flex:0 0 84vw;width:84vw;height:80vh;
+    scroll-snap-align:center;scroll-snap-stop:always;
+  }
+  .lv3-edge img{
+    /* Peek now comes from viewport/scroll clipping (like .project-frame
+       img), not from a narrow object-position-cropped sliver. */
+    width:100%;height:100%;object-fit:cover;object-position:50% 50%;
+  }
+}
+
 .lv3-label{position:absolute;left:28px;bottom:24px;z-index:3;font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);text-shadow:0 0 4px rgba(var(--accent-rgb),0.6)}
 .lv3-label b{font-weight:400;opacity:0.85}
 .lv3-count{position:absolute;right:76px;top:30px;z-index:3;font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:var(--accent);text-shadow:0 0 4px rgba(var(--accent-rgb),0.6)}
@@ -1865,9 +1914,19 @@ function renderCoverflow() {
   cfEdgePrevEl = document.getElementById('cfEdgePrev');
   cfEdgeNextEl = document.getElementById('cfEdgeNext');
   cfMainEl = sheetPanel.querySelector('.lv3-main');
+  const cfStageEl = document.getElementById('cfStage');
 
-  cfEdgePrevEl.addEventListener('click', cfPrev);
-  cfEdgeNextEl.addEventListener('click', cfNext);
+  // Touch gets real native scroll-snap (bindTouchStage) instead of
+  // navigate()'s canned transition — see that function's own comment, and
+  // .lv3-stage's @media(pointer:coarse) CSS above. Desktop's edge-click +
+  // keyboard-arrow path (below/index.html:~2156) is untouched either way.
+  if (isTouchDevice) {
+    bindTouchStage(cfStageEl);
+  } else {
+    cfEdgePrevEl.addEventListener('click', cfPrev);
+    cfEdgeNextEl.addEventListener('click', cfNext);
+    bindSwipe(cfStageEl);
+  }
 
   // The loupe is a cursor-following magnifier (see loupe.js — driven
   // entirely by mousemove/mouseleave, no touch handling at all), so on a
@@ -1897,7 +1956,6 @@ function renderCoverflow() {
   const infoToggle = document.getElementById('lv3InfoToggle');
   if (infoToggle) infoToggle.addEventListener('click', () => toggleInfoPanel());
 
-  bindSwipe(document.getElementById('cfStage'));
   updateStage();
 }
 
@@ -1933,6 +1991,13 @@ function updateStage() {
   mainImg.alt = `${project.title}, frame ${cfIndex + 1}`;
   cfEdgePrevEl.querySelector('img').src = fullSrc(project, prevI);
   cfEdgeNextEl.querySelector('img').src = fullSrc(project, nextI);
+  // Headless prefetch, index±2 — not on screen yet, but becomes an edge
+  // tile's src on the very next commit in that direction. Without this,
+  // bindTouchStage()'s recycle step could flash a not-yet-loaded image on
+  // the newly-revealed far edge; this gives it a full navigation cycle's
+  // head start. Harmless/additive for desktop too.
+  new Image().src = fullSrc(project, (cfIndex - 2 + total) % total);
+  new Image().src = fullSrc(project, (cfIndex + 2) % total);
 
   document.getElementById('cfLabel').innerHTML = `${code} ${project.year} <b>${String(cfIndex + 1).padStart(2, '0')}</b>`;
   document.getElementById('cfCount').textContent = `${String(cfIndex + 1).padStart(2, '0')} / ${total}`;
@@ -2061,6 +2126,76 @@ function bindSwipe(el) {
       if (dx < 0) cfNext(); else cfPrev();
     }
   }, { passive: true });
+}
+
+// Touch-only replacement for bindSwipe()/navigate()'s canned transition —
+// see .lv3-stage's own @media(pointer:coarse) CSS comment. Real native
+// scroll-snap on the SAME 3 fixed DOM slots (cfEdgePrevEl/cfMainEl/
+// cfEdgeNextEl) as an "infinite 3-tile" carousel: dragging/flinging to an
+// edge and letting native snap settle there is read as a commit; the
+// browser's own snap-back on a cancelled/partial drag is read as "no
+// commit" for free — something the old distance-threshold bindSwipe()
+// never had. On commit, only the three <img> src attributes get
+// reassigned (the slots themselves never move or get reparented), via
+// the EXISTING updateStage() — its own doc-comment claims it skips the
+// main image, but its actual body already sets it too, so no new
+// "extended" version is needed here. The container is then recentered on
+// .lv3-main with NO animation, synchronously in the same tick (not
+// deferred through requestAnimationFrame — this file's rAF is globally
+// polyfilled onto setTimeout(cb,16) for a device-bug workaround, and a
+// deferred write here could let one wrong frame paint first). Because
+// the tile the user's eye is already resting on gets relabeled onto
+// .lv3-main's fixed slot as part of the same synchronous step, this
+// reads as the recognized photo having been "already there" rather than
+// a jump — the standard silent-recenter technique for an infinite
+// scroll-snap carousel. No manual cleanup is needed for any of these
+// listeners: renderCoverflow() rebuilds #cfStage and its three children
+// from scratch on every gallery open (sheetPanel.innerHTML = ..., see
+// its own comment), discarding old nodes/listeners together, exactly
+// like the existing edge-click listeners already do with zero cleanup
+// code anywhere in this file.
+function bindTouchStage(stageEl) {
+  function centerInstant() {
+    stageEl.scrollLeft = cfMainEl.offsetLeft - (stageEl.clientWidth - cfMainEl.offsetWidth) / 2;
+  }
+  function centeredTile() {
+    const stageCenter = stageEl.getBoundingClientRect().left + stageEl.clientWidth / 2;
+    let best = cfMainEl, bestDist = Infinity;
+    for (const tile of [cfEdgePrevEl, cfMainEl, cfEdgeNextEl]) {
+      const r = tile.getBoundingClientRect();
+      const dist = Math.abs(r.left + r.width / 2 - stageCenter);
+      if (dist < bestDist) { bestDist = dist; best = tile; }
+    }
+    return best;
+  }
+  // Plain debounce, not the newer scrollend event — simpler, dependency-
+  // free, and doesn't need a feature-detection fallback.
+  let settleTimer = null;
+  stageEl.addEventListener('scroll', () => {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      const total = activeProject.photos.length;
+      const landed = centeredTile();
+      if (landed === cfEdgeNextEl) cfIndex = (cfIndex + 1) % total;
+      else if (landed === cfEdgePrevEl) cfIndex = (cfIndex - 1 + total) % total;
+      else return; // settled back on cfMainEl — cancelled drag, no-op
+      updateStage();
+      // Re-fires this same 'scroll' listener; resolves to the cfMainEl
+      // branch above next tick and no-ops there — expected, not a bug.
+      centerInstant();
+    }, 140);
+  }, { passive: true });
+
+  // Tap-to-advance: smooth-scroll to the tapped edge and let the settle
+  // detector above resolve the commit, unifying tap and swipe into one
+  // path on mobile instead of routing through the old navigate() slide.
+  function scrollToTile(tile) {
+    stageEl.scrollTo({ left: tile.offsetLeft - (stageEl.clientWidth - tile.offsetWidth) / 2, behavior: 'smooth' });
+  }
+  cfEdgePrevEl.addEventListener('click', () => scrollToTile(cfEdgePrevEl));
+  cfEdgeNextEl.addEventListener('click', () => scrollToTile(cfEdgeNextEl));
+
+  centerInstant();
 }
 
 // Mode-aware: mode-viewer's close steps back to the grid it came from
