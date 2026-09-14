@@ -196,7 +196,12 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .collapsible-panel.is-open{grid-template-rows:1fr}
 .collapsible-panel-inner{overflow:hidden}
 
-.project-row{display:flex;align-items:center;padding:22px 0;border-bottom:0.5px solid rgba(var(--ink-rgb),0.08);cursor:pointer;transition:all 0.25s;gap:20px;text-decoration:none;color:inherit}
+/* flex-start, not center: once the body carries an excerpt + CTA the row
+   is several lines tall, and centering left the "01" and the tag column
+   floating against the middle of the excerpt instead of reading with the
+   title they belong to. The small padding-top on those two optically
+   lines their first line up with the title's cap height. */
+.project-row{display:flex;align-items:flex-start;padding:22px 0;border-bottom:0.5px solid rgba(var(--ink-rgb),0.08);cursor:pointer;transition:all 0.25s;gap:20px;text-decoration:none;color:inherit}
 .project-row.is-inert{cursor:default}
 /* (hover:hover) — same convention as .frame:hover above: on a tap-only
    device this hover state never clears (no cursor to leave), and worse
@@ -211,7 +216,7 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .project-row.is-inert:hover .row-arrow{opacity:0;transform:none}
 .project-row.is-inert:hover .row-name{color:rgba(var(--ink-rgb),0.85)}
 }
-.row-num{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-rgb),0.25);width:32px;flex-shrink:0;letter-spacing:0.08em}
+.row-num{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-rgb),0.25);width:32px;flex-shrink:0;letter-spacing:0.08em;padding-top:6px}
 .row-body{flex:1;min-width:0}
 .row-name{font-family:var(--font-serif);font-size:22px;font-weight:400;color:rgba(var(--ink-rgb),0.85);margin-bottom:4px;transition:color 0.2s}
 .row-sub{font-family:var(--font-mono);font-size:8.5px;color:rgba(var(--ink-rgb),0.3);letter-spacing:0.1em;text-transform:uppercase}
@@ -225,9 +230,24 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    state. max-width caps how much of the row it can claim; min-width:0
    plus the default flex-shrink:1 let it actually shrink and wrap its two-
    word tags onto a second line instead of forcing the row wider. */
-.row-tag{font-family:var(--font-mono);font-size:8px;color:rgba(var(--ink-rgb),0.25);letter-spacing:0.08em;text-transform:uppercase;text-align:right;line-height:1.8;flex-shrink:1;min-width:0;max-width:40%}
+.row-tag{font-family:var(--font-mono);font-size:8px;color:rgba(var(--ink-rgb),0.25);letter-spacing:0.08em;text-transform:uppercase;text-align:right;line-height:1.8;flex-shrink:1;min-width:0;max-width:40%;padding-top:6px}
 .row-tag.on-shape{color:rgba(var(--reactive-ink-rgb,var(--ink-rgb)),var(--reactive-alpha,0.25))}
 .row-arrow{font-size:16px;color:rgba(var(--ink-rgb),0.2);transition:all 0.25s;opacity:0;margin-left:8px}
+/* Excerpt + CTA: the always-visible half of the "this row is a link"
+   signal, since .row-arrow above only ever appears on a real-mouse hover.
+   Quieter than .row-name but a step above .row-sub's 0.3 — it's meant to
+   be read, not just registered. max-width in ch keeps it to a comfortable
+   measure instead of running the full row width on a wide desktop. */
+.row-excerpt{font-family:var(--font-serif);font-size:13.5px;line-height:1.55;color:rgba(var(--ink-rgb),0.55);margin-top:9px;max-width:54ch}
+/* Accent-coloured so it reads as the actionable element in the row, at
+   the same mono/tracked/uppercase scale the rest of the page uses for
+   small labels (cf. .row-sub, .contact-label). inline-flex keeps the
+   arrow glued to the text as one unit rather than wrapping alone. */
+.row-cta{display:inline-flex;align-items:center;gap:7px;margin-top:11px;font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent)}
+.row-cta-arrow{transition:transform 0.25s}
+@media (hover:hover){
+.project-row:hover .row-cta-arrow{transform:translateX(3px)}
+}
 
 /* Additional credits — roles that don't warrant their own case study
    (see JOBS/case-studies/*), listed underneath the case-study rows
@@ -1582,11 +1602,19 @@ JOBS.forEach((job, i) => {
     // one continuous listening session, visualizer included, rather than
     // going quiet while a separate background tab keeps the real audio.
   }
+  // The excerpt + "Read case study" line only render for rows that
+  // actually go somewhere — an inert row promising a read that doesn't
+  // exist would be worse than no affordance at all. The old design leaned
+  // entirely on .row-arrow, which is opacity:0 until :hover and gated
+  // behind (hover:hover), so on any touch device there was no visible
+  // signal these rows were links whatsoever.
   row.innerHTML = `
     <span class="row-num">${String(i + 1).padStart(2, '0')}</span>
     <div class="row-body">
       <div class="row-name">${job.role}</div>
       <div class="row-sub">${job.name} · ${job.dates}</div>
+      ${job.caseStudyUrl && job.excerpt ? `<p class="row-excerpt">${job.excerpt}</p>` : ''}
+      ${job.caseStudyUrl ? `<span class="row-cta">Read case study<span class="row-cta-arrow" aria-hidden="true">→</span></span>` : ''}
     </div>
     <div class="row-tag">${job.tags.join('<br>')}</div>
     <span class="row-arrow">→</span>

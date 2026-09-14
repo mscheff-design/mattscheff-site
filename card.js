@@ -1212,9 +1212,15 @@ export function initCard(container) {
       const roleMaxWidthPx = w - pad * 2 - datesWidthPx - bh * 0.02;
       return fitTextSize(ctx, [job.role], roleMaxWidthPx, Math.round(bh * 0.052), (px) => `500 ${px}px ${FONT_DISPLAY}`);
     }));
+    // Room reserved at the right end of the meta line for the per-row
+    // "opens a case study" arrow drawn below. Taken out of the width the
+    // tags are fitted to, so a long tag list shrinks to make space rather
+    // than running underneath the arrow.
+    const rowArrowPx = Math.round(bh * 0.03);
+    const rowArrowGutter = rowArrowPx * 1.9;
     const tagsPx = fitTrackedSize(
       ctx, JOBS.map(job => `${job.name} · ${job.tags.join(' · ')}`),
-      w - pad * 2, Math.round(bh * 0.023), 1.1
+      w - pad * 2 - rowArrowGutter, Math.round(bh * 0.023), 1.1
     );
 
     JOBS.forEach((job, i) => {
@@ -1236,6 +1242,28 @@ export function initCard(container) {
       // the role above is the emphasized field now, see jobs.js.
       const tagsText = `${job.name} · ${job.tags.join(' · ')}`;
       drawTracked(ctx, tagsText, pad, bh * (rowTopF + 0.11), tagsPx, ink(0.35), 1.1);
+
+      // Minimal "this row opens something" mark. These rows have been
+      // clickable since they started dispatching resume-job-click (see
+      // handleCardClick), but nothing on the card ever said so — and a
+      // canvas-drawn row can't offer a cursor change or hover state to
+      // hint at it either. Guarded on caseStudyUrl so a job without a
+      // finished case study doesn't advertise a link that goes nowhere,
+      // matching how index.html's own rows render inert. Same → glyph and
+      // same restrained weight as the page's .row-arrow, sitting on the
+      // meta line (the role line above is already claimed by the
+      // right-aligned dates).
+      if (job.caseStudyUrl) {
+        ctx.save();
+        // A step stronger than the ink(0.35) meta text it sits beside —
+        // it's the one mark in the row doing a job other than being read,
+        // so it shouldn't be the faintest thing there.
+        ctx.font = `400 ${rowArrowPx}px ${FONT_MONO}`;
+        ctx.fillStyle = ink(0.45);
+        ctx.textAlign = 'right';
+        ctx.fillText('→', w - pad, bh * (rowTopF + 0.113));
+        ctx.restore();
+      }
 
       ctx.save();
       ctx.strokeStyle = ink(0.1);
