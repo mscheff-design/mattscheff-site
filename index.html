@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="lv3-swipe-build" content="decoded-node-recycle-v1">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Matthew Scheffler</title>
 <meta name="description" content="Digital Strategy · E-Commerce · Content & Visual Direction. Selected work and photography by Matthew Scheffler.">
@@ -1637,6 +1638,7 @@ let activeLoupe = null;
 let cfEdgePrevEl = null;
 let cfEdgeNextEl = null;
 let cfMainEl = null;
+let cfTouchController = null;
 // Set when the grid opens, restored when it closes — a full-viewport
 // overlay covers the page while open, but closing it should hand focus and
 // scroll position back to exactly where the visitor was, not reset either
@@ -1762,6 +1764,8 @@ function closeGallery() {
 }
 
 function closeGalleryDOM() {
+  cfTouchController?.destroy();
+  cfTouchController = null;
   if (!sheetBackdrop.classList.contains('open')) return;
   const previous = activeProject;
   activeProject = null;
@@ -1953,6 +1957,8 @@ function closeViewer() {
 }
 
 function renderCoverflow() {
+  cfTouchController?.destroy();
+  cfTouchController = null;
   sheetPanel.scrollTop = 0;
   sheetPanel.innerHTML = `
     <div class="lv3-grain"></div>
@@ -1984,7 +1990,7 @@ function renderCoverflow() {
   // .lv3-stage's @media(pointer:coarse) CSS above. Desktop's edge-click +
   // keyboard-arrow path (below/index.html:~2156) is untouched either way.
   if (isTouchDevice) {
-    bindTouchStage(cfStageEl);
+    cfTouchController = bindTouchStage(cfStageEl);
   } else {
     cfEdgePrevEl.addEventListener('click', cfPrev);
     cfEdgeNextEl.addEventListener('click', cfNext);
@@ -2019,7 +2025,7 @@ function renderCoverflow() {
   const infoToggle = document.getElementById('lv3InfoToggle');
   if (infoToggle) infoToggle.addEventListener('click', () => toggleInfoPanel());
 
-  updateStage();
+  if (!isTouchDevice) updateStage();
 }
 
 // Shared by the toggle button itself and the tap-on-photo-to-dismiss
@@ -2230,136 +2236,226 @@ function bindSwipe(el) {
   }, { passive: true });
 }
 
-// Touch-only replacement for bindSwipe()/navigate()'s canned transition —
-// see .lv3-stage's own @media(pointer:coarse) CSS comment. Real native
-// scroll-snap on the SAME 3 fixed DOM slots (cfEdgePrevEl/cfMainEl/
-// cfEdgeNextEl) as an "infinite 3-tile" carousel: dragging/flinging to an
-// edge and letting native snap settle there is read as a commit; the
-// browser's own snap-back on a cancelled/partial drag is read as "no
-// commit" for free — something the old distance-threshold bindSwipe()
-// never had. On commit, only the three <img> src attributes get
-// reassigned (the slots themselves never move or get reparented), via
-// the EXISTING updateStage() — its own doc-comment claims it skips the
-// main image, but its actual body already sets it too, so no new
-// "extended" version is needed here. The container is then recentered on
-// .lv3-main with NO animation, synchronously in the same tick (not
-// deferred through requestAnimationFrame — this file's rAF is globally
-// polyfilled onto setTimeout(cb,16) for a device-bug workaround, and a
-// deferred write here could let one wrong frame paint first). Because
-// the tile the user's eye is already resting on gets relabeled onto
-// .lv3-main's fixed slot as part of the same synchronous step, this
-// reads as the recognized photo having been "already there" rather than
-// a jump — the standard silent-recenter technique for an infinite
-// scroll-snap carousel. No manual cleanup is needed for any of these
-// listeners: renderCoverflow() rebuilds #cfStage and its three children
-// from scratch on every gallery open (sheetPanel.innerHTML = ..., see
-// its own comment), discarding old nodes/listeners together, exactly
-// like the existing edge-click listeners already do with zero cleanup
-// code anywhere in this file.
+// Touch keeps the three fixed tile containers and native scroll-snap.
+// Move decoded image ELEMENTS at recycle time; never reassign the src of
+// the image the visitor has just swiped into view. Prepare the complete
+// next trio before changing any slot or resetting the scroll position.
 function bindTouchStage(stageEl) {
-  function centerInstant() {
-    stageEl.scrollLeft = cfMainEl.offsetLeft - (stageEl.clientWidth - cfMainEl.offsetWidth) / 2;
+  const project = activeProject;
+  const total = project.photos.length;
+  const slots = [cfEdgePrevEl, cfMainEl, cfEdgeNextEl];
+  const label = document.getElementById('cfLabel');
+  const count = document.getElementById('cfCount');
+  // Unwrapped positions give two-photo galleries distinct decoded nodes
+  // for their identical previous/next photos. A node cannot occupy two slots.
+  let position = cfIndex;
+  const indexAt = pos => ((pos % total) + total) % total;
+  const cache = new Map();
+  let disposed = false, touching = false, armed = false;
+  let watching = false, frame = 0, stableFrames = 0, lastLeft = null;
+  let recenterRetries = 0;
+  const alive = () => !disposed && stageEl.isConnected && activeProject === project;
+  stageEl.dataset.lv3Build = 'decoded-node-recycle-v1';
+  if (!total) {
+    label.textContent = 'No photos available.';
+    count.textContent = '00 / 0';
+    return { navigate() {}, destroy() { disposed = true; } };
   }
-  function centeredTile() {
-    const stageCenter = stageEl.getBoundingClientRect().left + stageEl.clientWidth / 2;
-    let best = cfMainEl, bestDist = Infinity;
-    for (const tile of [cfEdgePrevEl, cfMainEl, cfEdgeNextEl]) {
-      const r = tile.getBoundingClientRect();
-      const dist = Math.abs(r.left + r.width / 2 - stageCenter);
-      if (dist < bestDist) { bestDist = dist; best = tile; }
-    }
+
+  function centerInstant() {
+    stageEl.scrollLeft = slots[1].offsetLeft - (stageEl.clientWidth - slots[1].offsetWidth) / 2;
+  }
+  function centeredSlot() {
+    const center = stageEl.getBoundingClientRect().left + stageEl.clientWidth / 2;
+    let best = 1, distance = Infinity;
+    slots.forEach((slot, i) => {
+      const r = slot.getBoundingClientRect();
+      const d = Math.abs(r.left + r.width / 2 - center);
+      if (d < distance) { best = i; distance = d; }
+    });
     return best;
   }
-  // NOTE: making the wings look identical to .lv3-main (so recycling
-  // changes nothing visible) is handled entirely in CSS — see
-  // .lv3-edge/.lv3-edge img inside the @media(pointer:coarse) block. It
-  // deliberately is NOT done from JS here: iOS Safari defers style/paint
-  // work queued while a touch scroll is in flight, so brightening the
-  // wings on touchstart never actually rendered until the scroll settled
-  // (i.e. until the recycle, which made it pointless).
-  function trySettle() {
-    const landed = centeredTile();
-    if (landed === cfMainEl) return; // settled back on main — cancelled drag, no-op
-    // At most ONE commit per gesture. Without this, a single swipe could
-    // advance twice: centerInstant() below writes scrollLeft, but iOS can
-    // drop a scroll write issued right after momentum, leaving the stage
-    // still resting on the edge tile — the watcher then reads that same
-    // stale position, finds it stable, and commits a second time. Re-armed
-    // only by a fresh touchstart (see touchOn), so one swipe advances
-    // exactly one photo no matter how the platform handles the write.
-    // scroll-snap-stop:always already caps a fling at one tile, so there's
-    // no legitimate multi-advance to preserve here.
-    if (!armed) { centerInstant(); return; } // self-heal position, don't advance
-    const total = activeProject.photos.length;
-    if (landed === cfEdgeNextEl) cfIndex = (cfIndex + 1) % total;
-    else cfIndex = (cfIndex - 1 + total) % total;
-    armed = false;
-    updateStage();
-    // Re-fires the 'scroll' listener below; the watcher re-arms, sees a
-    // stable position, resolves to the cfMainEl branch above and no-ops
-    // there — expected, not a bug.
-    centerInstant();
+  async function decodeImage(src) {
+    const img = new Image();
+    img.alt = '';
+    if (typeof img.decode === 'function') {
+      img.src = src;
+      await img.decode(); // load must NOT race this promise to an early swap
+    } else {
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = src;
+      });
+      img.onload = img.onerror = null;
+    }
+    if (!img.naturalWidth) throw new Error('Photo has no decoded pixels');
+    return img;
   }
-
-  // Commit only once scrollLeft has ACTUALLY stopped moving — measured,
-  // not inferred from a timeout or from scrollend. Both of those guess,
-  // and frame-stepping a screen recording showed the guess firing early:
-  // the content swapped while the photo was still 82px off-center, and
-  // the native snap then glided that last stretch over ~0.4s, decelerating
-  // — read as "the image sort of snaps into the viewport a beat late."
-  // (Whether that glide is the browser's own snap finishing or our
-  // centerInstant() being overridden by an in-flight native animation
-  // doesn't matter: committing mid-animation is wrong either way.)
-  // Polling the real position can't fire early by construction — if the
-  // scroll is still animating, the position is still changing. `touching`
-  // additionally blocks a commit while a finger is still down, so pausing
-  // mid-drag (a stable position, but not a finished gesture) doesn't
-  // count as settled.
-  let touching = false, armed = true;
-  const touchOn = () => { touching = true; armed = true; };
-  const touchOff = () => { touching = false; armSettleWatch(); };
-  stageEl.addEventListener('touchstart', touchOn, { passive: true });
-  stageEl.addEventListener('touchend', touchOff, { passive: true });
-  stageEl.addEventListener('touchcancel', touchOff, { passive: true });
-
-  // `watching` stays true for the whole polling chain rather than being
-  // cleared at the top of each tick — otherwise a scroll event landing in
-  // that window starts a SECOND chain, and two chains sharing stableFrames
-  // both reach the threshold and both call trySettle(), which is the other
-  // way one swipe could advance two photos.
-  let watching = false, stableFrames = 0, lastLeft = null;
-  function watchSettle() {
-    const cur = stageEl.scrollLeft;
-    if (lastLeft !== null && Math.abs(cur - lastLeft) < 0.5 && !touching) stableFrames++;
-    else stableFrames = 0;
-    lastLeft = cur;
-    // ~3 consecutive still frames: long enough not to trip on a single
-    // stalled frame mid-fling, short enough to feel immediate.
-    if (stableFrames >= 3) {
-      watching = false; stableFrames = 0; lastLeft = null;
-      trySettle();
+  function photo(pos) {
+    if (cache.has(pos)) return cache.get(pos);
+    const entry = { state: 'loading', img: null };
+    cache.set(pos, entry);
+    const index = indexAt(pos);
+    // A failed full-size asset can still show its correct thumbnail.
+    // Never substitute another photo or insert a broken image on error.
+    decodeImage(fullSrc(project, index))
+      .catch(() => {
+        if (!alive()) throw new Error('Viewer closed');
+        return decodeImage(thumbSrc(project, index));
+      })
+      .then(img => {
+        if (!alive() || cache.get(pos) !== entry) return;
+        entry.img = img;
+        entry.state = 'ready';
+        img.dataset.lv3Position = String(pos);
+        img.dataset.lv3Photo = String(index + 1);
+        armSettleWatch();
+      })
+      .catch(() => {
+        if (!alive() || cache.get(pos) !== entry) return;
+        entry.state = 'failed';
+        armSettleWatch();
+      });
+    return entry;
+  }
+  function prime(pos) {
+    if (total === 1) { photo(pos); return; }
+    for (let offset = -2; offset <= 2; offset++) photo(pos + offset);
+  }
+  function updateCaption(pos = position) {
+    const index = indexAt(pos);
+    const code = project.code || project.id.toUpperCase();
+    label.textContent = `${code} ${project.year} `;
+    const number = document.createElement('b');
+    number.textContent = String(index + 1).padStart(2, '0');
+    label.appendChild(number);
+    count.textContent = `${String(index + 1).padStart(2, '0')} / ${total}`;
+  }
+  function install(slotIndex, entry, pos) {
+    const img = entry.img;
+    if (slotIndex === 1) {
+      img.id = 'cfMainImg';
+      img.alt = `${project.title}, frame ${indexAt(pos) + 1}`;
+    } else {
+      img.removeAttribute('id');
+      img.alt = '';
+    }
+    if (slots[slotIndex].querySelector('img') !== img) {
+      slots[slotIndex].replaceChildren(img);
+    }
+  }
+  function fillReadySlots() {
+    slots.forEach((slot, i) => {
+      if (total === 1 && i !== 1) return;
+      const pos = position + i - 1;
+      const entry = photo(pos);
+      if (entry.state === 'ready') install(i, entry, pos);
+    });
+  }
+  function trySettle() {
+    if (!alive() || touching) return;
+    fillReadySlots(); // only after scrolling has settled, never during a drag
+    const landed = centeredSlot();
+    if (landed === 1 || total === 1) {
+      updateCaption();
+      if (photo(position).state === 'failed') label.textContent = 'Photo unavailable. Close and reopen the viewer to retry.';
       return;
     }
-    requestAnimationFrame(watchSettle);
+    if (!armed) {
+      // Preserve the original one-commit-per-gesture protection. Retry a
+      // dropped scroll write a bounded number of times, then stop polling.
+      if (recenterRetries++ < 3) { centerInstant(); armSettleWatch(); }
+      return;
+    }
+    const target = position + landed - 1;
+    const incoming = photo(target);
+    if (incoming.state !== 'ready' || slots[landed].querySelector('img') !== incoming.img) {
+      if (incoming.state === 'failed') label.textContent = 'Photo unavailable. Swipe back or tap an edge to retry.';
+      return;
+    }
+    updateCaption(target); // the landed photo is already visible while we wait
+    const trio = [-1, 0, 1].map(offset => photo(target + offset));
+    if (trio.some(entry => entry.state !== 'ready')) {
+      if (trio.some(entry => entry.state === 'failed')) {
+        label.textContent = 'Next photo unavailable. Swipe back or tap an edge to retry.';
+      }
+      return; // completion re-arms the watcher; no idle polling while loading
+    }
+    // Capture all three nodes before moving any. Fixed containers retain
+    // geometry/listeners. The incoming node and outgoing main keep their pixels.
+    slots[1].querySelector('img')?.removeAttribute('id');
+    trio.forEach((entry, i) => install(i, entry, target + i - 1));
+    position = target;
+    cfIndex = indexAt(position);
+    armed = false;
+    recenterRetries = 0;
+    centerInstant(); // same synchronous turn as the element moves
+    updateCaption();
+    for (const pos of cache.keys()) if (Math.abs(pos - position) > 2) cache.delete(pos);
+    prime(position);
+    armSettleWatch();
+  }
+  function stopWatch() {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0; watching = false; stableFrames = 0; lastLeft = null;
+  }
+  function watchSettle() {
+    frame = 0;
+    if (!alive() || touching) { stopWatch(); return; }
+    const cur = stageEl.scrollLeft;
+    if (lastLeft !== null && Math.abs(cur - lastLeft) < 0.5) stableFrames++;
+    else stableFrames = 0;
+    lastLeft = cur;
+    if (stableFrames >= 3) {
+      stopWatch();
+      trySettle();
+    } else frame = requestAnimationFrame(watchSettle);
   }
   function armSettleWatch() {
+    if (!alive() || touching) return;
     stableFrames = 0;
     if (watching) return;
     watching = true; lastLeft = null;
-    requestAnimationFrame(watchSettle);
+    frame = requestAnimationFrame(watchSettle);
   }
+  function retryFailed() {
+    for (const [pos, entry] of cache) if (entry.state === 'failed') cache.delete(pos);
+    prime(position);
+  }
+  const touchOn = () => { touching = true; armed = true; recenterRetries = 0; stopWatch(); retryFailed(); };
+  const touchOff = () => { touching = false; armSettleWatch(); };
+  function scrollToSlot(i) {
+    if (!alive() || total < 2) return;
+    armed = true; recenterRetries = 0; retryFailed();
+    stageEl.scrollTo({ left: slots[i].offsetLeft - (stageEl.clientWidth - slots[i].offsetWidth) / 2, behavior: 'smooth' });
+    armSettleWatch();
+  }
+  const previous = () => scrollToSlot(0);
+  const next = () => scrollToSlot(2);
+  stageEl.addEventListener('touchstart', touchOn, { passive: true });
+  stageEl.addEventListener('touchend', touchOff, { passive: true });
+  stageEl.addEventListener('touchcancel', touchOff, { passive: true });
   stageEl.addEventListener('scroll', armSettleWatch, { passive: true });
-
-  // Tap-to-advance: smooth-scroll to the tapped edge and let the settle
-  // detector above resolve the commit, unifying tap and swipe into one
-  // path on mobile instead of routing through the old navigate() slide.
-  function scrollToTile(tile) {
-    stageEl.scrollTo({ left: tile.offsetLeft - (stageEl.clientWidth - tile.offsetWidth) / 2, behavior: 'smooth' });
+  slots[0].addEventListener('click', previous);
+  slots[2].addEventListener('click', next);
+  if (total === 1) {
+    stageEl.style.overflowX = 'hidden';
+    slots[0].style.visibility = slots[2].style.visibility = 'hidden';
   }
-  cfEdgePrevEl.addEventListener('click', () => scrollToTile(cfEdgePrevEl));
-  cfEdgeNextEl.addEventListener('click', () => scrollToTile(cfEdgeNextEl));
-
-  centerInstant();
+  centerInstant(); updateCaption(); prime(position);
+  return {
+    navigate(dir) { scrollToSlot(dir > 0 ? 2 : 0); },
+    destroy() {
+      disposed = true; stopWatch(); cache.clear();
+      stageEl.removeEventListener('touchstart', touchOn);
+      stageEl.removeEventListener('touchend', touchOff);
+      stageEl.removeEventListener('touchcancel', touchOff);
+      stageEl.removeEventListener('scroll', armSettleWatch);
+      slots[0].removeEventListener('click', previous);
+      slots[2].removeEventListener('click', next);
+    }
+  };
 }
 
 // Mode-aware: mode-viewer's close steps back to the grid it came from
@@ -2407,8 +2503,8 @@ document.addEventListener('keydown', (e) => {
   if (!sheetBackdrop.classList.contains('open')) return;
   if (e.key === 'Escape') { closeActiveSheetMode(); return; }
   if (sheetPanel.classList.contains('mode-viewer')) {
-    if (e.key === 'ArrowRight') cfNext();
-    if (e.key === 'ArrowLeft') cfPrev();
+    if (e.key === 'ArrowRight') { if (isTouchDevice) { e.preventDefault(); cfTouchController?.navigate(1); } else cfNext(); }
+    if (e.key === 'ArrowLeft') { if (isTouchDevice) { e.preventDefault(); cfTouchController?.navigate(-1); } else cfPrev(); }
   }
 });
 
