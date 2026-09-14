@@ -239,11 +239,17 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
    be read, not just registered. max-width in ch keeps it to a comfortable
    measure instead of running the full row width on a wide desktop. */
 .row-excerpt{font-family:var(--font-serif);font-size:13.5px;line-height:1.55;color:rgba(var(--ink-rgb),0.55);margin-top:9px;max-width:54ch}
-/* Accent-coloured so it reads as the actionable element in the row, at
-   the same mono/tracked/uppercase scale the rest of the page uses for
-   small labels (cf. .row-sub, .contact-label). inline-flex keeps the
-   arrow glued to the text as one unit rather than wrapping alone. */
-.row-cta{display:inline-flex;align-items:center;gap:7px;margin-top:11px;font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent)}
+/* Coloured so it reads as the actionable element in the row, at the same
+   mono/tracked/uppercase scale the rest of the page uses for small
+   labels (cf. .row-sub, .contact-label). inline-flex keeps the arrow
+   glued to the text as one unit rather than wrapping alone.
+   #1f7a54 is the site's existing pine green — one of the four
+   CRAYON_COLORS and already the radio's paused/play tint (see
+   .nav-radio's own rule above). Fixed rather than var(--accent) for the
+   same reason those are: it's a constant bit of signage, not part of the
+   swappable palette. This section always sits on the light paper
+   background, so the contrast holds. */
+.row-cta{display:inline-flex;align-items:center;gap:7px;margin-top:11px;font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#1f7a54}
 .row-cta-arrow{transition:transform 0.25s}
 @media (hover:hover){
 .project-row:hover .row-cta-arrow{transform:translateX(3px)}
@@ -1614,7 +1620,7 @@ JOBS.forEach((job, i) => {
       <div class="row-name">${job.role}</div>
       <div class="row-sub">${job.name} · ${job.dates}</div>
       ${job.caseStudyUrl && job.excerpt ? `<p class="row-excerpt">${job.excerpt}</p>` : ''}
-      ${job.caseStudyUrl ? `<span class="row-cta">Read case study<span class="row-cta-arrow" aria-hidden="true">→</span></span>` : ''}
+      ${job.caseStudyUrl ? `<span class="row-cta">Read more<span class="row-cta-arrow" aria-hidden="true">→</span></span>` : ''}
     </div>
     <div class="row-tag">${job.tags.join('<br>')}</div>
     <span class="row-arrow">→</span>
