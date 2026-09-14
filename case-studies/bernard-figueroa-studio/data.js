@@ -43,7 +43,7 @@ export const CASE_STUDY = {
           { label: 'Client', value: 'Bernard Figueroa Lights' },
           { label: 'Role', value: 'Studio Assistant & Digital Manager' }
         ],
-        scope: 'Portfolio website, short-form video, photography and documentation, archive management, spec sheets, fabrication coordination, email, and social media.'
+        scope: 'Portfolio website · Short-form video · Photography · Documentation · Archive management · Spec sheets · Fabrication coordination · Email · Social media'
       }
     },
     {
