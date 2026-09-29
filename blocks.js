@@ -69,17 +69,45 @@ function mediaEl(media, { eager = false } = {}) {
     // not scroll.
     iframe.style.pointerEvents = 'none';
     iframe.tabIndex = -1;
-    iframe.addEventListener('load', () => {
+    // Emails carry their own mobile stylesheet (@media max-width ~620px),
+    // which would kick in on phones and reflow the layout badly. Instead
+    // the iframe never renders narrower than DESKTOP_WIDTH: on a narrower
+    // container it's laid out at that width and scaled down with a
+    // transform, so phones see a miniature of the desktop layout — the
+    // same way the full-page homepage screenshot reads on mobile.
+    // Transforms don't affect layout, so the wrapper carries the scaled
+    // height explicitly.
+    const DESKTOP_WIDTH = 640;
+    const wrap = el('div', 'cs-html-embed');
+    wrap.appendChild(iframe);
+    let lastWidth = 0;
+    const fit = () => {
+      const w = wrap.clientWidth;
+      if (!w) return;
+      const scale = Math.min(1, w / DESKTOP_WIDTH);
+      iframe.style.width = scale < 1 ? `${DESKTOP_WIDTH}px` : '100%';
+      iframe.style.transform = scale < 1 ? `scale(${scale})` : '';
       try {
         const doc = iframe.contentDocument;
         const h = doc.documentElement.scrollHeight || doc.body.scrollHeight;
-        if (h) iframe.style.height = `${h}px`;
+        if (h) {
+          iframe.style.height = `${h}px`;
+          wrap.style.height = `${h * scale}px`;
+        }
       } catch (err) {
         // Cross-origin or otherwise unreadable — leave whatever height
         // was already set rather than throwing.
       }
-    });
-    return iframe;
+    };
+    iframe.addEventListener('load', fit);
+    // re-fit only on width changes — the wrapper's own height changes
+    // (set by fit itself) would otherwise re-trigger the observer
+    new ResizeObserver(() => {
+      if (wrap.clientWidth === lastWidth) return;
+      lastWidth = wrap.clientWidth;
+      fit();
+    }).observe(wrap);
+    return wrap;
   }
   const img = document.createElement('img');
   img.className = 'cs-media-el';
@@ -290,11 +318,11 @@ function buildScrollableMediaFrame(media, props) {
     thumb.style.top = `${scrollRatio * (trackHeight - thumbHeight)}px`;
   };
   frame.addEventListener('scroll', updateThumb);
-  // IFRAME's own load listener (see mediaEl) resizes it to its
-  // document's natural height first — both listeners are attached to
-  // the same 'load' event in this same order, so by the time this one
-  // runs, frame.scrollHeight already reflects the resized iframe.
-  if (media.tagName === 'IMG' || media.tagName === 'IFRAME') media.addEventListener('load', updateThumb);
+  if (media.tagName === 'IMG') media.addEventListener('load', updateThumb);
+  // an HTML embed's wrapper (see mediaEl) sizes itself once its iframe
+  // loads, and again on every width change as the scale is re-fit — watch
+  // the wrapper's own size rather than any single event.
+  if (media.classList.contains('cs-html-embed')) new ResizeObserver(updateThumb).observe(media);
   requestAnimationFrame(updateThumb);
   frame.appendChild(track);
   frag.appendChild(frame);
@@ -729,6 +757,8 @@ function injectStyles() {
     .cs-full-bleed-scroll-frame{position:relative;max-width:min(900px,92vw);margin:0 auto;overflow-y:auto;border:1px solid rgba(var(--ink-rgb),0.15);box-shadow:0 12px 32px rgba(0,0,0,0.18);scrollbar-width:none}
     .cs-full-bleed-scroll-frame::-webkit-scrollbar{display:none}
     .cs-full-bleed-scroll-frame .cs-media-el{width:100%;display:block;object-fit:contain;border:0}
+    .cs-html-embed{overflow:hidden}
+    .cs-html-embed .cs-media-el{transform-origin:0 0}
     .cs-full-bleed-scroll-track{position:absolute;top:10px;bottom:10px;right:8px;width:3px;background:rgba(var(--ink-rgb),0.08);border-radius:2px;pointer-events:none}
     .cs-full-bleed-scroll-thumb{position:absolute;left:0;width:100%;background:rgba(var(--ink-rgb),0.32);border-radius:2px}
 
