@@ -159,7 +159,7 @@ export function mountCrayonTrails(hero, {
       toggle.setAttribute('aria-pressed', String(enabled));
       // A minimal dot has no room for a visible label — aria-label keeps it
       // announced correctly for screen readers/keyboard users regardless.
-      toggle.setAttribute('aria-label', `Crayon trails ${enabled ? 'on' : 'off'}`);
+      toggle.setAttribute('aria-label', enabled ? `Change crayon color. Current color: ${MOBILE_DOODLES[Math.max(0,CRAYON_COLORS.indexOf(chosenColor))].name}` : 'Crayon trails off. Turn on');
     }
     toggle.style.setProperty('--crayon-color', chosenColor);
   }
@@ -347,7 +347,21 @@ export function mountCrayonTrails(hero, {
     if(stamps.length>cfg.maxStamps) stamps.splice(0,stamps.length-cfg.maxStamps);
     schedule();
   }
-  const toggleClick=()=>doodle ? switchDoodle() : setEnabled(!enabled);
+  // Desktop: each click steps to the next crayon color, starting from the
+  // one picked at mount; after the last of the four, one more click turns
+  // trails off (a hollow dot), and the next turns them back on at the
+  // starting color. Marks already on the canvas keep their own brush, so
+  // they fade out in the color they were drawn in.
+  const cycleStart=Math.max(0,CRAYON_COLORS.indexOf(chosenColor));
+  let cycleStep=0;
+  function cycleColor() {
+    if (!enabled) { cycleStep=0; }
+    else if (++cycleStep>=CRAYON_COLORS.length) { cycleStep=0; setEnabled(false); return; }
+    chosenColor=CRAYON_COLORS[(cycleStart+cycleStep)%CRAYON_COLORS.length];
+    brushes=brushesFor(chosenColor); breakStroke();
+    if (enabled) updateToggle(); else setEnabled(true);
+  }
+  const toggleClick=()=>doodle ? switchDoodle() : cycleColor();
   const preferences=()=>{
     if (doodle) { if (motion.matches) finishDoodle(); else {wakeDoodle();scheduleLoop();} }
     else setEnabled(fine.matches&&!motion.matches);

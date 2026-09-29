@@ -86,7 +86,7 @@ function injectStyles() {
     .hero-materials .trails-toggle{position:absolute;z-index:200;pointer-events:auto;bottom:16px;right:18px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:0;padding:0;background:transparent;border-radius:50%;cursor:pointer}
     @media(pointer:coarse){.hero-materials .trails-toggle{width:44px;height:44px;bottom:8px;right:10px;touch-action:manipulation}}
     .hero-materials .trails-toggle::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--crayon-color,var(--accent));transition:background 0.2s,opacity 0.2s}
-    .hero-materials .trails-toggle[aria-pressed='false']::before{background:rgba(var(--ink-rgb),0.3)}
+    .hero-materials .trails-toggle[aria-pressed='false']::before{background:transparent;box-shadow:inset 0 0 0 1px rgba(var(--ink-rgb),0.4)}
     .hero-materials .trails-toggle:hover::before{opacity:0.8}
     .hero-materials .trails-toggle:focus-visible{outline:2px solid rgba(var(--ink-rgb),0.55);outline-offset:3px}
   `;
