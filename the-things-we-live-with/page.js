@@ -41,6 +41,7 @@ export function renderEditorialPage(mountEl, radio) {
       <h1 class="tw-title">${esc(PAGE.title)}</h1>
       <p class="tw-descriptor">${esc(PAGE.descriptor)}</p>
       <p class="tw-byline">${esc(PAGE.byline)}</p>
+      ${PAGE.epigraph ? `<blockquote class="tw-epigraph"><p>${esc(PAGE.epigraph.text)}</p><cite>${esc(PAGE.epigraph.by)}</cite></blockquote>` : ''}
       ${renderCopy(PAGE.intro, 'tw-intro')}
       <div class="tw-jump" role="navigation" aria-label="Shelves">
         ${sections.map((sec) => `<a class="tw-jump-link${sec.items.length ? '' : ' is-empty'}" href="#${esc(sec.id)}">${esc(sec.label)}<span class="tw-jump-n">${sec.items.length ? pad(sec.items.length) : '—'}</span></a>`).join('')}
@@ -487,12 +488,15 @@ function renderListEntry(it, n) {
               <span class="tw-list-city">${esc(it.city)}</span>
             </div>
             ${it.blurb ? `<p class="tw-list-blurb">${esc(it.blurb)}</p>` : ''}
-                    ${it.source ? `<a class="tw-list-src" href="${esc(it.source.url)}" target="_blank" rel="noopener">${esc(it.source.label)} ↗</a>` : ''}${it.about ? `<a class="tw-list-src" href="${esc(it.about.url)}" target="_blank" rel="noopener">${esc(it.about.label)} ↗</a>` : ''}
+            <p class="tw-list-links">${[
+              it.source ? `<a class="tw-list-src" href="${esc(it.source.url)}" target="_blank" rel="noopener">${esc(it.source.label)} ↗</a>` : '',
+              it.about ? `<a class="tw-list-src" href="${esc(it.about.url)}" target="_blank" rel="noopener">${esc(it.about.label)} ↗</a>` : '',
+            ].join('')}</p>
+            ${it.photo ? `<p class="tw-list-credit"><a href="${esc(it.photo.url)}" target="_blank" rel="noopener">${esc(['Photo: ' + it.photo.credit, it.photo.license, it.photo.via].filter(Boolean).join(' · '))}</a></p>` : ''}
           </div>
           ${it.image ? `
           <figure class="tw-list-fig">
             <img src="${esc(it.image)}" alt="${esc(it.alt || '')}" loading="lazy" decoding="async">
-            ${it.photo ? `<figcaption><a href="${esc(it.photo.url)}" target="_blank" rel="noopener">${esc(['Photo: ' + it.photo.credit, it.photo.license, it.photo.via].filter(Boolean).join(' · '))}</a></figcaption>` : ''}
           </figure>` : ''}
         </li>`;
 }
@@ -687,10 +691,15 @@ function injectStyles() {
 
     .tw-head{max-width:1120px;margin:0 auto;padding:130px 48px 0}
     .tw-head-tags{display:flex;justify-content:space-between;align-items:baseline;gap:24px;padding-bottom:18px;margin-bottom:34px;border-bottom:0.5px solid rgba(var(--ink-rgb),0.18)}
-    .tw-title{font-family:var(--font-display);font-weight:400;font-size:clamp(34px,4.6vw,54px);line-height:1.08;letter-spacing:-0.01em}
+    /* The project title alone is set in a book serif (EB Garamond, loaded only on
+       this page); everything else stays in the site's letterhead type. */
+    .tw-title{font-family:'EB Garamond',Georgia,serif;font-weight:400;font-size:clamp(40px,5.4vw,64px);line-height:1.04;letter-spacing:-0.012em}
     .tw-descriptor{font-family:var(--font-serif);font-size:18px;color:rgba(var(--ink-rgb),0.7);margin-top:10px}
     .tw-byline{font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.4);margin-top:14px}
-    .tw-intro{font-family:var(--font-serif);font-size:18px;line-height:1.6;color:rgba(var(--ink-rgb),0.78);max-width:60ch;margin-top:36px}
+    .tw-epigraph{margin:36px 0 0}
+    .tw-epigraph p{font-family:var(--font-serif);font-size:18px;line-height:1.5;color:var(--ink)}
+    .tw-epigraph cite{display:block;margin-top:6px;font-style:normal;font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)}
+    .tw-intro{font-family:var(--font-serif);font-size:18px;line-height:1.6;color:rgba(var(--ink-rgb),0.78);max-width:60ch;margin-top:22px}
 
     .tw-jump{display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:40px;padding-top:18px;border-top:0.5px solid rgba(var(--ink-rgb),0.12)}
     .tw-jump-link{text-decoration:none;cursor:pointer;font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.45);padding-bottom:4px;border-bottom:1px solid transparent;transition:color 0.25s,border-color 0.25s}
@@ -768,18 +777,24 @@ function injectStyles() {
     .tw-album-cap-t{font-family:var(--font-serif);font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .tw-album-cap-a{font-family:var(--font-mono);font-size:9px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     /* A diptych: the first half of the set runs down the left, the second down the right. */
-    .tw-list{list-style:none;max-width:1024px;margin:28px max(48px,calc((100% - 1024px) / 2)) 0}
-    .tw-list-entry{display:grid;grid-template-columns:24px minmax(0,1fr) 220px;column-gap:32px;padding:26px 0 28px;border-bottom:0.5px solid rgba(var(--ink-rgb),0.14)}
-    .tw-list-n{font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;color:rgba(var(--ink-rgb),0.4);padding-top:12px}
+    .tw-list{list-style:none;max-width:1024px;margin:20px max(48px,calc((100% - 1024px) / 2)) 0}
+    .tw-list-entry{display:grid;grid-template-columns:24px minmax(0,1fr) 280px;column-gap:32px;align-items:start;padding:14px 0;border-bottom:0.5px solid rgba(var(--ink-rgb),0.14)}
+    .tw-list-n{font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;color:rgba(var(--ink-rgb),0.4);padding-top:7px}
     .tw-list-line{display:flex;justify-content:space-between;align-items:baseline;gap:24px;flex-wrap:wrap}
-    .tw-list-name{font-family:var(--font-serif);font-weight:400;font-size:30px;line-height:1.15;letter-spacing:-0.01em;color:var(--ink)}
-    .tw-list-city{font-family:var(--font-mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);white-space:nowrap}
+    .tw-list-name{font-family:var(--font-serif);font-weight:400;font-size:21px;line-height:1.15;letter-spacing:-0.01em;color:var(--ink)}
+    .tw-list-city{font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);white-space:nowrap}
     .tw-list-note{max-width:620px;margin-top:12px;font-family:var(--font-serif);font-size:16px;line-height:1.6;color:rgba(var(--ink-rgb),0.8)}
     .tw-list-note.is-draft{color:rgba(var(--ink-rgb),0.5)}
-    .tw-list-src{display:inline-block;margin-top:12px;font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.45);text-decoration:none;transition:color 0.2s}
+    .tw-list-src{display:inline-block;margin-top:0;font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.45);text-decoration:none;transition:color 0.2s}
     .tw-list-src:hover{color:var(--accent)}
     .tw-list-src + .tw-list-src{margin-left:16px}
-    .tw-list-blurb{max-width:620px;margin-top:10px;font-family:var(--font-serif);font-size:16px;line-height:1.55;color:rgba(var(--ink-rgb),0.75)}
+    .tw-list-links{margin-top:8px}
+    .tw-list-credit{margin-top:4px;font-family:var(--font-mono);font-size:8.5px;letter-spacing:0.04em}
+    .tw-list-credit a{color:rgba(var(--ink-rgb),0.38);text-decoration:none;transition:color 0.2s}
+    .tw-list-credit a:hover{color:var(--accent)}
+    .tw-list-fig{overflow:hidden}
+    @media (hover:hover){.tw-list-entry:hover .tw-list-fig img{transform:scale(1.04)}}
+    .tw-list-blurb{max-width:560px;margin-top:5px;font-family:var(--font-serif);font-size:14.5px;line-height:1.5;color:rgba(var(--ink-rgb),0.75)}
     /* Objects: three columns; each object sits whole on a shared
        baseline inside a capped frame, captions line up beneath. */
     /* Objects: each row is its own grid whose columns are proportional to
@@ -823,9 +838,9 @@ function injectStyles() {
     .tw-objfig-credit{margin-top:10px}
     .tw-objfig-credit a:hover{color:var(--accent)}
     .tw-list-n{grid-column:1}
-    .tw-list-fig{margin:6px 0 0}
-    .tw-list-fig img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:rgba(var(--ink-rgb),0.06)}
-    .tw-list-fig figcaption{margin-top:8px;font-family:var(--font-mono);font-size:8.5px;line-height:1.5;letter-spacing:0.04em}
+    .tw-list-fig{margin:0}
+    .tw-list-fig img{display:block;width:100%;aspect-ratio:16/9;transition:transform 0.5s cubic-bezier(.22,.61,.36,1);object-fit:cover;background:rgba(var(--ink-rgb),0.06)}
+    .tw-list-fig figcaption{margin-top:5px;font-family:var(--font-mono);font-size:8px;line-height:1.5;letter-spacing:0.04em}
     .tw-list-fig figcaption a{color:rgba(var(--ink-rgb),0.42);text-decoration:none;transition:color 0.2s}
     .tw-list-fig figcaption a:hover{color:var(--accent)}
     .tw-set-meta{font-family:var(--font-mono);font-size:9px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.4)}
@@ -953,10 +968,10 @@ function injectStyles() {
       .tw-objstack{display:block;margin-bottom:48px}
       .tw-objfig.is-stacked{margin-bottom:48px}
       .tw-objfig-title{font-size:21px}
-      .tw-list-entry{grid-template-columns:34px minmax(0,1fr);column-gap:0;padding:22px 0 24px}
-      .tw-list-fig{grid-column:2;margin-top:18px}
-      .tw-list-n{padding-top:8px}
-      .tw-list-name{font-size:23px}
+      .tw-list-entry{grid-template-columns:22px minmax(0,1fr) 112px;column-gap:14px;padding:14px 0;align-items:start}
+      .tw-list-fig figcaption{display:none}
+      .tw-list-n{padding-top:5px}
+      .tw-list-name{font-size:18px}
       .tw-list-line{flex-direction:column;gap:6px}
       .tw-card{position:fixed;left:12px;right:12px;bottom:12px;top:auto!important;left:12px!important;width:auto;min-width:0;max-width:none;max-height:72vh;overflow:auto;padding:18px 18px 20px}
       .tw-card-close{display:block}
