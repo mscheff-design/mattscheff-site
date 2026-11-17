@@ -11,7 +11,9 @@ import { initRadioWidget } from './radio.js';
 import { applyStoredTheme } from './theme.js';
 import { initThemeSwitcher } from './themeSwitcher.js';
 
-export function renderSiteNav(mountEl) {
+// options.radio is passed straight to initRadioWidget (e.g. { autoResume:
+// false }); returns the radio controller so a page can play previews.
+export function renderSiteNav(mountEl, { radio: radioOptions } = {}) {
   injectStyles();
   applyStoredTheme();
   mountEl.innerHTML = `
@@ -26,9 +28,10 @@ export function renderSiteNav(mountEl) {
     </nav>
     <div id="themeSwitcher"></div>
   `;
-  initRadioWidget(mountEl.querySelector('#navRadio'));
+  const radio = initRadioWidget(mountEl.querySelector('#navRadio'), radioOptions);
   initThemeSwitcher(mountEl.querySelector('#themeSwitcher'));
   initNavDarkWatcher(mountEl.querySelector('nav'));
+  return radio;
 }
 
 // Same mechanism as index.html's own nav-dark watcher (see nav.is-on-dark's

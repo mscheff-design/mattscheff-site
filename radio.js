@@ -71,11 +71,30 @@ function decodeEntities(str) {
   return el.value;
 }
 
-export function initRadioWidget(mountEl) {
+// options.autoResume (default true): whether a page load that finds the
+// previous page left NTS "playing" reconnects to it automatically. The
+// editorial page (/the-things-we-live-with/) passes false: a live stream
+// starting on its own over a page built around chosen listening would undercut
+// it. The saved state is left alone, so NTS picks back up on the next page.
+//
+// Preview mode: a page can hand the widget a short clip (playPreview) to play
+// through the same transport — same button, visualizer, ticker — like
+// retuning the car radio for one song. Preview playback never writes
+// state.playing, so it can't leak into the next page's auto-resume. Changes
+// are announced on window as a 'radio-preview' CustomEvent
+// ({ id, playing }) so the page can mirror play state on its own controls.
+//
+// A track may carry onNext (a function) and setLabel (e.g. "Set 03/10"):
+// that makes it part of a set. The station button then reads setLabel and
+// skips forward, and a clip ending moves to the next track instead of
+// returning to NTS. The page owns the queue; onNext is how the radio asks it
+// for the next track (the page calls stopPreview when the set runs out).
+export function initRadioWidget(mountEl, { autoResume = true } = {}) {
   const state = loadState();
   let station = STATIONS.find(s => s.id === state.stationId);
   let isPlaying = false;
   let pollHandle = null;
+  let preview = null; // { id, label, src } while a preview clip is loaded
 
   mountEl.innerHTML = `
     <button class="radio-toggle" type="button" aria-label="Play NTS radio">
@@ -199,7 +218,14 @@ export function initRadioWidget(mountEl) {
     }, OWNER_PING_TIMEOUT_MS);
   }
 
+  function announcePreview() {
+    window.dispatchEvent(new CustomEvent('radio-preview', {
+      detail: { id: preview ? preview.id : null, playing: !!preview && isPlaying },
+    }));
+  }
+
   function applyStation(next, { autoplay }) {
+    preview = null;
     station = next;
     stationBtn.textContent = next.label;
     stationBtn.setAttribute('aria-label', `Switch station (currently ${next.label})`);
@@ -215,18 +241,18 @@ export function initRadioWidget(mountEl) {
     audio.play().then(() => {
       isPlaying = true;
       mountEl.classList.add('is-playing');
-      state.playing = true;
-      saveState(state);
+      if (!preview) { state.playing = true; saveState(state); }
       startViz();
       if (syncChannel) syncChannel.postMessage({ type: 'take-over', tabId: TAB_ID });
+      announcePreview();
     }).catch(() => {
       // Autoplay blocked (or stream unreachable) — fall back to a paused,
       // click-to-play state rather than leaving stale UI or throwing.
       isPlaying = false;
       mountEl.classList.remove('is-playing');
-      state.playing = false;
-      saveState(state);
+      if (!preview) { state.playing = false; saveState(state); }
       stopViz();
+      announcePreview();
     });
   }
 
@@ -235,9 +261,41 @@ export function initRadioWidget(mountEl) {
     isPlaying = false;
     mountEl.classList.remove('is-playing');
     stopViz();
-    state.playing = false;
-    saveState(state);
+    if (!preview) { state.playing = false; saveState(state); }
+    announcePreview();
   }
+
+  function playPreview(track) {
+    if (preview && preview.id === track.id) {
+      if (isPlaying) pause(); else play();
+      return;
+    }
+    // Switching away from a live NTS stream counts as the visitor stopping it.
+    if (isPlaying && !preview) { state.playing = false; saveState(state); }
+    audio.pause();
+    preview = track;
+    audio.src = track.src;
+    stationBtn.textContent = track.onNext ? (track.setLabel || 'Next') : 'Preview';
+    stationBtn.setAttribute('aria-label', track.onNext ? 'Next track in the set' : `Back to ${station.label}`);
+    setNowPlaying(track.label);
+    play();
+  }
+
+  // Back to the station, paused — the visitor chooses whether to resume NTS.
+  function stopPreview() {
+    if (!preview) return;
+    audio.pause();
+    isPlaying = false;
+    mountEl.classList.remove('is-playing');
+    stopViz();
+    applyStation(station, { autoplay: false });
+    announcePreview();
+  }
+
+  audio.addEventListener('ended', () => {
+    if (!preview) return;
+    if (preview.onNext) preview.onNext(); else stopPreview();
+  });
 
   async function fetchNowPlaying() {
     const forStation = station;
@@ -245,7 +303,7 @@ export function initRadioWidget(mountEl) {
       const res = await fetch('https://www.nts.live/api/v2/live', { cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json();
-      if (forStation !== station) return; // station changed mid-fetch
+      if (forStation !== station || preview) return; // station changed / preview showing
       const result = (data.results || []).find(r => r.channel_name === forStation.channel);
       const title = result && result.now && result.now.broadcast_title;
       setNowPlaying(title ? decodeEntities(title) : '');
@@ -260,6 +318,8 @@ export function initRadioWidget(mountEl) {
   });
 
   stationBtn.addEventListener('click', () => {
+    if (preview && preview.onNext) { preview.onNext(); return; }
+    if (preview) { stopPreview(); return; }
     const next = STATIONS[(STATIONS.indexOf(station) + 1) % STATIONS.length];
     applyStation(next, { autoplay: isPlaying });
   });
@@ -272,7 +332,7 @@ export function initRadioWidget(mountEl) {
   });
 
   applyStation(station, { autoplay: false });
-  if (state.playing) resumeIfNoOwner();
+  if (state.playing && autoResume) resumeIfNoOwner();
 
   pollHandle = setInterval(fetchNowPlaying, NOW_PLAYING_POLL_MS);
   // pagehide fires both when a page is genuinely being destroyed AND when
@@ -294,6 +354,8 @@ export function initRadioWidget(mountEl) {
   window.addEventListener('pageshow', (e) => {
     if (!e.persisted) return; // a normal load already went through the init above
     pollHandle = setInterval(fetchNowPlaying, NOW_PLAYING_POLL_MS);
-    if (state.playing) resumeIfNoOwner();
+    if (state.playing && autoResume && !preview) resumeIfNoOwner();
   });
+
+  return { playPreview, stopPreview };
 }
