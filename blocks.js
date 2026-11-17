@@ -248,10 +248,12 @@ export function glanceBlock(props) {
   frame.appendChild(el('div', 'cs-glance-hr cs-glance-hr--top'));
 
   const fields = el('div', 'cs-glance-fields');
-  (props.items || []).forEach(({ label, value }) => {
+  (props.items || []).forEach(({ label, value, url }) => {
     const field = el('div', 'cs-glance-field');
     field.appendChild(el('div', 'cs-glance-label', label));
-    field.appendChild(el('div', 'cs-glance-value', value));
+    // An item with a `url` renders its value as an outbound link (e.g. the
+    // client's website), opening in a new tab.
+    field.appendChild(el('div', 'cs-glance-value', url ? `<a class="cs-glance-link" href="${url}" target="_blank" rel="noopener">${value} <span aria-hidden="true">↗</span></a>` : value));
     fields.appendChild(field);
   });
   frame.appendChild(fields);
@@ -681,6 +683,8 @@ function injectStyles() {
     .cs-glance-fields{display:grid;grid-template-columns:repeat(4,1fr);gap:28px 32px;padding:32px 0}
     .cs-glance-label{font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.4);margin-bottom:10px}
     .cs-glance-value{font-family:var(--font-serif);font-size:16px;line-height:1.5;color:var(--ink)}
+    .cs-glance-link{color:inherit;text-decoration:none;border-bottom:0.5px solid rgba(var(--ink-rgb),0.3);transition:color 0.2s,border-color 0.2s}
+    .cs-glance-link:hover{color:var(--accent);border-color:currentColor}
     .cs-glance-scope{padding-top:32px}
     .cs-glance-scope .cs-glance-value{max-width:64ch}
     @media (max-width:640px){
