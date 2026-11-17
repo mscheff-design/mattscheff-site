@@ -38,13 +38,20 @@ export function renderEditorialPage(mountEl, radio) {
         <span class="tw-tag">A selection</span>
         <span class="tw-code"><span class="tw-code-mark"></span>${esc(PAGE.code)}</span>
       </div>
-      <h1 class="tw-title">${esc(PAGE.title)}</h1>
-      <p class="tw-descriptor">${esc(PAGE.descriptor)}</p>
-      <p class="tw-byline">${esc(PAGE.byline)}</p>
-      ${PAGE.epigraph ? `<blockquote class="tw-epigraph"><p>${esc(PAGE.epigraph.text)}</p><cite>${esc(PAGE.epigraph.by)}</cite></blockquote>` : ''}
-      ${renderCopy(PAGE.intro, 'tw-intro')}
-      <div class="tw-jump" role="navigation" aria-label="Shelves">
-        ${sections.map((sec) => `<a class="tw-jump-link${sec.items.length ? '' : ' is-empty'}" href="#${esc(sec.id)}">${esc(sec.label)}<span class="tw-jump-n">${sec.items.length ? pad(sec.items.length) : '—'}</span></a>`).join('')}
+      <div class="tw-head-grid">
+        <div class="tw-head-main">
+          <h1 class="tw-title">${esc(PAGE.title)}</h1>
+          <p class="tw-descriptor">${esc(PAGE.descriptor)}</p>
+          <p class="tw-byline">${esc(PAGE.byline)}</p>
+          ${PAGE.epigraph ? `<blockquote class="tw-epigraph"><p>${esc(PAGE.epigraph.text)}</p><cite>${esc(PAGE.epigraph.by)}</cite></blockquote>` : ''}
+          ${renderCopy(PAGE.intro, 'tw-intro')}
+        </div>
+        <div class="tw-contents" role="navigation" aria-label="Contents">
+          <span class="tw-tag tw-contents-tag">Contents</span>
+          <ol class="tw-contents-list">
+            ${sections.map((sec, si) => `<li><a class="tw-jump-link tw-contents-link${sec.items.length ? '' : ' is-empty'}" href="#${esc(sec.id)}"><span class="tw-contents-n">${pad(si + 1)}</span><span class="tw-contents-label">${esc(sec.label)}</span><span class="tw-contents-leader" aria-hidden="true"></span><span class="tw-contents-count">${sec.items.length ? pad(sec.items.length) : '—'}</span></a></li>`).join('')}
+          </ol>
+        </div>
       </div>
     </header>
 
@@ -701,13 +708,19 @@ function injectStyles() {
     .tw-epigraph cite{display:block;margin-top:6px;font-style:normal;font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)}
     .tw-intro{font-family:var(--font-serif);font-size:18px;line-height:1.6;color:rgba(var(--ink-rgb),0.78);max-width:60ch;margin-top:22px}
 
-    .tw-jump{display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:40px;padding-top:18px;border-top:0.5px solid rgba(var(--ink-rgb),0.12)}
-    .tw-jump-link{text-decoration:none;cursor:pointer;font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.45);padding-bottom:4px;border-bottom:1px solid transparent;transition:color 0.25s,border-color 0.25s}
-    .tw-jump-link:hover{color:var(--ink)}
-    .tw-jump-link.is-current{color:var(--ink);border-bottom-color:rgba(var(--ink-rgb),0.6)}
-    .tw-jump-link.is-empty{color:rgba(var(--ink-rgb),0.28)}
-    .tw-jump-link.is-empty.is-current{color:rgba(var(--ink-rgb),0.5);border-bottom-color:rgba(var(--ink-rgb),0.25)}
-    .tw-jump-n{margin-left:7px;font-size:8.5px;color:rgba(var(--ink-rgb),0.35)}
+    /* Header: the title and intro on the left, a library-card contents
+       list on the right (it replaces the old row of section links). */
+    .tw-head-grid{display:grid;grid-template-columns:minmax(0,1fr) 250px;column-gap:72px;align-items:end}
+    .tw-contents{padding-bottom:4px}
+    .tw-contents-tag{display:block;padding-bottom:10px;border-bottom:0.5px solid rgba(var(--ink-rgb),0.18)}
+    .tw-contents-list{list-style:none}
+    .tw-contents-link{display:grid;grid-template-columns:26px auto minmax(12px,1fr) auto;align-items:baseline;column-gap:8px;padding:10px 0;border-bottom:0.5px solid rgba(var(--ink-rgb),0.1);text-decoration:none;font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);transition:color 0.2s}
+    .tw-contents-n{color:rgba(var(--ink-rgb),0.35)}
+    .tw-contents-leader{border-bottom:1px dotted rgba(var(--ink-rgb),0.28);transform:translateY(-3px)}
+    .tw-contents-count{color:rgba(var(--ink-rgb),0.4);font-size:9.5px}
+    .tw-contents-link:hover,.tw-contents-link.is-current{color:var(--ink)}
+    .tw-contents-link:hover .tw-contents-n,.tw-contents-link.is-current .tw-contents-n{color:var(--ink)}
+    .tw-contents-link.is-empty{color:rgba(var(--ink-rgb),0.3)}
 
     /* One shelf per section, stacked like the shelves of a reference library. */
     .tw-shelf{margin-top:120px;scroll-margin-top:90px}
@@ -975,9 +988,7 @@ function injectStyles() {
       .tw-list-line{flex-direction:column;gap:6px}
       .tw-card{position:fixed;left:12px;right:12px;bottom:12px;top:auto!important;left:12px!important;width:auto;min-width:0;max-width:none;max-height:72vh;overflow:auto;padding:18px 18px 20px}
       .tw-card-close{display:block}
-      .tw-jump{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:20px;margin-right:-20px;padding-right:20px}
-      .tw-jump::-webkit-scrollbar{display:none}
-      .tw-jump-link{flex:0 0 auto}
+      .tw-head-grid{grid-template-columns:minmax(0,1fr);row-gap:36px}
       .tw-exit{padding:0 20px 32px}
       .tw-draftbar{font-size:8px;line-height:1.6}
     }
