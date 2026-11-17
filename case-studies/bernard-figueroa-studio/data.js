@@ -41,7 +41,7 @@ export const CASE_STUDY = {
         caseId: 'BFS — 02',
         items: [
           { label: 'Client', value: 'Bernard Figueroa Lights' },
-          { label: 'Role', value: 'Studio Assistant & Digital Manager' }
+          { label: 'Role', value: 'Studio Assistant / Digital Manager' }
         ],
         scope: 'Portfolio website · Short-form video · Photography · Documentation · Archive management · Spec sheets · Fabrication coordination · Email · Social media'
       }

@@ -35,7 +35,7 @@ export const CASE_STUDY = {
         items: [
           { label: 'Client', value: 'Urban Architecture Inc., New York' },
           { label: 'Principal', value: 'Keith Johnson, “The Merchant of Memphis”' },
-          { label: 'Role', value: 'Digital Consultant & Creative Director' }
+          { label: 'Role', value: 'Digital Media Manager' }
         ],
         scope: `Brand strategy · Art direction · Shopify development · Copywriting · Editorial · Email · Catalog systems · Video · Press strategy · Art handling · Vendor liaison · Product photography`
       }

@@ -48,7 +48,7 @@ export const CASE_STUDY = {
         caseId: 'STM — 03',
         items: [
           { label: 'Client', value: 'STATMASK' },
-          { label: 'Role', value: 'Social Media Manager, Product Photographer' }
+          { label: 'Role', value: 'Social Media & E-Commerce Manager / Product Photographer' }
         ],
         scope: 'Product photography · Short-form video · Art direction · Modular asset system · Meta campaign management · Order fulfillment · Analytics · Sales collateral'
       }

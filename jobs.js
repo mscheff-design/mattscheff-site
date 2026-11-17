@@ -20,7 +20,7 @@
 export const JOBS = [
   {
     id: 'urban-architecture',
-    role: 'Digital Manager / Digital Strategy',
+    role: 'Digital Media Manager',
     name: 'Urban Architecture Inc.',
     dates: '2022 – Present',
     tags: ['BRAND STRATEGY', 'SHOPIFY DEVELOPMENT', 'EDITORIAL'],
@@ -29,7 +29,7 @@ export const JOBS = [
   },
   {
     id: 'bernard-figueroa-studio',
-    role: 'Studio Assistant & Digital Manager',
+    role: 'Studio Assistant / Digital Manager',
     name: 'Bernard Figueroa Lights',
     dates: '2025 – Present',
     tags: ['PORTFOLIO WEBSITE', 'DOCUMENTATION', 'FABRICATION'],
@@ -38,7 +38,7 @@ export const JOBS = [
   },
   {
     id: 'statmask',
-    role: 'Social Media Manager & Product Photographer',
+    role: 'Social Media & E-Commerce Manager / Product Photographer',
     name: 'STATMASK',
     dates: '2020 – 2022',
     tags: ['PRODUCT PHOTOGRAPHY', 'PAID SOCIAL', 'META ADS'],
