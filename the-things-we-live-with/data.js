@@ -46,11 +46,11 @@ export const SECTIONS = [
   { id: 'photographs', label: 'Photobooks', layout: 'plates' },
   // The Listening shelf is the playlist: its records are the sequence, in
   // order. `set` adds "Play the set" (every preview, in order, through the nav
-  // radio). appleMusicUrl is the real full-length playlist, to make in Apple
-  // Music and paste in; until then there's no link.
+  // radio). spotifyUrl / appleMusicUrl are the full-length playlist; each
+  // shows as a small link in the set line when set (no Apple version yet).
   // layout 'records': a Grid / List switch over one set of covers; each record
   // opens the shared card (details, note, preview) on hover or tap.
-  { id: 'listening', label: 'Listening', layout: 'records', set: { tracks: 20, appleMusicUrl: null } },
+  { id: 'listening', label: 'Listening', layout: 'records', set: { tracks: 20, spotifyUrl: 'https://open.spotify.com/playlist/5je92qmmZviDrC02JrEQpd', appleMusicUrl: null } },
   // layout 'wall': posters hung in a grid instead of a sliding shelf; hovering
   // (or tapping) one opens a small card with its details.
   { id: 'film', label: 'Film', layout: 'wall' },

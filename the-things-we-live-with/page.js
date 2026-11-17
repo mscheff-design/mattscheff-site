@@ -681,7 +681,10 @@ function renderRecords(sec, si) {
         ${sec.set ? `
         <span class="tw-set">
           <button class="tw-play tw-setplay" type="button" disabled><span class="tw-play-icon" aria-hidden="true"></span><span class="tw-play-label">Play the set</span></button>
-          <span class="tw-set-meta">${pad(n)} tracks · 30-second previews${sec.set.appleMusicUrl ? ` · <a class="tw-src" href="${esc(sec.set.appleMusicUrl)}" target="_blank" rel="noopener">Full playlist on Apple Music ↗</a>` : ''}</span>
+          <span class="tw-set-meta">${pad(n)} tracks · 30-second previews${[
+            sec.set.spotifyUrl ? `<a class="tw-src" href="${esc(sec.set.spotifyUrl)}" target="_blank" rel="noopener">Spotify ↗</a>` : '',
+            sec.set.appleMusicUrl ? `<a class="tw-src" href="${esc(sec.set.appleMusicUrl)}" target="_blank" rel="noopener">Apple Music ↗</a>` : '',
+          ].filter(Boolean).map((l, i) => (i ? ' · ' : ' · Full playlist on ') + l).join('')}</span>
         </span>` : `<span class="tw-code"><span class="tw-code-mark"></span>${pad(n)} tracks</span>`}
       </div>
       ${sec.note ? renderCopy(sec.note, 'tw-shelf-note') : ''}
