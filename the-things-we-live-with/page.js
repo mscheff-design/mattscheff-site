@@ -684,7 +684,7 @@ function renderRecords(sec, si) {
           <span class="tw-set-meta">${pad(n)} tracks · 30-second previews${[
             sec.set.spotifyUrl ? `<a class="tw-src" href="${esc(sec.set.spotifyUrl)}" target="_blank" rel="noopener">Spotify ↗</a>` : '',
             sec.set.appleMusicUrl ? `<a class="tw-src" href="${esc(sec.set.appleMusicUrl)}" target="_blank" rel="noopener">Apple Music ↗</a>` : '',
-          ].filter(Boolean).map((l, i) => (i ? ' · ' : ' · Full playlist on ') + l).join('')}</span>
+          ].filter(Boolean).map((l) => ' · ' + l).join('')}</span>
         </span>` : `<span class="tw-code"><span class="tw-code-mark"></span>${pad(n)} tracks</span>`}
       </div>
       ${sec.note ? renderCopy(sec.note, 'tw-shelf-note') : ''}
@@ -914,6 +914,7 @@ function injectStyles() {
     .tw-list-fig figcaption a:hover{color:var(--accent)}
     .tw-set-meta{font-family:var(--font-mono);font-size:9px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.4)}
     .tw-set-meta em{font-style:normal;color:#7a5a12}
+    .tw-set-meta a{white-space:nowrap}
     .tw-setplay{padding:7px 12px}
     .tw-play:disabled{opacity:0.4;cursor:default}
     .tw-shelf-note{max-width:1024px;margin:22px max(48px,calc((100% - 1024px) / 2)) 0;font-family:var(--font-serif);font-size:17px;line-height:1.6;color:rgba(var(--ink-rgb),0.75)}
