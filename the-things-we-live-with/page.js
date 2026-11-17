@@ -250,6 +250,57 @@ export function renderEditorialPage(mountEl, radio) {
     const el = document.getElementById(location.hash.slice(1));
     window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - 90 });
   }
+  initReveal(mountEl);
+}
+
+// Media arrives as it scrolls into view, staggered across whatever arrives
+// together. Photobooks and posters fall into place as if lightly tossed down
+// in front of the reader; the rest simply appears. (The record grid's own
+// scatter, on switching views, is separate: see initRecordViews.)
+// Photobooks and film posters get the toss; everything else just fades up.
+const TOSSED = '.tw-plate, .tw-wall:not(.tw-wall--plates) > .tw-hang';
+function initReveal(root) {
+  if (prefersReducedMotion || !document.body.animate) return;
+  let pending = [...root.querySelectorAll('.tw-plate, .tw-rec, .tw-wall:not(.tw-wall--plates) > .tw-hang, .tw-list-fig, .tw-objfig-frame')];
+  pending.forEach((el) => el.classList.add('tw-pre'));
+  // Checked on scroll rather than with an IntersectionObserver, so a jump
+  // (contents link, fast fling) can never skip past a piece and strand it
+  // hidden: anything already scrolled past simply appears.
+  const check = () => {
+    const line = window.innerHeight * 0.94;
+    const arriving = [];
+    pending = pending.filter((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.top > line) return true;
+      if (r.bottom < 0) el.classList.remove('tw-pre');
+      else arriving.push([el, r]);
+      return false;
+    });
+    arriving.sort((a, b) => (a[1].top - b[1].top) || (a[1].left - b[1].left));
+    arriving.forEach(([el], k) => {
+      // Tossed onto the table: starts a touch closer (larger), above, and
+      // turned, lands just past rest, then settles square.
+      const jx = (Math.random() - 0.5) * 16, rot = (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 2.2);
+      el.classList.remove('tw-pre');
+      if (!el.matches(TOSSED)) {
+        // Playlist, bookstores and objects simply appear.
+        el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, delay: Math.min(k, 8) * 50, easing: 'ease-out', fill: 'backwards' });
+        return;
+      }
+      el.animate([
+        { opacity: 0, transform: `translate(${jx}px, -26px) rotate(${rot}deg) scale(1.07)`, easing: 'cubic-bezier(.4,0,.7,.9)' },
+        { opacity: 1, transform: `translate(${jx * 0.08}px, 2px) rotate(${-rot * 0.18}deg) scale(0.996)`, offset: 0.62, easing: 'cubic-bezier(.3,.7,.4,1)' },
+        { opacity: 1, transform: 'none' },
+      ], { duration: 820, delay: Math.min(k, 8) * 70, fill: 'backwards' });
+    });
+    if (!pending.length) { window.removeEventListener('scroll', check); window.removeEventListener('resize', check); }
+  };
+  // Called straight from scroll (no rAF gate: a frame requested while the tab
+  // is hidden never runs, which would wedge the gate shut). The list only
+  // shrinks, so the work per scroll event is small.
+  window.addEventListener('scroll', check, { passive: true });
+  window.addEventListener('resize', check, { passive: true });
+  check();
 }
 
 // A wall: posters hung in a grid. One shared card follows whichever poster is
@@ -495,6 +546,7 @@ function renderListEntry(it, n) {
               <span class="tw-list-city">${esc(it.city)}</span>
             </div>
             ${it.blurb ? `<p class="tw-list-blurb">${esc(it.blurb)}</p>` : ''}
+            ${it.note ? `<p class="tw-list-note">${esc(it.note)}</p>` : ''}
             <p class="tw-list-links">${[
               it.source ? `<a class="tw-list-src" href="${esc(it.source.url)}" target="_blank" rel="noopener">${esc(it.source.label)} ↗</a>` : '',
               it.about ? `<a class="tw-list-src" href="${esc(it.about.url)}" target="_blank" rel="noopener">${esc(it.about.label)} ↗</a>` : '',
@@ -704,7 +756,7 @@ function injectStyles() {
     .tw-descriptor{font-family:var(--font-serif);font-size:18px;color:rgba(var(--ink-rgb),0.7);margin-top:10px}
     .tw-byline{font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.4);margin-top:14px}
     .tw-epigraph{margin:36px 0 0}
-    .tw-epigraph p{font-family:var(--font-serif);font-size:18px;line-height:1.5;color:var(--ink)}
+    .tw-epigraph p{font-family:'EB Garamond',Georgia,serif;font-style:italic;font-size:22px;line-height:1.4;color:var(--ink)}
     .tw-epigraph cite{display:block;margin-top:6px;font-style:normal;font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)}
     .tw-intro{font-family:var(--font-serif);font-size:18px;line-height:1.6;color:rgba(var(--ink-rgb),0.78);max-width:60ch;margin-top:22px}
 
@@ -808,6 +860,7 @@ function injectStyles() {
     .tw-list-fig{overflow:hidden}
     @media (hover:hover){.tw-list-entry:hover .tw-list-fig img{transform:scale(1.04)}}
     .tw-list-blurb{max-width:560px;margin-top:5px;font-family:var(--font-serif);font-size:14.5px;line-height:1.5;color:rgba(var(--ink-rgb),0.75)}
+    .tw-list-note{max-width:560px;margin-top:8px;font-family:'EB Garamond',Georgia,serif;font-style:italic;font-size:17px;line-height:1.42;color:rgba(var(--ink-rgb),0.48)}
     /* Objects: three columns; each object sits whole on a shared
        baseline inside a capped frame, captions line up beneath. */
     /* Objects: each row is its own grid whose columns are proportional to
@@ -992,6 +1045,7 @@ function injectStyles() {
       .tw-exit{padding:0 20px 32px}
       .tw-draftbar{font-size:8px;line-height:1.6}
     }
+    .tw-pre{opacity:0}
     @media (prefers-reduced-motion:reduce){
     }
   `;

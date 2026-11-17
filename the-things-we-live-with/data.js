@@ -690,20 +690,21 @@ export const ITEMS = [
     note: null,
   },
   {
-    id: 'desert-raven',
+    id: 'windmills-of-your-mind',
     status: 'anchor',
     kind: 'record',
     section: 'listening',
-    creator: 'Jonathan Wilson',
-    title: 'Desert Raven',
-    date: '2011',
-    context: 'From Gentle Spirit',
-    itunesId: 450182156,
+    creator: 'Noel Harrison',
+    title: 'The Windmills of Your Mind',
+    date: '1968',
+    context: 'From The Thomas Crown Affair',
+    itunesId: 153417971,
     image: null,
     ratio: 1,
-    alt: 'Album cover for Jonathan Wilson’s Gentle Spirit',
+    alt: 'Album cover for Noel Harrison’s Life Is a Dream, a black-and-white portrait',
     credit: 'Cover art and preview via Apple Music',
-    source: { label: 'Apple Music', url: 'https://music.apple.com/us/search?term=' + encodeURIComponent('Jonathan Wilson Desert Raven') },
+    source: { label: 'Apple Music', url: 'https://music.apple.com/us/search?term=' + encodeURIComponent('Noel Harrison Windmills of Your Mind') },
+    devNote: 'Theme from The Thomas Crown Affair (1968), echoing the poster in Film. Apple track is the remastered album version from Life Is a Dream, which supplies the cover.',
     note: null,
   },
   {
@@ -938,7 +939,7 @@ export const ITEMS = [
     image: 'img/books/store-barts.jpg',
     alt: "Bart’s Books’ open-air courtyard: rows of tall red-framed shelves under corrugated awnings, café tables and an umbrella in the middle.",
     photo: { credit: "Travel + Leisure", license: null, via: null, url: 'https://www.travelandleisure.com' },
-    note: null,
+    note: 'I visited Bart’s for the first time for my 29th birthday and got pleasantly lost. I love this store because they organize their selections in an unconventional way, allowing your mind to wander as you explore.',
   },
   {
     id: 'westsider-books',
@@ -952,7 +953,7 @@ export const ITEMS = [
     image: 'img/books/store-westsider.jpg',
     alt: "Inside Westsider Books: shelves packed floor to ceiling on both sides of a narrow aisle, a wooden staircase climbing to the balcony level.",
     photo: { credit: "6sqft", license: null, via: null, url: 'https://www.6sqft.com' },
-    note: null,
+    note: 'An old favorite and local haunt during my years in New York. Rare tomes, art books off the beaten path. This store has it all, and lets the joy of discovery guide your visit.',
 
   },
   {
@@ -968,7 +969,7 @@ export const ITEMS = [
     image: 'img/books/arcana.jpg',
     alt: 'Inside Arcana: a long white aisle between dark freestanding shelving units filled with books, under an open ceiling of white trusses.',
     photo: { credit: 'Joshua White', license: null, via: 'Johnston Marklee (interior and custom shelving)', url: 'https://www.johnstonmarklee.com/work/arcana-books' },
-    note: null,
+    note: 'A newer addition to my Los Angeles life. A deep, quiet room of art, photography, and architecture books, new and out of print, where an hour disappears easily.',
   },
   {
     id: 'sauramps-musee-fabre',
@@ -982,7 +983,7 @@ export const ITEMS = [
     image: 'img/books/store-sauramps.jpg',
     alt: "The Musée Fabre bookshop: white vaulted ceilings over dark wood shelving and tables of art books.",
     photo: { credit: "Musée Fabre", license: null, via: null, url: 'https://www.museefabre.fr' },
-    note: null,
+    note: 'A childhood favorite from visits to the museum with my parents. I couldn’t always follow the French, which gave the books a certain mystery. I found my way poring through the images.',
   },
   {
     id: 'dia-beacon-bookstore',
@@ -996,7 +997,7 @@ export const ITEMS = [
     image: 'img/books/store-dia.jpg',
     alt: "The Dia Beacon bookstore: pale wood shelving and long tables of art books under factory windows.",
     photo: { credit: "Go Love NY", license: null, via: null, url: 'https://goloveny.substack.com/p/17-bookshops-that-make-main-street' },
-    note: null,
+    note: 'Understated but impactful, like the museum around it. The selection draws from Dia’s exhibitions and long-term installations, so the books feel like an extension of the galleries.',
 
   },
   {
