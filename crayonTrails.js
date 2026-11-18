@@ -158,26 +158,33 @@ const PERSONALITIES = {
   steady: { width: 1, alpha: 1, duration: 820, swell: .04, jitter: .02, wobble: 0 }
 };
 const PERSONALITY_NAMES = Object.keys(PERSONALITIES);
-// Every mark should take up a comparable share of the screen: the small
-// presets (cloud, spiral, figure eight, the thin bands) read as timid next
-// to the big sweeps. Each shape is stretched about its own centre until its
-// bounding box (from its points and control points) is at least
-// FIT_MIN_W x FIT_MIN_H of the paper, never shrunk and at most 2.2x per
-// axis, then nudged back inside the paper if that pushed it off an edge.
-const FIT_MIN_W = .8, FIT_MIN_H = .34, FIT_MAX = 2.2;
+// Every mark should cover real ground on the visible paper. Stretching a
+// shape taller mostly pushes ink behind the card, so instead each shape is
+// fitted to the open paper it lives in: marks that sit above the card fill
+// the band from the nav down to just behind the card's top edge, marks below
+// fill the band from just behind its bottom edge to the foot of the screen,
+// and every mark spans nearly the full width. Marks that already wrap the
+// card (orbit, ribbon, swash...) keep their height. Never shrinks a shape;
+// at most FIT_MAX per axis. Reference card: x .108–.892, y .281–.770.
+const FIT_W = .96, FIT_MAX = 3.2;
+const TOP_BAND = [.03, .33], BOTTOM_BAND = [.72, .985];
 const shapeFits = new Map();
 function shapeFit(form) {
   if (shapeFits.has(form)) return shapeFits.get(form);
   const xs=[form.start[0]], ys=[form.start[1]];
   for (const c of form.curves) for (let i=0;i<6;i+=2) { xs.push(c[i]); ys.push(c[i+1]); }
   const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
-  const cx=(x0+x1)/2, cy=(y0+y1)/2;
-  const sx=Math.min(FIT_MAX, Math.max(1, FIT_MIN_W/Math.max(.01,x1-x0)));
-  const sy=Math.min(FIT_MAX, Math.max(1, FIT_MIN_H/Math.max(.01,y1-y0)));
-  const nx0=cx+(x0-cx)*sx, nx1=cx+(x1-cx)*sx, ny0=cy+(y0-cy)*sy, ny1=cy+(y1-cy)*sy;
-  const dx = nx0<-.05 ? -.05-nx0 : nx1>1.05 ? 1.05-nx1 : 0;
-  const dy = ny0<-.04 ? -.04-ny0 : ny1>1.04 ? 1.04-ny1 : 0;
-  const fit={cx,cy,sx,sy,dx,dy};
+  // Horizontal: widen about the shape's centre to FIT_W, then centre it.
+  const ax=Math.min(FIT_MAX, Math.max(1, FIT_W/Math.max(.01,x1-x0)));
+  const bx=.5-ax*(x0+x1)/2;
+  // Vertical: fill the band the shape belongs to.
+  let ay=1, by=0;
+  const band = y1<=.42 ? TOP_BAND : y0>=.62 ? BOTTOM_BAND : null;
+  if (band) {
+    ay=Math.min(FIT_MAX, Math.max(1, (band[1]-band[0])/Math.max(.01,y1-y0)));
+    by = band===TOP_BAND ? band[0]-ay*y0 : band[1]-ay*y1;
+  }
+  const fit={ax,bx,ay,by};
   shapeFits.set(form, fit);
   return fit;
 }
@@ -711,7 +718,7 @@ export function mountCrayonTrails(hero, {
     // a flipped mark still wraps the card the same way.
     const fit = shapeFit(form);
     const map = (x,y) => {
-      x=fit.cx+(x-fit.cx)*fit.sx+fit.dx; y=fit.cy+(y-fit.cy)*fit.sy+fit.dy;
+      x=fit.ax*x+fit.bx; y=fit.ay*y+fit.by;
       if (doodle.flipX) x=1-x;
       if (doodle.flipY) y=1.051-y;
       return { x:mapAxis(x,left,right,width,.108,.892), y:mapAxis(y,top,bottom,visibleH,.281,.770) };
