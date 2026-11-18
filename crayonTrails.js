@@ -89,6 +89,62 @@ const MOBILE_DOODLES = [
   ] }
 ];
 
+
+// Additional preset marks (November 2026), same coordinate convention as
+// MOBILE_DOODLES above. Drawn one at a time as the reader scrolls, picked at
+// random and randomly mirrored (see pickDoodle), so the set reads as
+// spontaneous rather than a loop of four. Most of each mark's ink sits in
+// the open paper above and below the card; stretches behind it are hidden.
+const EXTRA_DOODLES = [
+  { name: 'top loops', start: [-.03,.20], curves: [
+    [.08,.16, .14,.08, .22,.07], [.30,.06, .30,.17, .24,.17], [.18,.17, .20,.08, .30,.10],
+    [.40,.12, .44,.20, .52,.18], [.60,.16, .62,.07, .56,.06], [.50,.06, .50,.16, .60,.17],
+    [.72,.18, .80,.10, .88,.12], [.95,.14, .98,.22, 1.04,.24]
+  ] },
+  { name: 'bottom wave', start: [1.03,.84], curves: [
+    [.92,.80, .84,.92, .74,.90], [.64,.88, .60,.80, .50,.82], [.40,.84, .36,.94, .26,.92],
+    [.16,.90, .12,.82, .08,.86], [.04,.90, .08,.96, .14,.93]
+  ] },
+  { name: 'swash', start: [.02,.06], curves: [
+    [.12,.10, .20,.20, .30,.30], [.45,.45, .55,.60, .70,.74], [.80,.84, .90,.90, .94,.86],
+    [.98,.82, .92,.76, .86,.82]
+  ] },
+  { name: 'spiral', start: [.48,.97], curves: [
+    [.36,1.0, .10,.97, .08,.88], [.06,.80, .24,.78, .30,.86], [.34,.92, .22,.96, .16,.90],
+    [.12,.86, .18,.82, .22,.86]
+  ] },
+  { name: 'orbit', start: [.50,.12], curves: [
+    [.80,.10, .98,.20, .97,.40], [.96,.62, .98,.82, .80,.90], [.60,.97, .30,.97, .14,.88],
+    [.00,.80, .02,.55, .04,.35], [.06,.18, .30,.10, .58,.14]
+  ] },
+  { name: 'zigzag', start: [-.02,.84], curves: [
+    [.08,.80, .14,.78, .18,.80], [.24,.86, .20,.94, .28,.93], [.36,.92, .40,.80, .46,.81],
+    [.52,.82, .50,.94, .58,.94], [.66,.94, .70,.82, .76,.82], [.82,.82, .82,.93, .90,.92],
+    [.96,.91, 1.0,.86, 1.04,.84]
+  ] },
+  { name: 'figure eight', start: [.40,.22], curves: [
+    [.55,.20, .62,.06, .72,.07], [.82,.08, .84,.20, .76,.20], [.68,.20, .66,.08, .78,.06],
+    [.90,.04, .96,.16, .88,.22], [.82,.26, .70,.22, .66,.16]
+  ] },
+  { name: 'underline', start: [.04,.86], curves: [
+    [.20,.84, .36,.82, .46,.84], [.56,.86, .58,.94, .50,.95], [.42,.96, .42,.86, .54,.84],
+    [.68,.82, .84,.84, .96,.88]
+  ] },
+  { name: 'ribbon', start: [.80,-.02], curves: [
+    [.92,.06, 1.0,.20, .96,.34], [.92,.50, .98,.66, .92,.78], [.86,.90, .70,.94, .56,.90],
+    [.44,.87, .40,.80, .30,.82], [.20,.84, .18,.92, .26,.94]
+  ] },
+  { name: 'cloud', start: [.30,.20], curves: [
+    [.30,.12, .40,.10, .42,.16], [.44,.22, .36,.22, .38,.16], [.40,.08, .52,.08, .52,.15],
+    [.52,.22, .44,.21, .47,.14], [.50,.07, .62,.08, .62,.15], [.62,.21, .55,.22, .57,.16],
+    [.60,.09, .72,.12, .74,.20]
+  ] }
+];
+const DOODLE_SHAPES = [...MOBILE_DOODLES, ...EXTRA_DOODLES];
+// Touch marks advance on scroll rather than on an 8s timer.
+const SCROLL_TRIGGERED = true;
+const COLOR_NAMES = ['red', 'blue', 'yellow', 'green'];
+
 export function mountCrayonTrails(hero, {
   surface = hero, toggle = null, color = null, seed = Math.floor(Math.random()*4294967295),
   getExclusionRects = () => [], isPointBlocked = () => false, isBusy = () => false,
@@ -105,20 +161,19 @@ export function mountCrayonTrails(hero, {
   if (!ctx) { canvas.remove(); throw new Error('2D canvas is unavailable.'); }
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const fine = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
-  // Touch: on, for the scroll pen (user-driven, so reduced motion doesn't
-  // switch it off). Desktop: the hover trail, as before.
-  let enabled = isTouchDevice ? true : (fine.matches && !motion.matches);
+  let enabled = !isTouchDevice && fine.matches && !motion.matches;
   let disposed = false, visible = true, paused = false;
   let width = 1, height = 1, dpr = 1, raf = 0, fadeTimer = 0, loopTimer = 0;
   let previous = null, smooth = null, traveled = 0, phase = 0, smoothAngle = null;
   let stamps = [], density = new Map();
-  // The self-drawing touch doodle (a42e4bf) is parked while scrolling draws
-  // instead (see the scroll pen below); its code stays inert while this is
-  // null.
-  const doodle = false ? {
+  // Touch: preset marks around the card, drawn in the desktop stroke's look,
+  // one per burst of scrolling (see doodleScroll).
+  // Starts `complete` with no path, so nothing draws on load: the first mark
+  // appears when the reader first scrolls (see doodleScroll).
+  const doodle = isTouchDevice ? {
     path: null, emitted: 0, progress: 0, elapsed: 0, lastTime: null,
-    frame: 0, complete: false, dismissed: false, measuredWidth: 0, delay: 300,
-    variant: Math.max(0, CRAYON_COLORS.indexOf(chosenColor))
+    frame: 0, complete: true, dismissed: false, measuredWidth: 0, delay: 120,
+    variant: 0, flipX: false, flipY: false, completedAt: 0
   } : null;
   // Touch autopilot state (see startAuto); declared up here because the
   // scroll/pointer handlers and the first scheduleAuto() read it early.
@@ -162,12 +217,12 @@ export function mountCrayonTrails(hero, {
     if (!toggle) return;
     if (doodle) {
       toggle.removeAttribute('aria-pressed');
-      toggle.setAttribute('aria-label', `Change squiggle. Current color: ${MOBILE_DOODLES[doodle.variant].name}`);
+      toggle.setAttribute('aria-label', `Draw another squiggle. Current color: ${COLOR_NAMES[Math.max(0,CRAYON_COLORS.indexOf(chosenColor))]}`);
     } else {
       toggle.setAttribute('aria-pressed', String(enabled));
       // A minimal dot has no room for a visible label — aria-label keeps it
       // announced correctly for screen readers/keyboard users regardless.
-      toggle.setAttribute('aria-label', enabled ? `Change crayon color. Current color: ${MOBILE_DOODLES[Math.max(0,CRAYON_COLORS.indexOf(chosenColor))].name}` : 'Crayon trails off. Turn on');
+      toggle.setAttribute('aria-label', enabled ? `Change crayon color. Current color: ${COLOR_NAMES[Math.max(0,CRAYON_COLORS.indexOf(chosenColor))]}` : 'Crayon trails off. Turn on');
     }
     toggle.style.setProperty('--crayon-color', chosenColor);
   }
@@ -248,7 +303,9 @@ export function mountCrayonTrails(hero, {
     // Height-only changes (resume reveal / browser chrome) leave the ink
     // on the paper. A changed width reflows the same gesture immediately,
     // preserving reveal progress; it never plays the entrance again.
-    if (doodle && !doodle.dismissed && (!doodle.path || doodle.measuredWidth !== width)) composeDoodle();
+    // Re-lay an existing mark when the width changes; never compose one here
+    // (on touch the first mark waits for the first scroll).
+    if (doodle && !doodle.dismissed && doodle.path && doodle.measuredWidth !== width) composeDoodle();
     paint();
     wakeDoodle();
   }
@@ -378,12 +435,12 @@ export function mountCrayonTrails(hero, {
   const toggleClick=()=>doodle ? switchDoodle() : cycleColor();
   const preferences=()=>{
     if (doodle) { if (motion.matches) finishDoodle(); else {wakeDoodle();scheduleLoop();} }
-    else if (!isTouchDevice) setEnabled(fine.matches&&!motion.matches);
+    else setEnabled(fine.matches&&!motion.matches);
   };
   const visibility=()=>{breakStroke();if(document.hidden)cancelWork();else {schedule();wakeDoodle();scheduleLoop();}};
   // The autopilot draws in canvas px, so scrolling or tapping mid-stroke
   // doesn't disturb it; only real-cursor strokes break on those.
-  const scroll=()=>{ if (isTouchDevice) penScroll(); else if (!auto.active) breakStroke(); };
+  const scroll=()=>{ if (isTouchDevice) doodleScroll(); else if (!auto.active) breakStroke(); };
   function down() { if (!auto.active) breakStroke(); }
   // window/documentElement, not hero — nav is a DOM SIBLING of hero, not a
   // descendant, so a listener on hero itself never sees pointer events
@@ -557,6 +614,29 @@ export function mountCrayonTrails(hero, {
     scheduleAuto(4200+random()*3800);
   }
 
+
+  // Next preset: random, never the same shape twice running, randomly
+  // mirrored left/right and top/bottom about the card.
+  function pickDoodle() {
+    let v=doodle.variant;
+    if (DOODLE_SHAPES.length>1) while (v===doodle.variant) v=Math.floor(random()*DOODLE_SHAPES.length);
+    doodle.variant=v; doodle.flipX=random()<.5; doodle.flipY=random()<.5;
+  }
+  // A burst of scrolling while the hero is on screen draws the next mark,
+  // once the current one has finished drawing and had a moment on the page.
+  let scrollAcc=0, scrollLastY=window.scrollY;
+  function doodleScroll() {
+    const y=window.scrollY, delta=Math.abs(y-scrollLastY);
+    scrollLastY=y;
+    if (!doodle || disposed || paused || !visible || document.hidden || isBusy()) return;
+    if (!doodle.complete) return;
+    scrollAcc+=delta;
+    if (scrollAcc<36) return;
+    if (doodle.path && performance.now()-doodle.completedAt<1400) return;
+    scrollAcc=0;
+    switchDoodle();
+  }
+
   function composeDoodle() {
     if (!doodle || doodle.dismissed) return false;
     const rect = surface.getBoundingClientRect();
@@ -564,7 +644,7 @@ export function mountCrayonTrails(hero, {
     const visibleH = surface.clientHeight || height;
     if (!card || !rect.width || !rect.height || !width || !visibleH) return false;
     const sx = width / rect.width, sy = visibleH / rect.height;
-    const form = MOBILE_DOODLES[doodle.variant];
+    const form = DOODLE_SHAPES[doodle.variant];
     // Full desktop width (the authored widthScale made these thinner and
     // flatter than the cursor trail); see the stamping pass below.
     const strokeWidth = cfg.width;
@@ -580,8 +660,13 @@ export function mountCrayonTrails(hero, {
       ? a*v/refA
       : v > refB ? b+(extent-b)*(v-refB)/(1-refB)
       : a+(b-a)*(v-refA)/(refB-refA);
-    const map = (x,y) => ({ x:mapAxis(x,left,right,width,.108,.892),
-      y:mapAxis(y,top,bottom,visibleH,.281,.770) });
+    // Mirroring is about the reference card's own centre (x .5, y .5255), so
+    // a flipped mark still wraps the card the same way.
+    const map = (x,y) => {
+      if (doodle.flipX) x=1-x;
+      if (doodle.flipY) y=1.051-y;
+      return { x:mapAxis(x,left,right,width,.108,.892), y:mapAxis(y,top,bottom,visibleH,.281,.770) };
+    };
     let previous = map(...form.start);
     const raw = [previous];
     for (const curve of form.curves) {
@@ -685,8 +770,9 @@ export function mountCrayonTrails(hero, {
       s.persistent=false; s.time=now;
       s.hold=(s.fraction??0)*cfg.doodleUndrawSeconds; s.fade=cfg.doodleUndrawTailSeconds;
     }
-    doodle.variant=(doodle.variant+1)%MOBILE_DOODLES.length;
-    chosenColor=CRAYON_COLORS[doodle.variant];
+    const hadMark=stamps.some(s=>!s.persistent && s.fraction!==undefined && s.time===now);
+    pickDoodle();
+    chosenColor=CRAYON_COLORS[(Math.max(0,CRAYON_COLORS.indexOf(chosenColor))+1)%CRAYON_COLORS.length];
     brushes=brushesFor(chosenColor);
     // delay (not 0, like the old hard-cut used) is what keeps this
     // sequential rather than simultaneous: advanceDoodle()'s progress stays
@@ -698,7 +784,7 @@ export function mountCrayonTrails(hero, {
     // starts appearing once the old one is completely gone.
     Object.assign(doodle, {path:null, emitted:0, progress:0, elapsed:0,
       lastTime:null, complete:false, dismissed:false, measuredWidth:0,
-      delay:(cfg.doodleUndrawSeconds+cfg.doodleUndrawTailSeconds)*1000});
+      delay:hadMark ? (cfg.doodleUndrawSeconds+cfg.doodleUndrawTailSeconds)*1000 : 120});
     density.clear(); breakStroke();
     updateToggle(); composeDoodle(); paint(); wakeDoodle();
   }
@@ -713,6 +799,8 @@ export function mountCrayonTrails(hero, {
     // asks pages to avoid, so the loop simply never (re)starts while that's
     // set — the manual toggle still works regardless, since it doesn't
     // depend on this timer.
+    // Marks now advance on scroll (doodleScroll), not on a timer.
+    if (SCROLL_TRIGGERED) return;
     if (!doodle || !doodle.complete || doodle.dismissed || disposed || paused || !visible || document.hidden || motion.matches) return;
     loopTimer=setTimeout(advanceLoop, cfg.doodleLoopSeconds*1000);
   }
@@ -742,7 +830,7 @@ export function mountCrayonTrails(hero, {
     if (!doodle || doodle.dismissed || disposed) return;
     stopDoodle();
     if (!doodle.path && !composeDoodle()) return;
-    doodle.progress=1; doodle.complete=true;
+    doodle.progress=1; doodle.complete=true; doodle.completedAt=performance.now();
     emitDoodle(); paint();
     scheduleLoop();
   }
