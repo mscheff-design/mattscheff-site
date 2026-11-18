@@ -342,6 +342,17 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .photo-header{margin-bottom:32px;border-top-color:rgba(var(--ink-light-rgb),0.12);border-bottom-color:rgba(var(--ink-light-rgb),0.12)}
 .photo-header span{color:rgba(var(--ink-light-rgb),0.35)}
 .photo-header span:first-child{color:rgba(var(--ink-light-rgb),0.92)}
+/* The crayon loop (crayonCircle.js) is a positioned canvas inside the
+   header; the heading text sits above it. */
+.photo-header span:first-child{position:relative;z-index:1}
+
+/* Back to top: a quiet round button that fades in once the reader reaches
+   the dark contact/footer area at the bottom of the page. */
+.to-top{all:unset;box-sizing:border-box;position:fixed;right:22px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:150;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-mono);font-size:15px;color:rgba(var(--ink-light-rgb),0.85);background:rgba(var(--ink-light-rgb),0.08);border:0.5px solid rgba(var(--ink-light-rgb),0.22);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity 0.3s ease,transform 0.3s ease,background 0.2s,color 0.2s;-webkit-tap-highlight-color:transparent}
+.to-top.is-shown{opacity:1;transform:none;pointer-events:auto}
+@media (hover:hover){.to-top:hover{background:rgba(var(--ink-light-rgb),0.16);color:rgba(var(--ink-light-rgb),1)}}
+.to-top:focus-visible{outline:1.5px solid var(--accent);outline-offset:3px}
+@media (max-width:599px){.to-top{right:16px;bottom:calc(16px + env(safe-area-inset-bottom))}}
 .photo-header .section-toggle-icon{color:rgba(var(--ink-light-rgb),0.65)}
 
 .rebate{display:flex;align-items:center;gap:6px;margin-bottom:6px}
@@ -1215,6 +1226,8 @@ footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;b
   </div>
 </footer>
 
+<button class="to-top" id="toTop" type="button" aria-label="Back to top">↑</button>
+
 <div class="sheet-backdrop" id="sheetBackdrop" aria-hidden="true">
   <button class="sheet-close" id="sheetClose" aria-label="Close">&times;</button>
   <div class="sheet-panel" id="sheetPanel"></div>
@@ -1255,6 +1268,7 @@ window.cancelAnimationFrame = (id) => clearTimeout(id);
 import { Loupe } from './loupe.js';
 import { initCard } from './card.js';
 import { initHeroSurface } from './heroSurface.js';
+import { circleWithCrayon } from './crayonCircle.js';
 import { JOBS } from './jobs.js';
 import { initRadioWidget } from './radio.js';
 import { applyStoredTheme } from './theme.js';
@@ -1343,6 +1357,27 @@ initCollapsibleSection('photographyHeader', 'photographyPanel');
     window.addEventListener('resize', scheduleNavDarkUpdate);
     updateNavDark();
   }
+}
+
+// A red crayon loop around the Photography heading, in the hero trail's wax,
+// drawn the first time the heading scrolls into view.
+circleWithCrayon(document.querySelector('#photographyHeader span:first-child'), { color: '#df4931' });
+
+// Back to top: shown while the contact section or footer is on screen.
+{
+  const toTop = document.getElementById('toTop');
+  const ends = [document.getElementById('contact'), document.getElementById('siteFooter')].filter(Boolean);
+  const showing = new Set();
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => (e.isIntersecting ? showing.add(e.target) : showing.delete(e.target)));
+    toTop.classList.toggle('is-shown', showing.size > 0);
+  }, { threshold: 0.1 });
+  ends.forEach((el) => io.observe(el));
+  toTop.addEventListener('click', () => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+    toTop.blur();
+  });
 }
 
 const card = initCard(document.getElementById('card3d'));
