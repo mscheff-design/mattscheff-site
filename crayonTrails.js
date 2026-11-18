@@ -151,17 +151,49 @@ const EXTRA_DOODLES = [
     [.60,.09, .72,.12, .74,.20]
   ] }
 ];
+// Looser, more abstract gestures in the spirit of Cy Twombly's blackboard
+// paintings: few, large, leaning loops; lazy lines that double back; broad
+// crossing arcs. All drawn in the top band (placeInBand mirrors them into
+// the bottom one as needed). November 18, 2026: these replace the tighter,
+// curlier presets (coils, garland, spiral, cloud...) in the rotation.
+const TWOMBLY_DOODLES = [
+  { name: 'blackboard', start: [-.03,.22], curves: [
+    [.10,.02, .30,.04, .26,.16], [.22,.26, .12,.16, .30,.10], [.48,.04, .58,.06, .54,.18],
+    [.50,.28, .40,.14, .62,.10], [.80,.06, .92,.12, 1.04,.20]
+  ] },
+  { name: 'drift', start: [-.03,.12], curves: [
+    [.20,.24, .40,.02, .55,.14], [.66,.22, .70,.06, .60,.06], [.50,.06, .56,.24, .72,.20],
+    [.86,.17, .94,.08, 1.04,.06]
+  ] },
+  { name: 'scrawl', start: [.02,.20], curves: [
+    [.15,.10, .28,.22, .40,.12], [.50,.04, .44,.20, .58,.18], [.74,.16, .70,.04, .84,.06],
+    [.96,.08, .90,.22, 1.03,.24]
+  ] },
+  { name: 'leaning loops', start: [-.02,.24], curves: [
+    [.08,.04, .20,.02, .16,.14], [.12,.26, .30,.24, .34,.10], [.40,.00, .52,.04, .48,.16],
+    [.44,.27, .66,.25, .70,.10], [.76,.00, .86,.08, .82,.18], [.78,.27, .96,.22, 1.04,.14]
+  ] },
+  { name: 'erasure', start: [-.03,.06], curves: [
+    [.30,.30, .60,.00, .80,.16], [.90,.24, .60,.26, .40,.18], [.20,.10, .60,.02, 1.04,.12]
+  ] },
+  { name: 'line and loop', start: [-.03,.18], curves: [
+    [.25,.10, .45,.22, .62,.14], [.74,.08, .82,.02, .76,.00], [.66,-.02, .64,.16, .80,.20],
+    [.90,.22, .96,.16, 1.04,.12]
+  ] }
+];
+const CALM = new Set(['bottom wave', 'underline']);
+
 // The original red and yellow marks are zigzags: rapid back-and-forth
 // reversals that read as jagged even with rounded corners, so they're left
 // out of the rotation (kept above for reference). Colour no longer comes
 // from the shape, so all four crayons still appear.
 const JAGGED = new Set(['red', 'yellow']);
 // Only band shapes (ones that live above or below the card) go in the
-// rotation: each mark pairs two of them across the card (compositeDoodle),
+// rotation (now the Twombly set plus two calm lines): each mark pairs two of them across the card (compositeDoodle),
 // so every mark is equally long and loopy. Shapes that wrap the card on
 // their own (orbit, ribbon, swash, the original blue and green) left most
 // of their ink hidden behind it and read as short and abrupt.
-const DOODLE_SHAPES = [...MOBILE_DOODLES.filter(d => !JAGGED.has(d.name)), ...EXTRA_DOODLES].filter(f => bandOf(f));
+const DOODLE_SHAPES = [...TWOMBLY_DOODLES, ...EXTRA_DOODLES.filter(d => CALM.has(d.name))];
 // One even, unhurried hand for every mark (personalities were tried, 54f26a6;
 // the shaky ones read as jagged). Kept as a table so a variant could return.
 //   width/alpha: multipliers on the desktop stroke's width and opacity
@@ -214,9 +246,11 @@ function bandOf(form) {
 // A band shape re-expressed in paper coordinates, fitted to `target` band
 // (mirrored top-to-bottom first if it natively lives in the other one), at
 // full width, optionally mirrored left-to-right.
-function placeInBand(form, target, flipX) {
+function placeInBand(form, target, flipX, rand = Math.random) {
+  // Each point is nudged a little at random, so the same preset never draws
+  // exactly the same way twice: the forms stay recognisable but loose.
   const pts=[form.start, ...form.curves.flatMap(c=>[[c[0],c[1]],[c[2],c[3]],[c[4],c[5]]])]
-    .map(([x,y])=>[flipX ? 1-x : x, bandOf(form)===target ? y : 1.051-y]);
+    .map(([x,y])=>[(flipX ? 1-x : x)+(rand()-.5)*.06, (bandOf(form)===target ? y : 1.051-y)+(rand()-.5)*.045]);
   const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
   const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
   const band = target==='top' ? TOP_BAND : BOTTOM_BAND;
@@ -232,9 +266,9 @@ function placeInBand(form, target, flipX) {
 // band shape in the other, joined by a single sweep that runs down (or up)
 // the side of the screen past the card, so the stroke reads as one gesture
 // travelling around the card rather than staying in one section.
-function compositeDoodle(first, second, startTop, flipA, flipB) {
-  const a=placeInBand(first, startTop ? 'top' : 'bottom', flipA);
-  const b=placeInBand(second, startTop ? 'bottom' : 'top', flipB);
+function compositeDoodle(first, second, startTop, flipA, flipB, rand = Math.random) {
+  const a=placeInBand(first, startTop ? 'top' : 'bottom', flipA, rand);
+  const b=placeInBand(second, startTop ? 'bottom' : 'top', flipB, rand);
   const aEnd=a.curves[a.curves.length-1].slice(4,6), bStart=b.start;
   const edge = aEnd[0] < .5 ? -.07 : 1.07, dir = startTop ? 1 : -1;
   const join=[edge, aEnd[1]+dir*.18, edge, bStart[1]-dir*.18, bStart[0], bStart[1]];
@@ -755,7 +789,7 @@ export function mountCrayonTrails(hero, {
     if (!doodle.composite && bandOf(picked)) {
       const bands=DOODLE_SHAPES.filter(f=>bandOf(f) && f!==picked);
       const second=bands[Math.floor(random()*bands.length)];
-      doodle.composite=compositeDoodle(picked, second, random()<.5, random()<.5, random()<.5);
+      doodle.composite=compositeDoodle(picked, second, random()<.5, random()<.5, random()<.5, random);
     }
     const form = bandOf(picked) ? doodle.composite : picked;
     // Full desktop width (the authored widthScale made these thinner and
