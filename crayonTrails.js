@@ -29,7 +29,7 @@ export const CRAYON_DEFAULTS = {
   // along that retreat comes up, not the sweep's own length. Each mark then
   // dwells fully visible for doodleLoopSeconds before the cycle advances
   // again.
-  doodleUndrawSeconds: 1.2, doodleUndrawTailSeconds: .12, doodleLoopSeconds: 8
+  doodleUndrawSeconds: .75, doodleUndrawTailSeconds: .1, doodleLoopSeconds: 4.5
 };
 export function makeRandom(seed) {
   let n = seed >>> 0;
@@ -142,19 +142,42 @@ const EXTRA_DOODLES = [
 ];
 const DOODLE_SHAPES = [...MOBILE_DOODLES, ...EXTRA_DOODLES];
 // Each mark draws with a personality, picked at random independently of its
-// shape: how heavy the wax is, how fast the hand moves, how much the
-// pressure swells, and how steady the nib is.
-//   width/alpha: multipliers on the desktop stroke's width and opacity
+// shape: how fast the hand moves, how much the pressure swells, and how
+// steady the nib is. Weight is the same for all (the desktop stroke's).
+//   width/alpha: multipliers on the desktop stroke's width and opacity (1)
 //   duration:    the hand-drawn reveal, ms
 //   swell:       pressure swing along the stroke (thick-thin)
 //   jitter:      nib angle wobble, radians; wobble: sideways tremor, px
 const PERSONALITIES = {
-  loud:     { width: 1.32, alpha: 1.18, duration: 950,  swell: .10, jitter: .05, wobble: 0 },
-  minimal:  { width: .52,  alpha: .82,  duration: 1500, swell: .03, jitter: .02, wobble: 0 },
-  elegant:  { width: .86,  alpha: .95,  duration: 1850, swell: .24, jitter: .02, wobble: 0 },
-  furious:  { width: 1.06, alpha: 1.05, duration: 560,  swell: .14, jitter: .16, wobble: 1.6 }
+  loud:     { width: 1, alpha: 1, duration: 620,  swell: .10, jitter: .05, wobble: 0 },
+  minimal:  { width: 1, alpha: 1, duration: 950,  swell: .03, jitter: .02, wobble: 0 },
+  elegant:  { width: 1, alpha: 1, duration: 1150, swell: .16, jitter: .02, wobble: 0 },
+  furious:  { width: 1, alpha: 1, duration: 380,  swell: .12, jitter: .16, wobble: 1.6 }
 };
 const PERSONALITY_NAMES = Object.keys(PERSONALITIES);
+// Every mark should take up a comparable share of the screen: the small
+// presets (cloud, spiral, figure eight, the thin bands) read as timid next
+// to the big sweeps. Each shape is stretched about its own centre until its
+// bounding box (from its points and control points) is at least
+// FIT_MIN_W x FIT_MIN_H of the paper, never shrunk and at most 2.2x per
+// axis, then nudged back inside the paper if that pushed it off an edge.
+const FIT_MIN_W = .8, FIT_MIN_H = .34, FIT_MAX = 2.2;
+const shapeFits = new Map();
+function shapeFit(form) {
+  if (shapeFits.has(form)) return shapeFits.get(form);
+  const xs=[form.start[0]], ys=[form.start[1]];
+  for (const c of form.curves) for (let i=0;i<6;i+=2) { xs.push(c[i]); ys.push(c[i+1]); }
+  const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  const cx=(x0+x1)/2, cy=(y0+y1)/2;
+  const sx=Math.min(FIT_MAX, Math.max(1, FIT_MIN_W/Math.max(.01,x1-x0)));
+  const sy=Math.min(FIT_MAX, Math.max(1, FIT_MIN_H/Math.max(.01,y1-y0)));
+  const nx0=cx+(x0-cx)*sx, nx1=cx+(x1-cx)*sx, ny0=cy+(y0-cy)*sy, ny1=cy+(y1-cy)*sy;
+  const dx = nx0<-.05 ? -.05-nx0 : nx1>1.05 ? 1.05-nx1 : 0;
+  const dy = ny0<-.04 ? -.04-ny0 : ny1>1.04 ? 1.04-ny1 : 0;
+  const fit={cx,cy,sx,sy,dx,dy};
+  shapeFits.set(form, fit);
+  return fit;
+}
 // Touch marks advance on the doodle's timer (scroll triggering, 5b07c87,
 // was tried and set aside).
 const SCROLL_TRIGGERED = false;
@@ -681,7 +704,9 @@ export function mountCrayonTrails(hero, {
       : a+(b-a)*(v-refA)/(refB-refA);
     // Mirroring is about the reference card's own centre (x .5, y .5255), so
     // a flipped mark still wraps the card the same way.
+    const fit = shapeFit(form);
     const map = (x,y) => {
+      x=fit.cx+(x-fit.cx)*fit.sx+fit.dx; y=fit.cy+(y-fit.cy)*fit.sy+fit.dy;
       if (doodle.flipX) x=1-x;
       if (doodle.flipY) y=1.051-y;
       return { x:mapAxis(x,left,right,width,.108,.892), y:mapAxis(y,top,bottom,visibleH,.281,.770) };
