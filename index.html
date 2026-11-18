@@ -254,6 +254,20 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 @media (hover:hover){
 .project-row:hover .row-cta-arrow{transform:translateX(3px)}
 }
+.row-tag span{display:block}
+/* Phones: the desktop row (number | body | right-hand tag column) left the
+   title and excerpt a ~100px column on a 375px screen, wrapping nearly every
+   word. Here the tag column drops below the body as one wrapped line, so the
+   title and excerpt get the row's full width. Paired with the narrower
+   section gutters further down. */
+@media (max-width:599px){
+  .project-row{flex-wrap:wrap;gap:0 12px;padding:22px 0 20px}
+  .row-num{width:22px}
+  .row-tag{order:3;flex-basis:100%;max-width:none;text-align:left;line-height:1.7;padding:12px 0 0 34px}
+  .row-tag span{display:inline}
+  .row-tag span + span::before{content:'·';margin:0 6px;color:rgba(var(--ink-rgb),0.2)}
+  .row-excerpt{max-width:none}
+}
 
 /* Additional credits — roles that don't warrant their own case study
    (see JOBS/case-studies/*), listed underneath the case-study rows
@@ -592,7 +606,7 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
      discrepancy of this kind for it to ever have. Confirmed via the same
      simulation: zero page overflow this way, with .contact-sheet's own
      rect landing exactly on clientWidth's edges. */
-  .contact-sheet{margin:0 -48px;padding:12px 0;border-left:none;border-right:none}
+  .contact-sheet{margin:0 -20px;padding:12px 0;border-left:none;border-right:none}
   /* Master grid becomes a one-at-a-time carousel on phones, each project
      sized under 100% so the next one peeks in from the right edge —
      signals there's more to swipe to without extra dot-indicator chrome.
@@ -654,6 +668,18 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .contact-email{font-family:var(--font-display);font-size:clamp(24px,4vw,40px);font-weight:700;letter-spacing:-0.01em;color:rgba(var(--ink-light-rgb),0.92);text-decoration:none;transition:color 0.2s}
 .contact-email:hover{color:var(--accent)}
 footer{position:relative;z-index:1;background:var(--bg-dark);padding:28px 48px;border-top:0.5px solid rgba(var(--ink-light-rgb),0.08);display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 24px}
+/* Phones: the desktop 48px side gutters took a quarter of a 375px screen.
+   20px matches the editorial pages' mobile gutter. .contact-sheet's
+   full-bleed margin (in the 599px block above) cancels this same value. */
+@media (max-width:599px){
+  .work,.education-section,.skills-section,.photo-section{padding-left:20px;padding-right:20px}
+  footer{padding:24px 20px}
+  .section-header,.photo-header{gap:12px}
+  /* Short date ranges stay on one line; Skills' long list still wraps. */
+  #workHeader span:nth-child(2),#educationHeader span:nth-child(2){white-space:nowrap}
+  .section-header span:nth-child(2),.photo-header span:nth-child(2){font-size:8px}
+  .section-header .section-toggle-icon,.photo-header .section-toggle-icon{font-size:44px;width:36px;height:36px}
+}
 .footer-left{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-light-rgb),0.2);letter-spacing:0.08em}
 .footer-links{display:flex;gap:24px}
 .footer-links a{font-family:var(--font-mono);font-size:9px;color:rgba(var(--ink-light-rgb),0.25);letter-spacing:0.08em;text-decoration:none;transition:color 0.2s}
@@ -1653,7 +1679,7 @@ JOBS.forEach((job, i) => {
       ${job.caseStudyUrl && job.excerpt ? `<p class="row-excerpt">${job.excerpt}</p>` : ''}
       ${job.caseStudyUrl ? `<span class="row-cta">Read more<span class="row-cta-arrow" aria-hidden="true">→</span></span>` : ''}
     </div>
-    <div class="row-tag">${job.tags.join('<br>')}</div>
+    <div class="row-tag">${job.tags.map((t) => `<span>${t}</span>`).join('')}</div>
     <span class="row-arrow">→</span>
   `;
   workProjectsEl.appendChild(row);

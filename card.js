@@ -376,12 +376,21 @@ const BACK_FORM_HEIGHT = (BACK_CONTENT_BOTTOM_F - BACK_FORM_TOP_F) * BASE_CARD_H
 const BACK_FORM_LOCAL_Y = CARD_HEIGHT / 2 - BACK_FORM_CENTER_F * BASE_CARD_HEIGHT;
 
 const ROWS_TOP_F = TOGGLE_BAND_BOTTOM_F;
-const ROW_HEIGHT_F = 0.155;
+// Touch (portrait card): rows are stacked, not side by side. The landscape
+// row (role left, dates right, tags beneath, all on one line each, sized so
+// the longest role fits) shrank every role to ~5 CSS px on a 375px phone.
+// There, the role gets its own line(s) at a fixed readable size, wrapping
+// to two if needed, with company · dates beneath, so each row is taller.
+const ROW_HEIGHT_F = isTouchDevice ? 0.165 : 0.155;
 const ROWS_BOTTOM_F = ROWS_TOP_F + JOBS.length * ROW_HEIGHT_F;
+// The combined tag cloud is dropped on touch: at portrait width it could
+// only fit as two lines of unreadably small type, and the same tags appear
+// in full in Selected Work just below the card.
+const SHOW_TAGCLOUD = !isTouchDevice;
 const TAGCLOUD_TOP_F = ROWS_BOTTOM_F + 0.05;
 const TAGCLOUD_LINE_GAP_F = 0.034;
 const TAGCLOUD_BOTTOM_F = TAGCLOUD_TOP_F + TAGCLOUD_LINE_GAP_F;
-const DOWNLOAD_BAND_TOP_F = TAGCLOUD_BOTTOM_F + 0.05;
+const DOWNLOAD_BAND_TOP_F = SHOW_TAGCLOUD ? TAGCLOUD_BOTTOM_F + 0.05 : ROWS_BOTTOM_F + 0.01;
 const DOWNLOAD_LABEL_F = DOWNLOAD_BAND_TOP_F + 0.055;
 const DOWNLOAD_BAND_BOTTOM_F = DOWNLOAD_BAND_TOP_F + 0.11;
 const TAB_CONTENT_BOTTOM_F = DOWNLOAD_BAND_BOTTOM_F + 0.05;
@@ -1147,6 +1156,67 @@ export function initCard(container) {
   // hand. The *_F constants are already authored as fractions of the
   // FULL open-silhouette height (see their own comment above), so both
   // regions draw straight from them with no rebasing.
+  // Touch-only résumé rows (see ROW_HEIGHT_F): role at a fixed readable
+  // size, wrapped to at most two lines across the full width, then
+  // "COMPANY · DATES" in tracked mono beneath, with the case-study arrow at
+  // the right of that meta line and a hairline under the row.
+  function wrapWords(ctx, text, maxW) {
+    const words = text.split(' ');
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const next = line ? `${line} ${word}` : word;
+      if (line && ctx.measureText(next).width > maxW) { lines.push(line); line = word; } else line = next;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  function drawStackedRows(ctx, w, bh, pad) {
+    const fullW = w - pad * 2;
+    const roleLineF = 0.044;
+    const rowArrowPx = Math.round(bh * 0.032);
+    const rowArrowGutter = rowArrowPx * 1.9;
+    // One role size for every row, shrunk only if some role would need more
+    // than two lines at the base size.
+    let rolePx = Math.round(bh * 0.037);
+    for (;;) {
+      ctx.font = `500 ${rolePx}px ${FONT_DISPLAY}`;
+      if (JOBS.every(job => wrapWords(ctx, job.role, fullW).length <= 2) || rolePx <= 24) break;
+      rolePx -= 1;
+    }
+    const metaTexts = JOBS.map(job => `${job.name} · ${job.dates}`.toUpperCase());
+    const metaPx = fitTrackedSize(ctx, metaTexts, fullW - rowArrowGutter, Math.round(bh * 0.024), 1.1);
+
+    JOBS.forEach((job, i) => {
+      const rowTopF = ROWS_TOP_F + i * ROW_HEIGHT_F;
+      ctx.font = `500 ${rolePx}px ${FONT_DISPLAY}`;
+      ctx.fillStyle = ink(0.88);
+      ctx.textAlign = 'left';
+      const lines = wrapWords(ctx, job.role, fullW).slice(0, 2);
+      // Single-line roles sit centred in the row's two-line allowance.
+      const firstF = rowTopF + 0.055 + (2 - lines.length) * roleLineF / 2;
+      lines.forEach((ln, k) => ctx.fillText(ln, pad, bh * (firstF + k * roleLineF)));
+      const metaF = firstF + (lines.length - 1) * roleLineF + 0.04;
+      drawTracked(ctx, metaTexts[i], pad, bh * metaF, metaPx, ink(0.42), 1.1);
+      if (job.caseStudyUrl) {
+        ctx.save();
+        ctx.font = `400 ${rowArrowPx}px ${FONT_MONO}`;
+        ctx.fillStyle = ink(0.45);
+        ctx.textAlign = 'right';
+        ctx.fillText('→', w - pad, bh * (metaF + 0.003));
+        ctx.restore();
+      }
+      ctx.save();
+      ctx.strokeStyle = ink(0.1);
+      ctx.lineWidth = Math.max(1, bh * 0.0015);
+      ctx.beginPath();
+      ctx.moveTo(pad, bh * (rowTopF + ROW_HEIGHT_F - 0.012));
+      ctx.lineTo(w - pad, bh * (rowTopF + ROW_HEIGHT_F - 0.012));
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
   function drawFront() {
     const ctx = frontCanvas.getContext('2d');
     const w = TEX_W, h = UNIFIED_TEX_H, bh = TEX_BASE_PX;
@@ -1202,6 +1272,9 @@ export function initCard(container) {
     // Using the smallest size any row actually needs, for every row,
     // fixes that — the tradeoff is a little spare width on shorter roles,
     // which reads far better than mismatched sizes.
+    if (isTouchDevice) {
+      drawStackedRows(ctx, w, bh, pad);
+    } else {
     const rolePx = Math.min(...JOBS.map(job => {
       // fitTextSize leaves ctx.font set to its own (display-font) result
       // on the way out — reset to the mono dates font on every iteration,
@@ -1275,6 +1348,9 @@ export function initCard(container) {
       ctx.restore();
     });
 
+    }
+
+    if (SHOW_TAGCLOUD) {
     const allTags = Array.from(new Set(JOBS.flatMap(j => j.tags)));
     const half = Math.ceil(allTags.length / 2);
     const line1 = allTags.slice(0, half).join(' · ');
@@ -1289,10 +1365,11 @@ export function initCard(container) {
     const tagCloudPx = fitTrackedSize(ctx, [line1, line2], w - pad * 2, Math.round(bh * 0.021), 1);
     drawTracked(ctx, line1, pad, bh * TAGCLOUD_TOP_F, tagCloudPx, ink(0.3), 1);
     drawTracked(ctx, line2, pad, bh * TAGCLOUD_BOTTOM_F, tagCloudPx, ink(0.3), 1);
+    }
 
     const downloadText = 'DOWNLOAD RÉSUMÉ (PDF) →';
     const downloadSize = fitTextSize(
-      ctx, [downloadText], w - pad * 2, Math.round(bh * 0.027),
+      ctx, [downloadText], w - pad * 2, Math.round(bh * (isTouchDevice ? 0.03 : 0.027)),
       (px) => `400 ${px}px ${FONT_MONO}`
     );
     ctx.font = `400 ${downloadSize}px ${FONT_MONO}`;
