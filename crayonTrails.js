@@ -136,6 +136,15 @@ const EXTRA_DOODLES = [
     [.15,.78, .32,.80, .30,.90], [.28,.99, .18,.95, .24,.86], [.32,.76, .62,.80, .62,.90],
     [.62,.99, .52,.96, .58,.86], [.66,.76, .92,.82, 1.03,.88]
   ] },
+  { name: 'garland', start: [-.02,.82], curves: [
+    [.06,.98, .16,.98, .20,.84], [.22,.76, .14,.76, .16,.84], [.20,.98, .34,.98, .40,.84],
+    [.42,.76, .34,.76, .36,.84], [.40,.98, .54,.98, .60,.84], [.62,.76, .54,.76, .56,.84],
+    [.60,.98, .74,.98, .80,.84], [.82,.76, .74,.76, .76,.84], [.80,.98, .95,.98, 1.03,.86]
+  ] },
+  { name: 'tendril', start: [-.02,.18], curves: [
+    [.10,.02, .25,.30, .33,.16], [.38,.07, .30,.02, .27,.10], [.24,.20, .45,.26, .55,.14],
+    [.62,.06, .56,.00, .52,.07], [.48,.16, .72,.24, .84,.12], [.90,.06, .95,.08, 1.03,.14]
+  ] },
   { name: 'cloud', start: [.30,.20], curves: [
     [.30,.12, .40,.10, .42,.16], [.44,.22, .36,.22, .38,.16], [.40,.08, .52,.08, .52,.15],
     [.52,.22, .44,.21, .47,.14], [.50,.07, .62,.08, .62,.15], [.62,.21, .55,.22, .57,.16],
@@ -147,7 +156,12 @@ const EXTRA_DOODLES = [
 // out of the rotation (kept above for reference). Colour no longer comes
 // from the shape, so all four crayons still appear.
 const JAGGED = new Set(['red', 'yellow']);
-const DOODLE_SHAPES = [...MOBILE_DOODLES.filter(d => !JAGGED.has(d.name)), ...EXTRA_DOODLES];
+// Only band shapes (ones that live above or below the card) go in the
+// rotation: each mark pairs two of them across the card (compositeDoodle),
+// so every mark is equally long and loopy. Shapes that wrap the card on
+// their own (orbit, ribbon, swash, the original blue and green) left most
+// of their ink hidden behind it and read as short and abrupt.
+const DOODLE_SHAPES = [...MOBILE_DOODLES.filter(d => !JAGGED.has(d.name)), ...EXTRA_DOODLES].filter(f => bandOf(f));
 // One even, unhurried hand for every mark (personalities were tried, 54f26a6;
 // the shaky ones read as jagged). Kept as a table so a variant could return.
 //   width/alpha: multipliers on the desktop stroke's width and opacity
