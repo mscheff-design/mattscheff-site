@@ -42,7 +42,7 @@ function makeTooth(random) {
   return c;
 }
 
-export function circleWithCrayon(span, { color = '#df4931', width = 13, opacity = .62, padX = 72, padY = 44, duration = 1250 } = {}) {
+export function circleWithCrayon(span, { color = '#df4931', width = 14, opacity = .8, padX = 88, padY = 56, duration = 1250 } = {}) {
   if (!span) return null;
   const host = span.parentElement;
   if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
@@ -87,11 +87,13 @@ export function circleWithCrayon(span, { color = '#df4931', width = 13, opacity 
 
     // The loop: an ellipse just outside the text with a gentle wobble, a
     // slight tilt, and a radius that creeps outward over the final stretch.
-    // Horizontal reach past the text: 20px, less where the heading sits near
+    // Horizontal reach past the text: 30px, less where the heading sits near
     // the screen edge (phones), so the loop's outer edge stays on screen.
-    const extX = Math.max(8, Math.min(20, sr.left - 9));
-    const grow = shape.grow * extX / 20;
-    const cx = w / 2, cy = h / 2, rx = sr.width / 2 + extX, ry = sr.height / 2 + 13;
+    const extX = Math.max(8, Math.min(30, sr.left - 9));
+    const grow = shape.grow * extX / 30;
+    // Sat a few px low: the heading is close to the top of its dark section,
+    // and the loop's lifting flick shouldn't spill over that edge.
+    const cx = w / 2, cy = h / 2 + 4, rx = sr.width / 2 + extX, ry = sr.height / 2 + 19;
     const total = shape.turns * Math.PI * 2, steps = 520;
     const pts = [];
     for (let i = 0; i <= steps; i++) {
