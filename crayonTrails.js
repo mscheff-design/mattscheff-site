@@ -141,18 +141,14 @@ const EXTRA_DOODLES = [
   ] }
 ];
 const DOODLE_SHAPES = [...MOBILE_DOODLES, ...EXTRA_DOODLES];
-// Each mark draws with a personality, picked at random independently of its
-// shape: how fast the hand moves, how much the pressure swells, and how
-// steady the nib is. Weight is the same for all (the desktop stroke's).
-//   width/alpha: multipliers on the desktop stroke's width and opacity (1)
+// One even, unhurried hand for every mark (personalities were tried, 54f26a6;
+// the shaky ones read as jagged). Kept as a table so a variant could return.
+//   width/alpha: multipliers on the desktop stroke's width and opacity
 //   duration:    the hand-drawn reveal, ms
-//   swell:       pressure swing along the stroke (thick-thin)
+//   swell:       pressure swing along the stroke
 //   jitter:      nib angle wobble, radians; wobble: sideways tremor, px
 const PERSONALITIES = {
-  loud:     { width: 1, alpha: 1, duration: 620,  swell: .10, jitter: .05, wobble: 0 },
-  minimal:  { width: 1, alpha: 1, duration: 950,  swell: .03, jitter: .02, wobble: 0 },
-  elegant:  { width: 1, alpha: 1, duration: 1150, swell: .16, jitter: .02, wobble: 0 },
-  furious:  { width: 1, alpha: 1, duration: 380,  swell: .12, jitter: .16, wobble: 1.6 }
+  steady: { width: 1, alpha: 1, duration: 820, swell: .07, jitter: .02, wobble: 0 }
 };
 const PERSONALITY_NAMES = Object.keys(PERSONALITIES);
 // Every mark should take up a comparable share of the screen: the small
@@ -659,9 +655,11 @@ export function mountCrayonTrails(hero, {
     let v=doodle.variant;
     if (DOODLE_SHAPES.length>1) while (v===doodle.variant) v=Math.floor(random()*DOODLE_SHAPES.length);
     doodle.variant=v; doodle.flipX=random()<.5; doodle.flipY=random()<.5;
-    let p=doodle.personality;
-    while (p===doodle.personality) p=PERSONALITY_NAMES[Math.floor(random()*PERSONALITY_NAMES.length)];
-    doodle.personality=p;
+    if (PERSONALITY_NAMES.length>1) {
+      let p=doodle.personality;
+      while (p===doodle.personality) p=PERSONALITY_NAMES[Math.floor(random()*PERSONALITY_NAMES.length)];
+      doodle.personality=p;
+    } else doodle.personality=PERSONALITY_NAMES[0];
   }
   // A burst of scrolling while the hero is on screen draws the next mark,
   // once the current one has finished drawing and had a moment on the page.
@@ -723,6 +721,26 @@ export function mountCrayonTrails(hero, {
           y:u*u*u*a.y+3*u*u*t*b.y+3*u*t*t*c.y+t*t*t*d.y });
       }
       previous=d;
+    }
+    // Round every corner. The authored beziers meet at hard joins in places
+    // (the zigzags especially), which the desktop trail never shows because
+    // its pen chases the cursor on a leash. Same idea here: resample to even
+    // 3px steps, then run a forward and a backward exponential smoothing
+    // pass (zero lag overall), which turns any corner into an arc of roughly
+    // 20px radius while leaving gentle curves essentially untouched.
+    {
+      const even=[raw[0]]; let carry=0;
+      for (let i=1;i<raw.length;i++) {
+        const a=raw[i-1], b=raw[i], len=Math.hypot(b.x-a.x,b.y-a.y);
+        let d=3-carry;
+        while (d<=len) { const t=d/len; even.push({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t}); d+=3; }
+        carry=len-(d-3);
+      }
+      even.push(raw[raw.length-1]);
+      const k=.14;
+      for (let i=1;i<even.length;i++) { even[i]={x:even[i-1].x+(even[i].x-even[i-1].x)*k, y:even[i-1].y+(even[i].y-even[i-1].y)*k}; }
+      for (let i=even.length-2;i>=0;i--) { even[i]={x:even[i+1].x+(even[i].x-even[i+1].x)*k, y:even[i+1].y+(even[i].y-even[i+1].y)*k}; }
+      raw.length=0; raw.push(...even);
     }
     // Resample by distance, carrying the leftover between segments. Never
     // stamp just the segment endpoints (the earlier disconnected-dot bug).
