@@ -105,12 +105,17 @@ export function mountCrayonTrails(hero, {
   if (!ctx) { canvas.remove(); throw new Error('2D canvas is unavailable.'); }
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const fine = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
-  let enabled = !isTouchDevice && fine.matches && !motion.matches;
+  // Touch draws with a finger (a stroke that starts sideways on the paper;
+  // vertical swipes still scroll, see card.js's TOUCH_IDLE_ACTION). It's
+  // entirely user-driven, so reduced-motion doesn't switch it off.
+  let enabled = isTouchDevice ? true : (fine.matches && !motion.matches);
   let disposed = false, visible = true, paused = false;
   let width = 1, height = 1, dpr = 1, raf = 0, fadeTimer = 0, loopTimer = 0;
   let previous = null, smooth = null, traveled = 0, phase = 0, smoothAngle = null;
   let stamps = [], density = new Map();
-  const doodle = isTouchDevice ? {
+  // The self-drawing touch doodle is retired in favour of finger drawing;
+  // its code stays below (inert while this is null) in case it comes back.
+  const doodle = false ? {
     path: null, emitted: 0, progress: 0, elapsed: 0, lastTime: null,
     frame: 0, complete: false, dismissed: false, measuredWidth: 0, delay: 300,
     variant: Math.max(0, CRAYON_COLORS.indexOf(chosenColor))
@@ -245,7 +250,11 @@ export function mountCrayonTrails(hero, {
     wakeDoodle();
   }
   function move(event) {
-    if (!enabled || !visible || paused || document.hidden || event.pointerType==='touch' || event.buttons || isBusy()) {breakStroke();return;}
+    const touch=event.pointerType==='touch';
+    // Mouse/pen: hover draws, a held button doesn't. Touch: only a finger
+    // that's down draws, and never a stroke that began on the card itself
+    // (that touch belongs to the card's tap-to-flip).
+    if (!enabled || !visible || paused || document.hidden || isBusy() || (touch ? (!isTouchDevice || touchOnCard) : event.buttons)) {breakStroke();return;}
     const target=event.target;
     if (target?.closest?.('a,button,input,textarea,select,[data-crayon-ignore]')) {breakStroke();return;}
     const rect=surface.getBoundingClientRect();
@@ -368,6 +377,13 @@ export function mountCrayonTrails(hero, {
   };
   const visibility=()=>{breakStroke();if(document.hidden)cancelWork();else {schedule();wakeDoodle();scheduleLoop();}};
   const scroll=()=>breakStroke();
+  let touchOnCard=false;
+  function down(event) {
+    breakStroke();
+    if (event.pointerType!=='touch') return;
+    const r=getCardScreenRect();
+    touchOnCard=!!(r && insideRect(event.clientX,event.clientY,r,4));
+  }
   // window/documentElement, not hero — nav is a DOM SIBLING of hero, not a
   // descendant, so a listener on hero itself never sees pointer events
   // whose target is inside nav (they bubble through nav's own ancestor
@@ -378,7 +394,9 @@ export function mountCrayonTrails(hero, {
   // listening this broadly doesn't risk drawing outside it.
   window.addEventListener('pointermove',move,{passive:true});
   document.documentElement.addEventListener('pointerleave',breakStroke,{passive:true});
-  window.addEventListener('pointerdown',breakStroke,{passive:true});
+  window.addEventListener('pointerdown',down,{passive:true});
+  window.addEventListener('pointerup',breakStroke,{passive:true});
+  window.addEventListener('pointercancel',breakStroke,{passive:true});
   window.addEventListener('scroll',scroll,{passive:true,capture:true});
   document.addEventListener('visibilitychange',visibility);
   motion.addEventListener('change',preferences); fine.addEventListener('change',preferences);
@@ -606,7 +624,7 @@ export function mountCrayonTrails(hero, {
     get markCount(){return stamps.length;},
     destroy(){
       if(disposed)return;disposed=true;cancelWork();
-      window.removeEventListener('pointermove',move);document.documentElement.removeEventListener('pointerleave',breakStroke);window.removeEventListener('pointerdown',breakStroke);
+      window.removeEventListener('pointermove',move);document.documentElement.removeEventListener('pointerleave',breakStroke);window.removeEventListener('pointerdown',down);window.removeEventListener('pointerup',breakStroke);window.removeEventListener('pointercancel',breakStroke);
       window.removeEventListener('scroll',scroll,true);document.removeEventListener('visibilitychange',visibility);
       motion.removeEventListener('change',preferences);fine.removeEventListener('change',preferences);toggle?.removeEventListener('click',toggleClick);
       sizeObserver.disconnect();intersection.disconnect();canvas.remove();stamps=[];density.clear();

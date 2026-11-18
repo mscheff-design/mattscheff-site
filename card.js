@@ -321,10 +321,14 @@ const RESUME_PDF_PATH = 'assets/matthew-scheffler-resume.pdf';
 // deliberately larger gap before YEAR_Y_F (unchanged, still pinned near
 // TOGGLE_BAND_TOP_F either way) instead, which the dashed divider there
 // already marks as a real section break, not leftover space.
-const NAME_FIRST_Y_F = isTouchDevice ? 0.32 : 0.42;
-const NAME_LAST_Y_F = isTouchDevice ? 0.47 : 0.6;
-const TITLE_LINE1_Y_F = isTouchDevice ? 0.62 : 0.75;
-const TITLE_LINE2_Y_F = isTouchDevice ? 0.68 : 0.82;
+// Portrait (touch) is composed as two groups rather than one block with
+// leftover space beneath it: the name anchors the top, and the title sits
+// down with the year as the card's footer, the way a printed portrait card
+// splits its weight between head and foot.
+const NAME_FIRST_Y_F = isTouchDevice ? 0.27 : 0.42;
+const NAME_LAST_Y_F = isTouchDevice ? 0.42 : 0.6;
+const TITLE_LINE1_Y_F = isTouchDevice ? 0.775 : 0.75;
+const TITLE_LINE2_Y_F = isTouchDevice ? 0.835 : 0.82;
 const YEAR_Y_F = 0.93;
 
 // Résumé/tab layout, expressed as fractions of BASE_CARD_HEIGHT measured
@@ -2133,7 +2137,12 @@ export function initCard(container) {
   // still lets the card's own drag gesture (both axes; a phone has no
   // hover to fall back on, only this) fully win over native scrolling
   // exactly like before, without claiming the rest of the hero too.
-  interactionRoot.style.touchAction = 'auto';
+  // Touch: 'pan-y' rather than 'auto' off the card, so a vertical swipe
+  // still scrolls the page but a gesture that starts sideways stays with
+  // the page's own pointer events, which is what lets a finger draw crayon
+  // marks on the paper around the card (see crayonTrails.js's move()).
+  const TOUCH_IDLE_ACTION = isTouchDevice ? 'pan-y pinch-zoom' : 'auto';
+  interactionRoot.style.touchAction = TOUCH_IDLE_ACTION;
 
   interactionRoot.addEventListener('pointerdown', (e) => {
     if (mode !== 'idle' || flipping || physicsSuspended) return;
@@ -2155,7 +2164,7 @@ export function initCard(container) {
     // isn't load-bearing, just avoids writing a style that can't do
     // anything on desktop.
     if (e.pointerType === 'touch') {
-      interactionRoot.style.touchAction = pointerDownOnCard ? 'none' : 'auto';
+      interactionRoot.style.touchAction = pointerDownOnCard ? 'none' : TOUCH_IDLE_ACTION;
     }
     // Nothing in the page marks any of its own text unselectable, and a
     // drag can legitimately sweep well outside the card itself — up past
@@ -2232,7 +2241,7 @@ export function initCard(container) {
     potentialDrag = false;
     document.body.style.userSelect = '';
     document.body.style.webkitUserSelect = '';
-    interactionRoot.style.touchAction = 'auto';
+    interactionRoot.style.touchAction = TOUCH_IDLE_ACTION;
   });
 
   // A touch sequence can end without ever reaching pointerup — the OS
@@ -2251,7 +2260,7 @@ export function initCard(container) {
     potentialDrag = false;
     document.body.style.userSelect = '';
     document.body.style.webkitUserSelect = '';
-    interactionRoot.style.touchAction = 'auto';
+    interactionRoot.style.touchAction = TOUCH_IDLE_ACTION;
   });
 
   interactionRoot.addEventListener('pointerleave', () => {
