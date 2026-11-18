@@ -105,15 +105,17 @@ export function mountCrayonTrails(hero, {
   if (!ctx) { canvas.remove(); throw new Error('2D canvas is unavailable.'); }
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const fine = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
-  let enabled = !isTouchDevice && fine.matches && !motion.matches;
+  // Touch: on, for the scroll pen (user-driven, so reduced motion doesn't
+  // switch it off). Desktop: the hover trail, as before.
+  let enabled = isTouchDevice ? true : (fine.matches && !motion.matches);
   let disposed = false, visible = true, paused = false;
   let width = 1, height = 1, dpr = 1, raf = 0, fadeTimer = 0, loopTimer = 0;
   let previous = null, smooth = null, traveled = 0, phase = 0, smoothAngle = null;
   let stamps = [], density = new Map();
-  // Touch: the self-drawing doodle (authored marks around the card, drawn,
-  // held, undrawn, next colour), now stamped in the desktop stroke's look
-  // (see composeDoodle).
-  const doodle = isTouchDevice ? {
+  // The self-drawing touch doodle (a42e4bf) is parked while scrolling draws
+  // instead (see the scroll pen below); its code stays inert while this is
+  // null.
+  const doodle = false ? {
     path: null, emitted: 0, progress: 0, elapsed: 0, lastTime: null,
     frame: 0, complete: false, dismissed: false, measuredWidth: 0, delay: 300,
     variant: Math.max(0, CRAYON_COLORS.indexOf(chosenColor))
@@ -376,12 +378,12 @@ export function mountCrayonTrails(hero, {
   const toggleClick=()=>doodle ? switchDoodle() : cycleColor();
   const preferences=()=>{
     if (doodle) { if (motion.matches) finishDoodle(); else {wakeDoodle();scheduleLoop();} }
-    else setEnabled(fine.matches&&!motion.matches);
+    else if (!isTouchDevice) setEnabled(fine.matches&&!motion.matches);
   };
   const visibility=()=>{breakStroke();if(document.hidden)cancelWork();else {schedule();wakeDoodle();scheduleLoop();}};
   // The autopilot draws in canvas px, so scrolling or tapping mid-stroke
   // doesn't disturb it; only real-cursor strokes break on those.
-  const scroll=()=>{ if (!auto.active) breakStroke(); };
+  const scroll=()=>{ if (isTouchDevice) penScroll(); else if (!auto.active) breakStroke(); };
   function down() { if (!auto.active) breakStroke(); }
   // window/documentElement, not hero — nav is a DOM SIBLING of hero, not a
   // descendant, so a listener on hero itself never sees pointer events
@@ -407,6 +409,82 @@ export function mountCrayonTrails(hero, {
   wakeDoodle();
   // scheduleAuto(700);  // touch autopilot (ed5220c), parked in favour of the doodle
 
+
+
+  // ---- Touch scroll pen -------------------------------------------------
+  // On a phone, scrolling is the one continuous, physical motion the reader
+  // makes, so it drives the crayon: each scroll moves a virtual pen across
+  // the visible paper by an amount proportional to how far the page moved,
+  // fed through the same strokeTo() pipeline as the desktop cursor (so the
+  // line has the identical round, waxy hand). A flick draws a long sweep, a
+  // nudge a short mark, and a pause ends the stroke. The pen's turning is a
+  // function of distance travelled (two slow sines, random phase), so the
+  // path's shape doesn't depend on scroll speed, only its pace does. Soft
+  // walls keep it on the part of the paper that's actually on screen, and it
+  // may pass behind the card.
+  const pen = { x:null, y:null, heading:0, dist:0, pending:0, lastY:window.scrollY, frame:0, lastFeed:0 };
+  function penSeed(top, bottom) {
+    const rect=surface.getBoundingClientRect();
+    const card=getCardScreenRect();
+    const cr=card ? { l:card.left-rect.left, t:card.top-rect.top, r:card.right-rect.left, b:card.bottom-rect.top } : null;
+    for (let i=0;i<14;i++) {
+      pen.x=width*(.08+random()*.84); pen.y=top+(bottom-top)*random();
+      if (!cr || !(pen.x>cr.l-10 && pen.x<cr.r+10 && pen.y>cr.t-10 && pen.y<cr.b+10)) break;
+    }
+    pen.heading=random()*Math.PI*2;
+    Object.assign(pen, { a1:.006+random()*.009, w1:.004+random()*.006, p1:random()*6.3,
+      a2:.003+random()*.006, w2:.011+random()*.012, p2:random()*6.3 });
+  }
+  function penScroll() {
+    const y=window.scrollY, delta=y-pen.lastY;
+    pen.lastY=y;
+    if (!enabled || !visible || paused || document.hidden || isBusy()) return;
+    pen.pending+=Math.min(160, Math.abs(delta));
+    if (!pen.frame) pen.frame=requestAnimationFrame(penStep);
+  }
+  function penStep(now) {
+    pen.frame=0;
+    const rect=surface.getBoundingClientRect();
+    // The paper actually on screen, in canvas px, below the nav.
+    const top=Math.max(0,-rect.top)+Math.max(0,64-Math.max(0,rect.top));
+    const bottom=Math.min(rect.height, window.innerHeight-rect.top)-10;
+    if (bottom-top<110 || !rect.width) { pen.pending=0; breakStroke(); return; }
+    // A pause in scrolling ends the stroke; the next one starts fresh from
+    // where the pen is (or a new spot, if that's scrolled off).
+    if (now-pen.lastFeed>320) {
+      breakStroke();
+      if (pen.x===null || pen.y<top || pen.y>bottom) penSeed(top, bottom);
+    }
+    const d=Math.min(pen.pending*.65, 30);
+    pen.pending=Math.max(0, pen.pending-d/.65);
+    if (d<.5) return;
+    const card=getCardScreenRect();
+    const cr=card ? { l:card.left-rect.left, t:card.top-rect.top, r:card.right-rect.left, b:card.bottom-rect.top } : null;
+    const sub=Math.ceil(d/6);
+    for (let i=0;i<sub;i++) {
+      const step=d/sub;
+      pen.dist+=step;
+      pen.heading+=(pen.a1*Math.sin(pen.dist*pen.w1+pen.p1)+pen.a2*Math.sin(pen.dist*pen.w2+pen.p2))*step;
+      const m=30, cx=width/2, cy=(top+bottom)/2;
+      if (pen.x<m || pen.x>width-m || pen.y<top+m || pen.y>bottom-m) {
+        const want=Math.atan2(cy-pen.y, cx-pen.x);
+        let dd=want-pen.heading; dd=((dd+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+        pen.heading+=dd*.08;
+      }
+      // Behind the card the marks are hidden, so it can cross under it but
+      // is eased back out toward the nearest edge rather than lingering.
+      if (cr && pen.x>cr.l && pen.x<cr.r && pen.y>cr.t && pen.y<cr.b) {
+        const exits=[[pen.x-cr.l,Math.PI],[cr.r-pen.x,0],[pen.y-cr.t,-Math.PI/2],[cr.b-pen.y,Math.PI/2]];
+        exits.sort((p,q)=>p[0]-q[0]);
+        let dd=exits[0][1]-pen.heading; dd=((dd+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+        pen.heading+=dd*.05;
+      }
+      pen.x+=Math.cos(pen.heading)*step; pen.y+=Math.sin(pen.heading)*step;
+    }
+    strokeTo(pen.x, pen.y, now, rect);
+    pen.lastFeed=now;
+    if (pen.pending>.5) pen.frame=requestAnimationFrame(penStep);
+  }
 
   // ---- Touch autopilot --------------------------------------------------
   // A phone has no cursor to draw with, so on touch a virtual one wanders the
@@ -704,7 +782,7 @@ export function mountCrayonTrails(hero, {
     get enabled(){return enabled;},
     get markCount(){return stamps.length;},
     destroy(){
-      if(disposed)return;disposed=true;cancelWork();clearTimeout(auto.timer);if(auto.frame)cancelAnimationFrame(auto.frame);
+      if(disposed)return;disposed=true;cancelWork();if(pen.frame)cancelAnimationFrame(pen.frame);clearTimeout(auto.timer);if(auto.frame)cancelAnimationFrame(auto.frame);
       window.removeEventListener('pointermove',move);document.documentElement.removeEventListener('pointerleave',breakStroke);window.removeEventListener('pointerdown',down);
       window.removeEventListener('scroll',scroll,true);document.removeEventListener('visibilitychange',visibility);
       motion.removeEventListener('change',preferences);fine.removeEventListener('change',preferences);toggle?.removeEventListener('click',toggleClick);
