@@ -105,16 +105,15 @@ export function mountCrayonTrails(hero, {
   if (!ctx) { canvas.remove(); throw new Error('2D canvas is unavailable.'); }
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const fine = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
-  // Touch has no cursor, so an autopilot draws instead (see startAuto):
-  // on unless reduced motion is set, like the desktop trail.
-  let enabled = isTouchDevice ? !motion.matches : (fine.matches && !motion.matches);
+  let enabled = !isTouchDevice && fine.matches && !motion.matches;
   let disposed = false, visible = true, paused = false;
   let width = 1, height = 1, dpr = 1, raf = 0, fadeTimer = 0, loopTimer = 0;
   let previous = null, smooth = null, traveled = 0, phase = 0, smoothAngle = null;
   let stamps = [], density = new Map();
-  // The old self-drawing touch doodle is retired in favour of the autopilot
-  // below; its code stays (inert while this is null) in case it comes back.
-  const doodle = false ? {
+  // Touch: the self-drawing doodle (authored marks around the card, drawn,
+  // held, undrawn, next colour), now stamped in the desktop stroke's look
+  // (see composeDoodle).
+  const doodle = isTouchDevice ? {
     path: null, emitted: 0, progress: 0, elapsed: 0, lastTime: null,
     frame: 0, complete: false, dismissed: false, measuredWidth: 0, delay: 300,
     variant: Math.max(0, CRAYON_COLORS.indexOf(chosenColor))
@@ -377,7 +376,7 @@ export function mountCrayonTrails(hero, {
   const toggleClick=()=>doodle ? switchDoodle() : cycleColor();
   const preferences=()=>{
     if (doodle) { if (motion.matches) finishDoodle(); else {wakeDoodle();scheduleLoop();} }
-    else setEnabled(isTouchDevice ? !motion.matches : (fine.matches&&!motion.matches));
+    else setEnabled(fine.matches&&!motion.matches);
   };
   const visibility=()=>{breakStroke();if(document.hidden)cancelWork();else {schedule();wakeDoodle();scheduleLoop();}};
   // The autopilot draws in canvas px, so scrolling or tapping mid-stroke
@@ -406,7 +405,7 @@ export function mountCrayonTrails(hero, {
   // Draw once on first visibility, then stop all doodle scheduling. The
   // persistent stamps share the desktop brush but not its fade lifecycle.
   wakeDoodle();
-  scheduleAuto(700);
+  // scheduleAuto(700);  // touch autopilot (ed5220c), parked in favour of the doodle
 
 
   // ---- Touch autopilot --------------------------------------------------
@@ -488,7 +487,9 @@ export function mountCrayonTrails(hero, {
     if (!card || !rect.width || !rect.height || !width || !visibleH) return false;
     const sx = width / rect.width, sy = visibleH / rect.height;
     const form = MOBILE_DOODLES[doodle.variant];
-    const strokeWidth = cfg.width * form.widthScale;
+    // Full desktop width (the authored widthScale made these thinner and
+    // flatter than the cursor trail); see the stamping pass below.
+    const strokeWidth = cfg.width;
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const left = clamp((card.left-rect.left)*sx, 0, width);
     const right = clamp((card.right-rect.left)*sx, left, width);
@@ -518,17 +519,23 @@ export function mountCrayonTrails(hero, {
     }
     // Resample by distance, carrying the leftover between segments. Never
     // stamp just the segment endpoints (the earlier disconnected-dot bug).
-    const path=[], spacing=Math.max(1.4,strokeWidth*0.085);
+    // Same spacing and heading treatment as strokeTo(): the heading is a
+    // running blend of each segment's direction (0.28 pull), so the nib
+    // turns smoothly rather than snapping to every bezier step.
+    const path=[], spacing=Math.max(1.4,strokeWidth*.1);
     const textureRandom=makeRandom(0x5c71bb1e);
-    let distanceToNext=0, travelled=0;
+    let distanceToNext=0, travelled=0, heading=null;
     for (let i=1;i<raw.length;i++) {
       const a=raw[i-1], b=raw[i], length=Math.hypot(b.x-a.x,b.y-a.y);
       if (length<0.0001) continue;
+      const rawAngle=Math.atan2(b.y-a.y,b.x-a.x);
+      if (heading===null) heading=rawAngle;
+      else { let d=rawAngle-heading; d=((d+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI; heading+=d*.28; }
       let along=distanceToNext;
       while (along<=length) {
         const t=along/length;
         path.push({ x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t,
-          distance:travelled+along, angle:Math.atan2(b.y-a.y,b.x-a.x)+(textureRandom()-.5)*.04,
+          distance:travelled+along, angle:heading+(textureRandom()-.5)*.04,
           brush:brushes[Math.floor(textureRandom()*brushes.length)] });
         along+=spacing;
       }
@@ -544,11 +551,14 @@ export function mountCrayonTrails(hero, {
     }
     for (const p of path) {
       p.fraction=p.revealDistance/Math.max(1,revealDistance);
-      // Subtle hand pressure and slightly lighter open ends. No animated
-      // noise: these values are fixed for the lifetime of the drawing.
-      const taper=Math.min(1,p.distance/16,(travelled-p.distance)/20);
-      p.size=strokeWidth*(0.82+0.10*Math.sin(p.fraction*13+0.4)+0.035*Math.sin(p.fraction*39));
-      p.alpha=cfg.opacity*(0.65+0.35*Math.max(0,taper));
+      // The desktop cursor trail's own pressure, start taper and margin
+      // weighting (see strokeTo), so the doodle reads as the same crayon.
+      const phase=p.distance;
+      const taper=Math.min(1,phase/14);
+      p.size=strokeWidth*(.88+.09*Math.sin(phase*.018)+.03*Math.sin(phase*.09));
+      const edgeDistance=Math.min(p.x/width,1-p.x/width,p.y/visibleH,1-p.y/visibleH);
+      const marginWeight=.42+.58*Math.max(0,1-edgeDistance/.32);
+      p.alpha=cfg.opacity*marginWeight*taper;
       p.persistent=true;
     }
     doodle.path=path;
