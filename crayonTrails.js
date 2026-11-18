@@ -155,7 +155,7 @@ const DOODLE_SHAPES = [...MOBILE_DOODLES.filter(d => !JAGGED.has(d.name)), ...EX
 //   swell:       pressure swing along the stroke
 //   jitter:      nib angle wobble, radians; wobble: sideways tremor, px
 const PERSONALITIES = {
-  steady: { width: 1, alpha: 1, duration: 820, swell: .07, jitter: .02, wobble: 0 }
+  steady: { width: 1, alpha: 1, duration: 820, swell: .04, jitter: .02, wobble: 0 }
 };
 const PERSONALITY_NAMES = Object.keys(PERSONALITIES);
 // Every mark should take up a comparable share of the screen: the small
@@ -786,11 +786,15 @@ export function mountCrayonTrails(hero, {
     }
     for (const p of path) {
       p.fraction=p.revealDistance/Math.max(1,revealDistance);
+      doodle.revealLength=revealDistance;
       // The desktop cursor trail's own pressure, start taper and margin
       // weighting (see strokeTo), so the doodle reads as the same crayon.
       const phase=p.distance;
       const taper=Math.min(1,phase/14);
-      p.size=strokeWidth*(.9+P.swell*Math.sin(phase*.018)+.03*Math.sin(phase*.09));
+      // Only the long, slow pressure swing: the short (~70px) ripple the
+      // desktop recipe layers on top read as beading along these longer,
+      // evenly drawn marks.
+      p.size=strokeWidth*(.92+P.swell*Math.sin(phase*.018));
       const edgeDistance=Math.min(p.x/width,1-p.x/width,p.y/visibleH,1-p.y/visibleH);
       const marginWeight=.42+.58*Math.max(0,1-edgeDistance/.32);
       p.alpha=Math.min(.9, cfg.opacity*P.alpha*marginWeight*taper);
@@ -927,10 +931,16 @@ export function mountCrayonTrails(hero, {
       else stopDoodle();
       return;
     }
-    const revealMs=(PERSONALITIES[doodle.personality]||PERSONALITIES.elegant).duration;
+    // A steady pen speed (px/s of visible line) rather than one fixed time
+    // for every mark, so a long sweep isn't dumped onto the page in big
+    // per-frame chunks and a short one doesn't crawl. Clamped so nothing
+    // takes forever or flashes in.
+    const revealMs=Math.max(550, Math.min(1500, (doodle.revealLength||1200)/1.45));
     const t=Math.max(0,Math.min(1,(doodle.elapsed-doodle.delay)/revealMs));
     // A quick hand-drawn reveal with small, monotonic changes in pace.
-    doodle.progress=t+0.025*Math.sin(t*Math.PI*2)-0.014*Math.sin(t*Math.PI*6);
+    // Even pace with a soft start and finish (no mid-stroke lurches), so
+    // the line grows smoothly rather than in surges.
+    doodle.progress=t<.12 ? (t/.12)*(t/.12)*.06 : t>.88 ? 1-((1-t)/.12)*((1-t)/.12)*.06 : .06+(t-.12)/.76*.88;
     if (t===1) { finishDoodle(); return; }
     emitDoodle(); paint();
     wakeDoodle();
