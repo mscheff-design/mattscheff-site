@@ -188,6 +188,44 @@ function shapeFit(form) {
   shapeFits.set(form, fit);
   return fit;
 }
+
+// Which open band a shape lives in ('top', 'bottom'), or null if it already
+// wraps the card.
+function bandOf(form) {
+  const ys=[form.start[1]];
+  for (const c of form.curves) for (let i=1;i<6;i+=2) ys.push(c[i]);
+  const y0=Math.min(...ys), y1=Math.max(...ys);
+  return y1<=.42 ? 'top' : y0>=.62 ? 'bottom' : null;
+}
+// A band shape re-expressed in paper coordinates, fitted to `target` band
+// (mirrored top-to-bottom first if it natively lives in the other one), at
+// full width, optionally mirrored left-to-right.
+function placeInBand(form, target, flipX) {
+  const pts=[form.start, ...form.curves.flatMap(c=>[[c[0],c[1]],[c[2],c[3]],[c[4],c[5]]])]
+    .map(([x,y])=>[flipX ? 1-x : x, bandOf(form)===target ? y : 1.051-y]);
+  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+  const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  const band = target==='top' ? TOP_BAND : BOTTOM_BAND;
+  const ax=Math.min(FIT_MAX, Math.max(1, FIT_W/Math.max(.01,x1-x0))), bx=.5-ax*(x0+x1)/2;
+  const ay=Math.min(FIT_MAX, Math.max(1, (band[1]-band[0])/Math.max(.01,y1-y0)));
+  const by = target==='top' ? band[0]-ay*y0 : band[1]-ay*y1;
+  const out=pts.map(([x,y])=>[ax*x+bx, ay*y+by]);
+  const curves=[];
+  for (let i=1;i<out.length;i+=3) curves.push([...out[i], ...out[i+1], ...out[i+2]]);
+  return { start: out[0], curves };
+}
+// One mark that covers both open bands: a band shape in one, a different
+// band shape in the other, joined by a single sweep that runs down (or up)
+// the side of the screen past the card, so the stroke reads as one gesture
+// travelling around the card rather than staying in one section.
+function compositeDoodle(first, second, startTop, flipA, flipB) {
+  const a=placeInBand(first, startTop ? 'top' : 'bottom', flipA);
+  const b=placeInBand(second, startTop ? 'bottom' : 'top', flipB);
+  const aEnd=a.curves[a.curves.length-1].slice(4,6), bStart=b.start;
+  const edge = aEnd[0] < .5 ? -.07 : 1.07, dir = startTop ? 1 : -1;
+  const join=[edge, aEnd[1]+dir*.18, edge, bStart[1]-dir*.18, bStart[0], bStart[1]];
+  return { start: a.start, curves: [...a.curves, join, ...b.curves], composite: true };
+}
 // Touch marks advance on the doodle's timer (scroll triggering, 5b07c87,
 // was tried and set aside).
 const SCROLL_TRIGGERED = false;
@@ -668,7 +706,7 @@ export function mountCrayonTrails(hero, {
   function pickDoodle() {
     let v=doodle.variant;
     if (DOODLE_SHAPES.length>1) while (v===doodle.variant) v=Math.floor(random()*DOODLE_SHAPES.length);
-    doodle.variant=v; doodle.flipX=random()<.5; doodle.flipY=random()<.5;
+    doodle.variant=v; doodle.flipX=random()<.5; doodle.flipY=random()<.5; doodle.composite=null;
     if (PERSONALITY_NAMES.length>1) {
       let p=doodle.personality;
       while (p===doodle.personality) p=PERSONALITY_NAMES[Math.floor(random()*PERSONALITY_NAMES.length)];
@@ -697,7 +735,15 @@ export function mountCrayonTrails(hero, {
     const visibleH = surface.clientHeight || height;
     if (!card || !rect.width || !rect.height || !width || !visibleH) return false;
     const sx = width / rect.width, sy = visibleH / rect.height;
-    const form = DOODLE_SHAPES[doodle.variant];
+    const picked = DOODLE_SHAPES[doodle.variant];
+    // Band shapes travel: paired with a second band shape on the other side
+    // of the card (fixed per mark, so a re-layout redraws the same thing).
+    if (!doodle.composite && bandOf(picked)) {
+      const bands=DOODLE_SHAPES.filter(f=>bandOf(f) && f!==picked);
+      const second=bands[Math.floor(random()*bands.length)];
+      doodle.composite=compositeDoodle(picked, second, random()<.5, random()<.5, random()<.5);
+    }
+    const form = bandOf(picked) ? doodle.composite : picked;
     // Full desktop width (the authored widthScale made these thinner and
     // flatter than the cursor trail); see the stamping pass below.
     const P = PERSONALITIES[doodle.personality] || PERSONALITIES.elegant;
@@ -716,11 +762,12 @@ export function mountCrayonTrails(hero, {
       : a+(b-a)*(v-refA)/(refB-refA);
     // Mirroring is about the reference card's own centre (x .5, y .5255), so
     // a flipped mark still wraps the card the same way.
-    const fit = shapeFit(form);
+    // Composites are already placed in paper coordinates (and mirrored).
+    const fit = form.composite ? {ax:1,bx:0,ay:1,by:0} : shapeFit(form);
     const map = (x,y) => {
       x=fit.ax*x+fit.bx; y=fit.ay*y+fit.by;
-      if (doodle.flipX) x=1-x;
-      if (doodle.flipY) y=1.051-y;
+      if (!form.composite && doodle.flipX) x=1-x;
+      if (!form.composite && doodle.flipY) y=1.051-y;
       return { x:mapAxis(x,left,right,width,.108,.892), y:mapAxis(y,top,bottom,visibleH,.281,.770) };
     };
     let previous = map(...form.start);
