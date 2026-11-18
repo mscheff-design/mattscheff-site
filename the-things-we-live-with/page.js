@@ -254,20 +254,76 @@ export function renderEditorialPage(mountEl, radio) {
 }
 
 // Media arrives as it scrolls into view, staggered across whatever arrives
-// together. Photobooks and posters fall into place as if lightly tossed down
-// in front of the reader; the rest simply appears. (The record grid's own
-// scatter, on switching views, is separate: see initRecordViews.)
-// Photobooks and film posters get the toss; everything else just fades up.
-const TOSSED = '.tw-plate, .tw-wall:not(.tw-wall--plates) > .tw-hang';
+// together, each shelf in its own way (all kept small):
+//   Photobooks: strewn down, each from its own direction, turn and weight,
+//     landing in a loose random order.
+//   Film: posters unroll down the wall, a rolled lip riding the reveal edge.
+//   Playlist: rows drop into place one after another, in track order.
+//   Bookstores, objects: simply fade up.
+// (The record grid's scatter on switching views is separate and unchanged:
+// see initRecordViews.)
+const POSTERS = '.tw-wall:not(.tw-wall--plates) > .tw-hang';
+const rnd = (a, b) => a + Math.random() * (b - a);
+const sign = () => (Math.random() < 0.5 ? -1 : 1);
+
+function tossBook(el, k, n) {
+  // Strewn, not dealt: each cover comes from its own heading (anywhere
+  // around, mostly from above), its own distance, turn and weight, and the
+  // batch lands in a loose random order rather than left to right.
+  const ang = rnd(-Math.PI * 1.15, Math.PI * 0.15), dist = rnd(18, 44);
+  const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist;
+  const rot = sign() * rnd(1.5, 6.5), sc = rnd(1.03, 1.1), settle = rnd(0.08, 0.32);
+  el.animate([
+    { opacity: 0, transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(${sc})`, easing: 'cubic-bezier(.5,0,.75,.85)' },
+    { opacity: 1, transform: `translate(${-dx * rnd(0.03, 0.09)}px, ${-dy * rnd(0.03, 0.09)}px) rotate(${-rot * settle}deg) scale(0.997)`, offset: rnd(0.48, 0.62), easing: 'cubic-bezier(.25,.8,.35,1)' },
+    { opacity: 1, transform: 'none' },
+  ], { duration: rnd(440, 640), delay: rnd(0, Math.min(n, 8) * 55), fill: 'backwards' });
+}
+
+function unfurlPoster(el, k) {
+  // Unrolled down the wall: the sheet stays flat and is revealed from its top
+  // edge, with a rolled lip (a soft cylinder of shade and highlight) riding
+  // the reveal edge down and fading as it reaches the bottom.
+  const dur = 1050, delay = Math.min(k, 9) * 85, ease = 'cubic-bezier(.45,.05,.3,1)';
+  el.animate([
+    { opacity: 0, clipPath: 'inset(0 0 100% 0)' },
+    { opacity: 1, offset: 0.08 },
+    { opacity: 1, clipPath: 'inset(0 0 0% 0)' },
+  ], { duration: dur, delay, easing: ease, fill: 'backwards' });
+  const lip = document.createElement('span');
+  lip.className = 'tw-roll';
+  lip.setAttribute('aria-hidden', 'true');
+  el.appendChild(lip);
+  lip.animate([
+    { top: '0%', opacity: 1 },
+    { top: '92%', opacity: 1, offset: 0.9 },
+    { top: '100%', opacity: 0 },
+  ], { duration: dur, delay, easing: ease, fill: 'both' }).finished.then(() => lip.remove(), () => lip.remove());
+}
+
+function rippleRow(el, k) {
+  // Drops into its slot: falls a short way, lands just past, settles.
+  el.animate([
+    { opacity: 0, transform: 'translateY(-14px)', easing: 'cubic-bezier(.5,0,.8,.6)' },
+    { opacity: 1, transform: 'translateY(1.5px)', offset: 0.62, easing: 'cubic-bezier(.3,.7,.4,1)' },
+    { opacity: 1, transform: 'none' },
+  ], { duration: 560, delay: Math.min(k, 20) * 40, fill: 'backwards' });
+}
+
 function initReveal(root) {
   if (prefersReducedMotion || !document.body.animate) return;
-  let pending = [...root.querySelectorAll('.tw-plate, .tw-rec, .tw-wall:not(.tw-wall--plates) > .tw-hang, .tw-list-fig, .tw-objfig-frame')];
+  let pending = [...root.querySelectorAll(`.tw-plate, .tw-rec, ${POSTERS}, .tw-list-fig, .tw-objfig-frame`)];
   pending.forEach((el) => el.classList.add('tw-pre'));
   // Checked on scroll rather than with an IntersectionObserver, so a jump
   // (contents link, fast fling) can never skip past a piece and strand it
   // hidden: anything already scrolled past simply appears.
   const check = () => {
-    const line = window.innerHeight * 0.94;
+    // A piece starts once its top edge is a fifth of the way up the screen,
+    // so it plays where it's seen rather than at the very bottom edge. At the
+    // foot of the page, where nothing can scroll that high, anything on
+    // screen goes.
+    const atEnd = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4;
+    const line = window.innerHeight * (atEnd ? 1 : 0.8);
     const arriving = [];
     pending = pending.filter((el) => {
       const r = el.getBoundingClientRect();
@@ -276,22 +332,20 @@ function initReveal(root) {
       else arriving.push([el, r]);
       return false;
     });
-    arriving.sort((a, b) => (a[1].top - b[1].top) || (a[1].left - b[1].left));
-    arriving.forEach(([el], k) => {
-      // Tossed onto the table: starts a touch closer (larger), above, and
-      // turned, lands just past rest, then settles square.
-      const jx = (Math.random() - 0.5) * 16, rot = (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 2.2);
+    // `pending` is in document order, so `arriving` already is too: that is
+    // reading order for the grids and track order for the two-column list
+    // (sorting by screen position would zigzag between its columns, and
+    // posters of different heights would arrive out of turn).
+    // Stagger counts per kind, so a batch spanning two shelves starts each
+    // shelf's sequence from its first piece.
+    const n = { book: 0, poster: 0, row: 0, other: 0 };
+    const books = arriving.filter(([el]) => el.matches('.tw-plate')).length;
+    arriving.forEach(([el]) => {
       el.classList.remove('tw-pre');
-      if (!el.matches(TOSSED)) {
-        // Playlist, bookstores and objects simply appear.
-        el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, delay: Math.min(k, 8) * 50, easing: 'ease-out', fill: 'backwards' });
-        return;
-      }
-      el.animate([
-        { opacity: 0, transform: `translate(${jx}px, -26px) rotate(${rot}deg) scale(1.07)`, easing: 'cubic-bezier(.4,0,.7,.9)' },
-        { opacity: 1, transform: `translate(${jx * 0.08}px, 2px) rotate(${-rot * 0.18}deg) scale(0.996)`, offset: 0.62, easing: 'cubic-bezier(.3,.7,.4,1)' },
-        { opacity: 1, transform: 'none' },
-      ], { duration: 820, delay: Math.min(k, 8) * 70, fill: 'backwards' });
+      if (el.matches('.tw-plate')) tossBook(el, n.book++, books);
+      else if (el.matches(POSTERS)) unfurlPoster(el, n.poster++);
+      else if (el.matches('.tw-rec')) rippleRow(el, n.row++);
+      else el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, delay: Math.min(n.other++, 8) * 50, easing: 'ease-out', fill: 'backwards' });
     });
     if (!pending.length) { window.removeEventListener('scroll', check); window.removeEventListener('resize', check); }
   };
@@ -1050,6 +1104,7 @@ function injectStyles() {
       .tw-draftbar{font-size:8px;line-height:1.6}
     }
     .tw-pre{opacity:0}
+    .tw-roll{position:absolute;left:0;right:0;height:16px;transform:translateY(-100%);pointer-events:none;z-index:2;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,0.14) 35%,rgba(255,255,255,0.28) 62%,rgba(0,0,0,0.22) 88%,rgba(0,0,0,0.32) 100%);box-shadow:0 3px 5px -2px rgba(0,0,0,0.25)}
     @media (prefers-reduced-motion:reduce){
     }
   `;
