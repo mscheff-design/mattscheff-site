@@ -593,6 +593,7 @@ function renderObjectStack(items, idx) {
 function renderListEntry(it, n) {
   return `
         <li class="tw-list-entry">
+          <div class="tw-list-text">
           <span class="tw-list-n">${pad(n)}</span>
           <div class="tw-list-body">
             <div class="tw-list-line">
@@ -606,6 +607,7 @@ function renderListEntry(it, n) {
               it.about ? `<a class="tw-list-src" href="${esc(it.about.url)}" target="_blank" rel="noopener">${esc(it.about.label)} ↗</a>` : '',
             ].join('')}</p>
             ${it.photo ? `<p class="tw-list-credit"><a href="${esc(it.photo.url)}" target="_blank" rel="noopener">${esc(['Photo: ' + it.photo.credit, it.photo.license, it.photo.via].filter(Boolean).join(' · '))}</a></p>` : ''}
+          </div>
           </div>
           ${it.image ? `
           <figure class="tw-list-fig">
@@ -960,6 +962,7 @@ function injectStyles() {
     .tw-objfig-credit,.tw-objfig-credit a{font-family:var(--font-mono);font-size:9px;line-height:1.6;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.45);text-decoration:none}
     .tw-objfig-credit{margin-top:10px}
     .tw-objfig-credit a:hover{color:var(--accent)}
+    .tw-list-text{display:contents}
     .tw-list-n{grid-column:1}
     .tw-list-fig{margin:0}
     .tw-list-fig img{display:block;width:100%;aspect-ratio:16/9;transition:transform 0.5s cubic-bezier(.22,.61,.36,1);object-fit:cover;background:rgba(var(--ink-rgb),0.06)}
@@ -1092,7 +1095,18 @@ function injectStyles() {
       .tw-objstack{display:block;margin-bottom:48px}
       .tw-objfig.is-stacked{margin-bottom:48px}
       .tw-objfig-title{font-size:21px}
-      .tw-list-entry{grid-template-columns:22px minmax(0,1fr) 112px;column-gap:14px;padding:14px 0;align-items:start}
+      /* Phones: each store is a horizontal swipe. The text pane sits where
+         it always did; the photo, large, peeks in from the right edge, and a
+         swipe slides the whole row over to show it in full (scroll-snap,
+         so it settles on either the text or the photo). */
+      .tw-list{margin-right:0}
+      .tw-list-entry{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;padding:16px 0 18px}
+      .tw-list-entry::-webkit-scrollbar{display:none}
+      .tw-list-text{display:flex;gap:12px;flex:0 0 calc(100vw - 96px);scroll-snap-align:start;min-width:0}
+      .tw-list-text .tw-list-body{min-width:0}
+      .tw-list-fig{flex:0 0 calc(100vw - 40px);scroll-snap-align:end;align-self:center}
+      .tw-list-fig img{aspect-ratio:4/3}
+      .tw-list-entry > .tw-list-fig:last-child{margin-right:20px}
       .tw-list-fig figcaption{display:none}
       .tw-list-n{padding-top:5px}
       .tw-list-name{font-size:18px}
