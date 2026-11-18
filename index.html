@@ -347,7 +347,7 @@ nav.is-on-dark .radio-now{color:rgba(var(--ink-light-rgb),0.45)}
 .photo-header span:first-child{position:relative;z-index:1}
 
 /* Back to top: a quiet round button that fades in once the reader reaches
-   the dark contact/footer area at the bottom of the page. */
+   the Photography section, staying through contact and footer. */
 .to-top{all:unset;box-sizing:border-box;position:fixed;right:22px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:150;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-mono);font-size:15px;color:rgba(var(--ink-light-rgb),0.85);background:rgba(var(--ink-light-rgb),0.08);border:0.5px solid rgba(var(--ink-light-rgb),0.22);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity 0.3s ease,transform 0.3s ease,background 0.2s,color 0.2s;-webkit-tap-highlight-color:transparent}
 .to-top.is-shown{opacity:1;transform:none;pointer-events:auto}
 @media (hover:hover){.to-top:hover{background:rgba(var(--ink-light-rgb),0.16);color:rgba(var(--ink-light-rgb),1)}}
@@ -1363,10 +1363,11 @@ initCollapsibleSection('photographyHeader', 'photographyPanel');
 // drawn the first time the heading scrolls into view.
 circleWithCrayon(document.querySelector('#photographyHeader span:first-child'), { color: '#df4931' });
 
-// Back to top: shown while the contact section or footer is on screen.
+// Back to top: shown from the Photography section down (while it, the
+// contact section or the footer is on screen).
 {
   const toTop = document.getElementById('toTop');
-  const ends = [document.getElementById('contact'), document.getElementById('siteFooter')].filter(Boolean);
+  const ends = [document.getElementById('photography'), document.getElementById('contact'), document.getElementById('siteFooter')].filter(Boolean);
   const showing = new Set();
   const io = new IntersectionObserver((entries) => {
     entries.forEach((e) => (e.isIntersecting ? showing.add(e.target) : showing.delete(e.target)));
