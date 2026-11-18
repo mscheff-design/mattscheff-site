@@ -42,7 +42,7 @@ function makeTooth(random) {
   return c;
 }
 
-export function circleWithCrayon(span, { color = '#df4931', width = 13, opacity = .62, padX = 40, padY = 30, duration = 950 } = {}) {
+export function circleWithCrayon(span, { color = '#df4931', width = 13, opacity = .62, padX = 72, padY = 44, duration = 1250 } = {}) {
   if (!span) return null;
   const host = span.parentElement;
   if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
@@ -62,11 +62,14 @@ export function circleWithCrayon(span, { color = '#df4931', width = 13, opacity 
   const brushes = makeBrushes(color, random);
   const tooth = ctx.createPattern(makeTooth(random), 'repeat');
   const shape = {
-    start: -2.5 + random() * .5,         // upper left
-    turns: 1.1 + random() * .08,         // runs past its start, like a quick loop
-    tilt: -.05 + random() * .04,
-    wob: random() * 6.28,
-    grow: .05 + random() * .04           // the overshoot drifts outward, so the ends don't meet
+    start: -2.6 + random() * .5,         // begins upper left
+    turns: 1.16 + random() * .1,         // runs well past its start
+    tilt: -.06 + random() * .05,
+    p1: random() * 6.28, p2: random() * 6.28, p3: random() * 6.28,
+    lean: .05 + random() * .04,          // one side bulges more than the other: an egg, not an ellipse
+    driftX: 5 + random() * 6,            // the hand drifts as it goes round, so the second pass
+    driftY: -(3 + random() * 4),         //   sits off the first instead of retracing it
+    flick: .12 + random() * .06          // the end swings out and lifts off
   };
 
   let stamps = [], w = 0, h = 0, revealed = false, raf = 0;
@@ -89,12 +92,17 @@ export function circleWithCrayon(span, { color = '#df4931', width = 13, opacity 
     const extX = Math.max(8, Math.min(20, sr.left - 9));
     const grow = shape.grow * extX / 20;
     const cx = w / 2, cy = h / 2, rx = sr.width / 2 + extX, ry = sr.height / 2 + 13;
-    const total = shape.turns * Math.PI * 2, steps = 420;
+    const total = shape.turns * Math.PI * 2, steps = 520;
     const pts = [];
     for (let i = 0; i <= steps; i++) {
       const u = i / steps, a = shape.start + total * u;
-      const k = 1 + .035 * Math.sin(a * 2 + shape.wob) + grow * Math.max(0, u - .82) / .18;
-      const x = Math.cos(a) * rx * k, y = Math.sin(a) * ry * k;
+      // Lumpy, uneven radius (low-frequency wobble, never a perfect oval),
+      // a quick lead-in from just inside the line, and an end that swings
+      // wide as the crayon lifts.
+      let k = 1 + shape.lean * Math.cos(a + shape.p1) + .035 * Math.sin(2 * a + shape.p2) + .02 * Math.sin(3 * a + shape.p3);
+      k *= 1 - .1 * Math.max(0, 1 - u / .07);
+      k += shape.flick * Math.pow(Math.max(0, u - .84) / .16, 1.6);
+      const x = Math.cos(a) * rx * k + shape.driftX * u, y = Math.sin(a) * ry * k + shape.driftY * u;
       pts.push({ x: cx + x * Math.cos(shape.tilt) - y * Math.sin(shape.tilt), y: cy + x * Math.sin(shape.tilt) + y * Math.cos(shape.tilt) });
     }
     // Stamp it with the trail's recipe: dense round nib, smoothed heading,
@@ -111,9 +119,10 @@ export function circleWithCrayon(span, { color = '#df4931', width = 13, opacity 
       let along = carry;
       while (along <= len) {
         const t = along / len, dist = travelled + along;
-        const taper = Math.min(1, dist / 14, (length - dist) / 26);
+        const taper = Math.min(1, dist / 12, (length - dist) / 46);
         stamps.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, angle: heading + (random() - .5) * .04,
-          size: width * (.92 + .05 * Math.sin(dist * .018)), alpha: opacity * Math.max(.2, taper),
+          size: width * (.84 + .16 * (1 - dist / length) + .06 * Math.sin(dist * .021 + shape.p2)),
+          alpha: opacity * Math.max(.2, taper) * (.82 + .18 * (1 - dist / length)),
           brush: brushes[Math.floor(random() * brushes.length)], f: dist / length });
         along += spacing;
       }
@@ -143,7 +152,9 @@ export function circleWithCrayon(span, { color = '#df4931', width = 13, opacity 
     const t0 = performance.now();
     const step = (now) => {
       const t = Math.min(1, (now - t0) / duration);
-      paint(t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+      // A hand's pace: settles in, speeds round the loop, eases off as it lifts.
+      const e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      paint(Math.min(1, e + .035 * Math.sin(e * Math.PI * 2)));
       raf = t < 1 ? requestAnimationFrame(step) : 0;
     };
     raf = requestAnimationFrame(step);

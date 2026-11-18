@@ -999,11 +999,11 @@ export function mountCrayonTrails(hero, {
       else stopDoodle();
       return;
     }
-    // A steady pen speed (px/s of visible line) rather than one fixed time
+    // A steady pen speed (~800px of visible line per second) rather than one fixed time
     // for every mark, so a long sweep isn't dumped onto the page in big
     // per-frame chunks and a short one doesn't crawl. Clamped so nothing
     // takes forever or flashes in.
-    const revealMs=Math.max(550, Math.min(1500, (doodle.revealLength||1200)/1.45));
+    const revealMs=Math.max(1100, Math.min(2800, (doodle.revealLength||1200)/.8));
     const t=Math.max(0,Math.min(1,(doodle.elapsed-doodle.delay)/revealMs));
     // A quick hand-drawn reveal with small, monotonic changes in pace.
     // Even pace with a soft start and finish (no mid-stroke lurches), so
