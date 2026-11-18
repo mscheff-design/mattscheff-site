@@ -117,11 +117,6 @@ const EXTRA_DOODLES = [
     [.80,.10, .98,.20, .97,.40], [.96,.62, .98,.82, .80,.90], [.60,.97, .30,.97, .14,.88],
     [.00,.80, .02,.55, .04,.35], [.06,.18, .30,.10, .58,.14]
   ] },
-  { name: 'zigzag', start: [-.02,.84], curves: [
-    [.08,.80, .14,.78, .18,.80], [.24,.86, .20,.94, .28,.93], [.36,.92, .40,.80, .46,.81],
-    [.52,.82, .50,.94, .58,.94], [.66,.94, .70,.82, .76,.82], [.82,.82, .82,.93, .90,.92],
-    [.96,.91, 1.0,.86, 1.04,.84]
-  ] },
   { name: 'figure eight', start: [.40,.22], curves: [
     [.55,.20, .62,.06, .72,.07], [.82,.08, .84,.20, .76,.20], [.68,.20, .66,.08, .78,.06],
     [.90,.04, .96,.16, .88,.22], [.82,.26, .70,.22, .66,.16]
@@ -134,13 +129,25 @@ const EXTRA_DOODLES = [
     [.92,.06, 1.0,.20, .96,.34], [.92,.50, .98,.66, .92,.78], [.86,.90, .70,.94, .56,.90],
     [.44,.87, .40,.80, .30,.82], [.20,.84, .18,.92, .26,.94]
   ] },
+  { name: 'lasso', start: [.10,.24], curves: [
+    [.10,.05, .55,.02, .62,.12], [.68,.22, .40,.26, .36,.16], [.32,.06, .70,.02, .96,.10]
+  ] },
+  { name: 'double loop', start: [.02,.90], curves: [
+    [.15,.78, .32,.80, .30,.90], [.28,.99, .18,.95, .24,.86], [.32,.76, .62,.80, .62,.90],
+    [.62,.99, .52,.96, .58,.86], [.66,.76, .92,.82, 1.03,.88]
+  ] },
   { name: 'cloud', start: [.30,.20], curves: [
     [.30,.12, .40,.10, .42,.16], [.44,.22, .36,.22, .38,.16], [.40,.08, .52,.08, .52,.15],
     [.52,.22, .44,.21, .47,.14], [.50,.07, .62,.08, .62,.15], [.62,.21, .55,.22, .57,.16],
     [.60,.09, .72,.12, .74,.20]
   ] }
 ];
-const DOODLE_SHAPES = [...MOBILE_DOODLES, ...EXTRA_DOODLES];
+// The original red and yellow marks are zigzags: rapid back-and-forth
+// reversals that read as jagged even with rounded corners, so they're left
+// out of the rotation (kept above for reference). Colour no longer comes
+// from the shape, so all four crayons still appear.
+const JAGGED = new Set(['red', 'yellow']);
+const DOODLE_SHAPES = [...MOBILE_DOODLES.filter(d => !JAGGED.has(d.name)), ...EXTRA_DOODLES];
 // One even, unhurried hand for every mark (personalities were tried, 54f26a6;
 // the shaky ones read as jagged). Kept as a table so a variant could return.
 //   width/alpha: multipliers on the desktop stroke's width and opacity
@@ -727,7 +734,7 @@ export function mountCrayonTrails(hero, {
     // its pen chases the cursor on a leash. Same idea here: resample to even
     // 3px steps, then run a forward and a backward exponential smoothing
     // pass (zero lag overall), which turns any corner into an arc of roughly
-    // 20px radius while leaving gentle curves essentially untouched.
+    // 30px radius while leaving gentle curves essentially untouched.
     {
       const even=[raw[0]]; let carry=0;
       for (let i=1;i<raw.length;i++) {
@@ -737,7 +744,7 @@ export function mountCrayonTrails(hero, {
         carry=len-(d-3);
       }
       even.push(raw[raw.length-1]);
-      const k=.14;
+      const k=.09;
       for (let i=1;i<even.length;i++) { even[i]={x:even[i-1].x+(even[i].x-even[i-1].x)*k, y:even[i-1].y+(even[i].y-even[i-1].y)*k}; }
       for (let i=even.length-2;i>=0;i--) { even[i]={x:even[i+1].x+(even[i].x-even[i+1].x)*k, y:even[i+1].y+(even[i].y-even[i+1].y)*k}; }
       raw.length=0; raw.push(...even);
