@@ -2137,11 +2137,10 @@ export function initCard(container) {
   // still lets the card's own drag gesture (both axes; a phone has no
   // hover to fall back on, only this) fully win over native scrolling
   // exactly like before, without claiming the rest of the hero too.
-  // Touch: 'pan-y' rather than 'auto' off the card, so a vertical swipe
-  // still scrolls the page but a gesture that starts sideways stays with
-  // the page's own pointer events, which is what lets a finger draw crayon
-  // marks on the paper around the card (see crayonTrails.js's move()).
-  const TOUCH_IDLE_ACTION = isTouchDevice ? 'pan-y pinch-zoom' : 'auto';
+  // Off the card the hero keeps native touch handling ('auto'). (A
+  // 'pan-y' variant briefly let a finger draw crayon marks here; the touch
+  // trail is now drawn by crayonTrails.js's autopilot instead.)
+  const TOUCH_IDLE_ACTION = 'auto';
   interactionRoot.style.touchAction = TOUCH_IDLE_ACTION;
 
   interactionRoot.addEventListener('pointerdown', (e) => {
