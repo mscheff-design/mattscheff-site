@@ -141,8 +141,23 @@ const EXTRA_DOODLES = [
   ] }
 ];
 const DOODLE_SHAPES = [...MOBILE_DOODLES, ...EXTRA_DOODLES];
-// Touch marks advance on scroll rather than on an 8s timer.
-const SCROLL_TRIGGERED = true;
+// Each mark draws with a personality, picked at random independently of its
+// shape: how heavy the wax is, how fast the hand moves, how much the
+// pressure swells, and how steady the nib is.
+//   width/alpha: multipliers on the desktop stroke's width and opacity
+//   duration:    the hand-drawn reveal, ms
+//   swell:       pressure swing along the stroke (thick-thin)
+//   jitter:      nib angle wobble, radians; wobble: sideways tremor, px
+const PERSONALITIES = {
+  loud:     { width: 1.32, alpha: 1.18, duration: 950,  swell: .10, jitter: .05, wobble: 0 },
+  minimal:  { width: .52,  alpha: .82,  duration: 1500, swell: .03, jitter: .02, wobble: 0 },
+  elegant:  { width: .86,  alpha: .95,  duration: 1850, swell: .24, jitter: .02, wobble: 0 },
+  furious:  { width: 1.06, alpha: 1.05, duration: 560,  swell: .14, jitter: .16, wobble: 1.6 }
+};
+const PERSONALITY_NAMES = Object.keys(PERSONALITIES);
+// Touch marks advance on the doodle's timer (scroll triggering, 5b07c87,
+// was tried and set aside).
+const SCROLL_TRIGGERED = false;
 const COLOR_NAMES = ['red', 'blue', 'yellow', 'green'];
 
 export function mountCrayonTrails(hero, {
@@ -166,14 +181,14 @@ export function mountCrayonTrails(hero, {
   let width = 1, height = 1, dpr = 1, raf = 0, fadeTimer = 0, loopTimer = 0;
   let previous = null, smooth = null, traveled = 0, phase = 0, smoothAngle = null;
   let stamps = [], density = new Map();
-  // Touch: preset marks around the card, drawn in the desktop stroke's look,
-  // one per burst of scrolling (see doodleScroll).
-  // Starts `complete` with no path, so nothing draws on load: the first mark
-  // appears when the reader first scrolls (see doodleScroll).
+  // Touch: random preset marks around the card, each with its own
+  // personality, drawn in the desktop stroke's look on the doodle's loop.
+  // Draws its first mark shortly after load, then loops (hold, undraw, next).
   const doodle = isTouchDevice ? {
     path: null, emitted: 0, progress: 0, elapsed: 0, lastTime: null,
-    frame: 0, complete: true, dismissed: false, measuredWidth: 0, delay: 120,
-    variant: 0, flipX: false, flipY: false, completedAt: 0
+    frame: 0, complete: false, dismissed: false, measuredWidth: 0, delay: 300,
+    variant: Math.floor(random()*DOODLE_SHAPES.length), flipX: random()<.5, flipY: random()<.5,
+    personality: PERSONALITY_NAMES[Math.floor(random()*PERSONALITY_NAMES.length)], completedAt: 0
   } : null;
   // Touch autopilot state (see startAuto); declared up here because the
   // scroll/pointer handlers and the first scheduleAuto() read it early.
@@ -440,7 +455,7 @@ export function mountCrayonTrails(hero, {
   const visibility=()=>{breakStroke();if(document.hidden)cancelWork();else {schedule();wakeDoodle();scheduleLoop();}};
   // The autopilot draws in canvas px, so scrolling or tapping mid-stroke
   // doesn't disturb it; only real-cursor strokes break on those.
-  const scroll=()=>{ if (isTouchDevice) doodleScroll(); else if (!auto.active) breakStroke(); };
+  const scroll=()=>{ if (!isTouchDevice && !auto.active) breakStroke(); };
   function down() { if (!auto.active) breakStroke(); }
   // window/documentElement, not hero — nav is a DOM SIBLING of hero, not a
   // descendant, so a listener on hero itself never sees pointer events
@@ -621,6 +636,9 @@ export function mountCrayonTrails(hero, {
     let v=doodle.variant;
     if (DOODLE_SHAPES.length>1) while (v===doodle.variant) v=Math.floor(random()*DOODLE_SHAPES.length);
     doodle.variant=v; doodle.flipX=random()<.5; doodle.flipY=random()<.5;
+    let p=doodle.personality;
+    while (p===doodle.personality) p=PERSONALITY_NAMES[Math.floor(random()*PERSONALITY_NAMES.length)];
+    doodle.personality=p;
   }
   // A burst of scrolling while the hero is on screen draws the next mark,
   // once the current one has finished drawing and had a moment on the page.
@@ -647,7 +665,8 @@ export function mountCrayonTrails(hero, {
     const form = DOODLE_SHAPES[doodle.variant];
     // Full desktop width (the authored widthScale made these thinner and
     // flatter than the cursor trail); see the stamping pass below.
-    const strokeWidth = cfg.width;
+    const P = PERSONALITIES[doodle.personality] || PERSONALITIES.elegant;
+    const strokeWidth = cfg.width * P.width;
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const left = clamp((card.left-rect.left)*sx, 0, width);
     const right = clamp((card.right-rect.left)*sx, left, width);
@@ -697,8 +716,11 @@ export function mountCrayonTrails(hero, {
       let along=distanceToNext;
       while (along<=length) {
         const t=along/length;
-        path.push({ x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t,
-          distance:travelled+along, angle:heading+(textureRandom()-.5)*.04,
+        // A furious hand trembles sideways a little; the others don't.
+        const tremor=P.wobble ? (Math.sin((travelled+along)*.21)+Math.sin((travelled+along)*.067))*P.wobble*.5 : 0;
+        const nx=-Math.sin(heading), ny=Math.cos(heading);
+        path.push({ x:a.x+(b.x-a.x)*t+nx*tremor, y:a.y+(b.y-a.y)*t+ny*tremor,
+          distance:travelled+along, angle:heading+(textureRandom()-.5)*P.jitter,
           brush:brushes[Math.floor(textureRandom()*brushes.length)] });
         along+=spacing;
       }
@@ -718,10 +740,10 @@ export function mountCrayonTrails(hero, {
       // weighting (see strokeTo), so the doodle reads as the same crayon.
       const phase=p.distance;
       const taper=Math.min(1,phase/14);
-      p.size=strokeWidth*(.88+.09*Math.sin(phase*.018)+.03*Math.sin(phase*.09));
+      p.size=strokeWidth*(.9+P.swell*Math.sin(phase*.018)+.03*Math.sin(phase*.09));
       const edgeDistance=Math.min(p.x/width,1-p.x/width,p.y/visibleH,1-p.y/visibleH);
       const marginWeight=.42+.58*Math.max(0,1-edgeDistance/.32);
-      p.alpha=cfg.opacity*marginWeight*taper;
+      p.alpha=Math.min(.9, cfg.opacity*P.alpha*marginWeight*taper);
       p.persistent=true;
     }
     doodle.path=path;
@@ -855,7 +877,8 @@ export function mountCrayonTrails(hero, {
       else stopDoodle();
       return;
     }
-    const t=Math.max(0,Math.min(1,(doodle.elapsed-doodle.delay)/1200));
+    const revealMs=(PERSONALITIES[doodle.personality]||PERSONALITIES.elegant).duration;
+    const t=Math.max(0,Math.min(1,(doodle.elapsed-doodle.delay)/revealMs));
     // A quick hand-drawn reveal with small, monotonic changes in pace.
     doodle.progress=t+0.025*Math.sin(t*Math.PI*2)-0.014*Math.sin(t*Math.PI*6);
     if (t===1) { finishDoodle(); return; }
